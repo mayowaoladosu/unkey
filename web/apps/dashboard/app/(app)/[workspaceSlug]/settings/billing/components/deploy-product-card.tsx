@@ -50,15 +50,11 @@ export const DeployProductCard: React.FC<DeployProductCardProps> = ({
     trpc: { context: { skipBatch: true } },
     retry: 1,
   });
-  const { data: invoice } = trpc.stripe.getUpcomingInvoice.useQuery(undefined, {
-    enabled: Boolean(currentPlan),
-    staleTime: 30_000,
-  });
 
   const revalidate = async () => {
     await Promise.all([
       trpcUtils.stripe.getDeploySubscription.invalidate(),
-      trpcUtils.stripe.getUpcomingInvoice.invalidate(),
+      trpcUtils.billing.queryDeployUsage.invalidate(),
       trpcUtils.workspace.getCurrent.invalidate(),
       trpcUtils.stripe.getDeploySubscription.refetch(),
     ]);
@@ -101,9 +97,16 @@ export const DeployProductCard: React.FC<DeployProductCardProps> = ({
   const plans = plansData?.plans ?? [];
   const currentPlanOption = plans.find((p) => p.plan === currentPlan);
 
-  // Credits equal the plan fee; usage beyond them is billed on top.
-  const credits = currentPlanOption?.amount ?? null;
-  const usageAmount = invoice?.deployUsageAmount ?? null;
+  // Dollar amounts come from ClickHouse + catalog pricing and the mirrored
+  // included-credit column, matching what the spend-cap worker enforces.
+  const credits = usage?.includedCreditCents ?? null;
+  const usageAmount = usage?.grossCents ?? null;
+  const overageAmount = usage?.overageCents ?? null;
+
+  // The plan's recurring fee and its equal monthly credits, from the plan
+  // catalog. Distinct from `credits`, which is the current period's mirrored
+  // included credit and is prorated on a mid-cycle first month.
+  const planFee = currentPlanOption?.amount ?? null;
 
   const meterStats = usage
     ? [
@@ -144,8 +147,8 @@ export const DeployProductCard: React.FC<DeployProductCardProps> = ({
         tag={currentPlan ? (currentPlanOption?.name ?? currentPlan) : undefined}
         subtitle={
           currentPlan
-            ? credits !== null
-              ? `${formatDollars(credits)}/${currentPlanOption?.interval ?? "month"}, includes ${formatDollars(credits)} of usage credits`
+            ? planFee !== null
+              ? `${formatDollars(planFee)}/${currentPlanOption?.interval ?? "month"}, includes ${formatDollars(planFee)} of usage credits`
               : "The plan fee includes usage credits; usage beyond them is billed on top."
             : "Run and scale your projects. Every plan includes usage credits equal to its fee."
         }
@@ -229,7 +232,7 @@ export const DeployProductCard: React.FC<DeployProductCardProps> = ({
                 ))}
               </div>
             ) : null}
-            <SpendBudget isAdmin={isAdmin} usageCents={usageAmount} />
+            <SpendBudget isAdmin={isAdmin} usageCents={overageAmount} />
           </div>
         ) : null}
       </ProductCard>

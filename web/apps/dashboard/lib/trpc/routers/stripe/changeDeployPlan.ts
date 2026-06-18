@@ -2,6 +2,7 @@ import { insertAuditLogs } from "@/lib/audit";
 import { db, eq, schema } from "@/lib/db";
 import { getStripeClient } from "@/lib/stripe";
 import { deployBillingConfig, findPlanFeeItem } from "@/lib/stripe/deployBilling";
+import { deployIncludedCreditForSubscription } from "@/lib/stripe/deployIncludedCredit";
 import { DEPLOY_PLANS } from "@/lib/stripe/deployPlan";
 import { TRPCError } from "@trpc/server";
 import Stripe from "stripe";
@@ -66,11 +67,9 @@ export const changeDeployPlan = workspaceProcedure
     }
 
     const newPriceId = config.planFeePriceIds[input.plan];
-    try {
-      // DEPLOY_PLANS is ordered lowest to highest, so plan order doubles as
-      // the upgrade/downgrade direction.
-      const isDowngrade = DEPLOY_PLANS.indexOf(input.plan) < DEPLOY_PLANS.indexOf(planFeeItem.plan);
+    const isDowngrade = DEPLOY_PLANS.indexOf(input.plan) < DEPLOY_PLANS.indexOf(planFeeItem.plan);
 
+    try {
       await stripe.subscriptionItems.update(planFeeItem.id, {
         price: newPriceId,
         proration_behavior: isDowngrade ? "none" : "always_invoice",
@@ -91,13 +90,22 @@ export const changeDeployPlan = workspaceProcedure
       throw err;
     }
 
+    const includedCreditCents = isDowngrade
+      ? ctx.workspace.deployIncludedCreditCents
+      : await deployIncludedCreditForSubscription(stripe, ctx.workspace.stripeSubscriptionId);
+
     // One transaction so the plan write and its audit log commit together; a
     // failure in either rolls back the other. Written optimistically; the
     // subscription.updated webhook reconciles deploy_plan to the same value.
     await db.transaction(async (tx) => {
       await tx
         .update(schema.workspaces)
-        .set({ deployPlan: input.plan })
+        .set({
+          deployPlan: input.plan,
+          ...(includedCreditCents != null
+            ? { deployIncludedCreditCents: includedCreditCents }
+            : {}),
+        })
         .where(eq(schema.workspaces.id, ctx.workspace.id));
       await insertAuditLogs(tx, {
         workspaceId: ctx.workspace.id,

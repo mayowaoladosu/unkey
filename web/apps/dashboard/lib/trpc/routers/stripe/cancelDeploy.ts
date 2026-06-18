@@ -79,7 +79,7 @@ export const cancelDeploy = workspaceProcedure
     await db.transaction(async (tx) => {
       await tx
         .update(schema.workspaces)
-        .set({ deployPlan: null })
+        .set({ deployPlan: null, deployIncludedCreditCents: null })
         .where(eq(schema.workspaces.id, ctx.workspace.id));
       await insertAuditLogs(tx, {
         workspaceId: ctx.workspace.id,

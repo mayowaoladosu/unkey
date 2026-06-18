@@ -37,14 +37,14 @@ function parseDollars(value: string): number | null | undefined {
 
 type SpendBudgetProps = {
   isAdmin: boolean;
-  /** Month-to-date Compute usage spend in cents, or null while loading. */
+  /** Month-to-date billable overage in cents (gross minus included credits), or null while loading. */
   usageCents: number | null;
 };
 
 /**
  * The Compute spend-budget row: a flush section under the usage meter showing
- * month-to-date usage spend against the monthly budget, severity-colored with
- * ticks at the fixed alert thresholds (Vercel's model: one number, alerts at
+ * month-to-date billable overage (usage beyond included credits) against the
+ * monthly budget, severity-colored with ticks at the fixed alert thresholds (Vercel's model: one number, alerts at
  * percentages of it, stopping workloads is a toggle). The bar spans the full
  * width like the usage meter above it, so the ticks line up; the Edit action
  * sits on the caption line below. Unset budget renders a one-line invitation
@@ -134,8 +134,8 @@ export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents })
           <div className="flex items-center justify-between gap-4">
             <span className="text-[12px] text-gray-10">
               {budget?.stopAtBudget
-                ? "Email alerts at 50%, 75% and 100% · workloads stop at the budget"
-                : "Email alerts at 50%, 75% and 100% · workloads keep running"}
+                ? "Email alerts at 50%, 75% and 100% of billable overage · workloads stop at the budget"
+                : "Email alerts at 50%, 75% and 100% of billable overage · workloads keep running"}
             </span>
             <div className="shrink-0">{editButton}</div>
           </div>
@@ -191,7 +191,7 @@ export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents })
         <div className="flex flex-col gap-5">
           <FormInput
             label="Monthly budget"
-            description="We email you when usage spend reaches 50%, 75% and 100% of this amount. Leave empty for no budget."
+            description="We email you when billable usage beyond your included credits reaches 50%, 75% and 100% of this amount. Leave empty for no budget."
             placeholder="300"
             prefix="$"
             inputMode="numeric"
@@ -216,8 +216,8 @@ export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents })
               <span className="text-[13px] text-gray-12">Stop workloads at the budget</span>
               <span className="text-[12px] text-gray-10">
                 {budgetCents != null
-                  ? `Workloads stop for the rest of the month when usage spend reaches ${formatDollars(budgetCents)}.`
-                  : "Workloads stop for the rest of the month when usage spend reaches the budget."}
+                  ? `Workloads stop for the rest of the month when billable overage reaches ${formatDollars(budgetCents)}.`
+                  : "Workloads stop for the rest of the month when billable overage reaches the budget."}
               </span>
             </div>
             <Switch

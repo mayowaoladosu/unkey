@@ -53,14 +53,29 @@ export const workspaces = mysqlTable("workspaces", {
    * Monthly Compute (Deploy) spend budget in USD cents, set by workspace
    * admins in the dashboard. NULL = no budget. Email alerts fire at fixed
    * percentages of the budget (50/75/100); deploySpendBudgetStop additionally
-   * stops workloads when month-to-date usage spend reaches it. v1 stores the
-   * preferences only: nothing alerts or stops yet.
+   * stops workloads when month-to-date usage spend reaches it.
    */
   deploySpendBudgetCents: bigint("deploy_spend_budget_cents", {
     mode: "number",
     unsigned: true,
   }),
   deploySpendBudgetStop: boolean("deploy_spend_budget_stop").notNull().default(false),
+
+  /**
+   * Included Compute usage credit for the current billing period, in USD cents.
+   * Written by the invoice.payment_succeeded credit-grant path: it equals the
+   * net plan fee Stripe granted back as metered credit, so it stays correct
+   * across prorations and mid-cycle upgrades where the nominal catalog fee is
+   * not. The spend-cap check reads it locally to compute net-of-credit overage
+   * (overage = gross usage cost - this), so it never reads the Stripe credit
+   * balance on the hot path. NULL = not yet known (no invoice since the feature
+   * shipped); the check skips a NULL-credit workspace rather than counting its
+   * full gross as overage.
+   */
+  deployIncludedCreditCents: bigint("deploy_included_credit_cents", {
+    mode: "number",
+    unsigned: true,
+  }),
 
   /**
    * feature flags

@@ -6,6 +6,7 @@ import {
   deploySubscriptionItems,
   findDeployItems,
 } from "@/lib/stripe/deployBilling";
+import { deployIncludedCreditForSubscription } from "@/lib/stripe/deployIncludedCredit";
 import { DEPLOY_PLANS } from "@/lib/stripe/deployPlan";
 import { TRPCError } from "@trpc/server";
 import Stripe from "stripe";
@@ -19,12 +20,10 @@ import { assertSubscriptionAttachable } from "./subscriptionGuards";
  * subscription, creating the subscription first if the workspace is on the free
  * tier with no subscription yet.
  *
- * Writes workspaces.deploy_plan optimistically so the UI reflects the new plan
- * immediately. Stripe stays source of truth: the resulting customer.subscription.*
- * webhook reconciles the column, and since it derives the same value from the
- * subscription we just mutated, that reconciliation is a no-op. The
- * no-subscription path also writes stripeSubscriptionId so the webhook can find
- * this workspace.
+ * Writes workspaces.deploy_plan and deploy_included_credit_cents optimistically
+ * from the paid invoice so the UI and spend-cap worker see credits immediately.
+ * Stripe stays source of truth: customer.subscription.* reconciles deploy_plan;
+ * invoice.payment_succeeded reconciles included credit on webhook retry.
  */
 export const subscribeDeploy = workspaceProcedure
   .use(requireWorkspaceAdmin)
@@ -65,6 +64,8 @@ export const subscribeDeploy = workspaceProcedure
     // derives the same value from the subscription we just mutated).
     let workspaceUpdate: { deployPlan: string; stripeSubscriptionId?: string };
 
+    let subscriptionId = ctx.workspace.stripeSubscriptionId ?? "";
+
     if (ctx.workspace.stripeSubscriptionId) {
       // Existing subscription (e.g. a paid API plan): append the Deploy items.
       // Items not listed here are left untouched, so API items are preserved.
@@ -93,6 +94,7 @@ export const subscribeDeploy = workspaceProcedure
       }
 
       workspaceUpdate = { deployPlan: input.plan };
+      subscriptionId = sub.id;
     } else {
       // Free tier: create a subscription whose initial items are the Deploy set.
       // error_if_incomplete keeps us off a half-paid state if the card declines.
@@ -133,14 +135,22 @@ export const subscribeDeploy = workspaceProcedure
       // Link the new subscription so the customer.subscription.* webhook can
       // resolve this workspace.
       workspaceUpdate = { stripeSubscriptionId: sub.id, deployPlan: input.plan };
+      subscriptionId = sub.id;
     }
+
+    const includedCreditCents = await deployIncludedCreditForSubscription(stripe, subscriptionId);
 
     // One transaction so the plan write and its audit log commit together; a
     // failure in either rolls back the other.
     await db.transaction(async (tx) => {
       await tx
         .update(schema.workspaces)
-        .set(workspaceUpdate)
+        .set({
+          ...workspaceUpdate,
+          ...(includedCreditCents != null
+            ? { deployIncludedCreditCents: includedCreditCents }
+            : {}),
+        })
         .where(eq(schema.workspaces.id, ctx.workspace.id));
       await insertAuditLogs(tx, {
         workspaceId: ctx.workspace.id,
