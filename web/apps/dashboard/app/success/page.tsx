@@ -138,10 +138,13 @@ function SuccessContent() {
           return;
         }
 
-        // Update customer with default payment method
+        // Update customer with default payment method. Pass sessionId so the
+        // server resolves the customer id from the checkout session (the
+        // workspace isn't bound to a stripeCustomerId yet at this point) and
+        // verifies the session belongs to this workspace.
         try {
           await updateCustomerFn({
-            customerId: customer.id,
+            sessionId,
             paymentMethod: setupIntent.payment_method,
           });
 
