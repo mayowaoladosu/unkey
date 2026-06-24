@@ -48,7 +48,8 @@ type SpendBudgetProps = {
  * percentages of it, stopping workloads is a toggle). The bar spans the full
  * width like the usage meter above it, so the ticks line up; the Edit action
  * sits on the caption line below. Unset budget renders a one-line invitation
- * instead.
+ * instead. When the spend cap has paused compute, a warning banner sits above
+ * it.
  */
 export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents }) => {
   const trpcUtils = trpc.useUtils();
@@ -80,12 +81,24 @@ export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents })
 
   const currentBudget = budget?.budgetCents ?? null;
   const hasBudget = currentBudget !== null;
+  const suspended = budget?.suspended ?? false;
+
+  // The spend cap measures net-of-credit overage: included usage credit is
+  // consumed before the budget meter moves. Subtract it here so the meter shows
+  // the same number the backend enforces, instead of gross usage. A null credit
+  // is "not yet known" (the checker skips alerts and enforcement then), which
+  // is distinct from zero: showing gross usage against the budget would show
+  // over-budget while the backend deliberately does nothing.
+  const includedCreditCents = budget?.includedCreditCents ?? null;
+  const creditKnown = includedCreditCents !== null;
+  const netUsageCents =
+    usageCents !== null && creditKnown ? Math.max(0, usageCents - includedCreditCents) : null;
 
   const fraction =
-    usageCents !== null && currentBudget
-      ? Math.min(1, Math.max(0, usageCents / currentBudget))
+    netUsageCents !== null && currentBudget
+      ? Math.min(1, Math.max(0, netUsageCents / currentBudget))
       : null;
-  const usedFraction = usageCents !== null && currentBudget ? usageCents / currentBudget : 0;
+  const usedFraction = netUsageCents !== null && currentBudget ? netUsageCents / currentBudget : 0;
   // Severity steps like Vercel's ring: neutral, amber from 75%, red at 100%.
   const fillClassName =
     usedFraction >= 1 ? "bg-error-9" : usedFraction >= 0.75 ? "bg-warning-9" : "bg-gray-9";
@@ -102,17 +115,28 @@ export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents })
 
   return (
     <>
+      {suspended ? (
+        <div className="rounded-lg border border-warning-6 bg-warningA-2 px-4 py-3">
+          <span className="text-[11px] text-warning-11 uppercase tracking-wide">
+            Compute paused
+          </span>
+          <p className="mt-1 text-[13px] text-gray-12">
+            Compute is paused: spend cap reached. Raise or remove your budget, or turn off
+            &quot;stop workloads&quot;, and Compute resumes automatically within about a minute.
+          </p>
+        </div>
+      ) : null}
       {hasBudget ? (
         <div className="flex w-full flex-col gap-2">
           <div className="flex items-baseline justify-between gap-4">
             <span className="text-[13px] text-gray-11">Spend budget</span>
             <span className="font-medium text-[13px] text-gray-12 tabular-nums">
-              {usageCents !== null ? formatDollars(usageCents) : "—"} of{" "}
+              {netUsageCents !== null ? formatDollars(netUsageCents) : "—"} of{" "}
               {formatDollars(currentBudget)}
               {/* Floor, not round: the bar turns red at exactly 100%, so the
                   label must not read "100%" while the color is still amber. */}
-              {usageCents !== null && currentBudget
-                ? ` (${Math.floor((usageCents / currentBudget) * 100)}%)`
+              {netUsageCents !== null && currentBudget
+                ? ` (${Math.floor((netUsageCents / currentBudget) * 100)}%)`
                 : ""}
             </span>
           </div>
@@ -139,6 +163,17 @@ export const SpendBudget: React.FC<SpendBudgetProps> = ({ isAdmin, usageCents })
             </span>
             <div className="shrink-0">{editButton}</div>
           </div>
+          {creditKnown && includedCreditCents > 0 ? (
+            <span className="text-[12px] text-gray-9">
+              Usage shown is after {formatDollars(includedCreditCents)} included credit.
+            </span>
+          ) : null}
+          {creditKnown ? null : (
+            <span className="text-[12px] text-gray-9">
+              Included credit is not known yet, so usage cannot be shown against the budget. It
+              updates with the next invoice.
+            </span>
+          )}
         </div>
       ) : (
         <div className="flex items-center justify-between gap-4">

@@ -15,13 +15,22 @@ const MAX_BUDGET_CENTS = 1_000_000_000;
  * The workspace's monthly Compute spend budget. NULL = no budget. Email
  * alerts fire at fixed percentages of the budget (50/75/100); stopAtBudget
  * additionally stops workloads when month-to-date usage spend reaches it.
- * v1 stores the preferences only: nothing alerts or stops yet.
  */
 export const getDeployBudget = workspaceProcedure
   .use(withRatelimit(ratelimit.read))
   .query(({ ctx }) => ({
     budgetCents: ctx.workspace.deploySpendBudgetCents ?? null,
     stopAtBudget: ctx.workspace.deploySpendBudgetStop,
+    // True while the spend cap has paused this workspace's compute; the
+    // dashboard surfaces it so an admin understands why compute is offline.
+    suspended: ctx.workspace.deploySpendSuspended,
+    // The period's included usage credit, in cents. The spend cap measures
+    // net-of-credit overage (max(0, gross usage - this)), so the dashboard
+    // subtracts it too and the meter matches what the backend enforces. NULL
+    // means not yet known (no invoice event has persisted it); the checker
+    // skips alerts and enforcement then, so the dashboard must render that
+    // state rather than pretend the credit is zero and show gross as net.
+    includedCreditCents: ctx.workspace.deployIncludedCreditCents ?? null,
   }));
 
 /**

@@ -88,10 +88,25 @@ func (s *Service) CancelDeploy(ctx context.Context, req *connect.Request[ctrlv1.
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to dispatch teardown: %w", err))
 	}
 
+	// Cancelling ends enforcement: a workspace without a deploy plan must not
+	// stay spend-suspended, or a later resubscribe would start blocked. This
+	// runs BEFORE the deploy_plan clear because the idempotency short-circuit
+	// above keys on deploy_plan: anything sequenced after the clear is
+	// unreachable on retry, so a crash between the two steps would leave the
+	// suspension stuck with no path to repair it.
+	if err := s.db.SetWorkspaceDeploySpendSuspended(ctx, db.SetWorkspaceDeploySpendSuspendedParams{
+		Suspended: false,
+		UpdatedAt: sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
+		ID:        workspaceID,
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to clear spend-suspended: %w", err))
+	}
+
 	// Clear the local entitlement so the dashboard gate blocks new deploys and
 	// both the invoice.created webhook and month-end close skip the workspace.
-	// No audit log here: the dashboard records the user actor, mirroring the
-	// deployment cancel path.
+	// Last on purpose: it is the idempotency key, so it must only flip once
+	// every other step has succeeded. No audit log here: the dashboard records
+	// the user actor, mirroring the deployment cancel path.
 	if err := s.db.ClearWorkspaceDeployPlan(ctx, db.ClearWorkspaceDeployPlanParams{
 		ID:        workspaceID,
 		UpdatedAt: sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
