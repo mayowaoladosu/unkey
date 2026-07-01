@@ -7,6 +7,7 @@ CREATE TABLE `billing_period_rate_cards` (
 	`month` int NOT NULL,
 	`rate_card_id` varchar(256) NOT NULL,
 	`resolved_from` enum('selection','assignment','workspace_default') NOT NULL,
+	`pushed_at` bigint,
 	`created_at` bigint NOT NULL,
 	`updated_at` bigint,
 	CONSTRAINT `billing_period_rate_cards_pk` PRIMARY KEY(`pk`),

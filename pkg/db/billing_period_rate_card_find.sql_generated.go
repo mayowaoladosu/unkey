@@ -10,7 +10,7 @@ import (
 )
 
 const findBillingPeriodRateCard = `-- name: FindBillingPeriodRateCard :one
-SELECT pk, id, workspace_id, identity_id, year, month, rate_card_id, resolved_from, created_at, updated_at
+SELECT pk, id, workspace_id, identity_id, year, month, rate_card_id, resolved_from, pushed_at, created_at, updated_at
 FROM billing_period_rate_cards
 WHERE workspace_id = ?
   AND identity_id = ?
@@ -27,7 +27,7 @@ type FindBillingPeriodRateCardParams struct {
 
 // FindBillingPeriodRateCard
 //
-//	SELECT pk, id, workspace_id, identity_id, year, month, rate_card_id, resolved_from, created_at, updated_at
+//	SELECT pk, id, workspace_id, identity_id, year, month, rate_card_id, resolved_from, pushed_at, created_at, updated_at
 //	FROM billing_period_rate_cards
 //	WHERE workspace_id = ?
 //	  AND identity_id = ?
@@ -50,6 +50,7 @@ func (q *Queries) FindBillingPeriodRateCard(ctx context.Context, db DBTX, arg Fi
 		&i.Month,
 		&i.RateCardID,
 		&i.ResolvedFrom,
+		&i.PushedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

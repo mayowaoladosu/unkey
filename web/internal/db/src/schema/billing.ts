@@ -133,6 +133,14 @@ export const billingPeriodRateCards = mysqlTable(
       "assignment",
       "workspace_default",
     ]).notNull(),
+    /**
+     * Unix millis when this identity+period was successfully pushed to the
+     * billing provider. Set once, first-write-wins, after a successful push;
+     * a set value makes the hourly period-close skip the identity so a closed
+     * period is billed exactly once (defeats double-billing once Stripe's 24h
+     * invoice-item idempotency window expires). Null until first pushed.
+     */
+    pushedAt: bigint("pushed_at", { mode: "number" }),
     ...lifecycleDates,
   },
   (table) => ({

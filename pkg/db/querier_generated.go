@@ -410,7 +410,7 @@ type Querier interface {
 	FindAppWithSettings(ctx context.Context, db DBTX, arg FindAppWithSettingsParams) (FindAppWithSettingsRow, error)
 	//FindBillingPeriodRateCard
 	//
-	//  SELECT pk, id, workspace_id, identity_id, year, month, rate_card_id, resolved_from, created_at, updated_at
+	//  SELECT pk, id, workspace_id, identity_id, year, month, rate_card_id, resolved_from, pushed_at, created_at, updated_at
 	//  FROM billing_period_rate_cards
 	//  WHERE workspace_id = ?
 	//    AND identity_id = ?
@@ -2862,6 +2862,18 @@ type Querier interface {
 	//  WHERE id = ?
 	//  FOR UPDATE
 	LockKeyForUpdate(ctx context.Context, db DBTX, id string) (string, error)
+	// Records that this identity+period was successfully pushed to the billing
+	// provider. Idempotent: only stamps pushed_at the first time (COALESCE keeps
+	// the earliest push timestamp), so a retry after a crash never moves it.
+	//
+	//  UPDATE billing_period_rate_cards
+	//  SET pushed_at = COALESCE(pushed_at, ?),
+	//      updated_at = ?
+	//  WHERE workspace_id = ?
+	//    AND identity_id = ?
+	//    AND year = ?
+	//    AND month = ?
+	MarkBillingPeriodRateCardPushed(ctx context.Context, db DBTX, arg MarkBillingPeriodRateCardPushedParams) error
 	// MarkClickhouseOutboxBatchDeleted soft-deletes a set of pks after their CH
 	// insert is confirmed. Called inside the same transaction that selected
 	// them, so the row locks held by FOR UPDATE SKIP LOCKED are released as

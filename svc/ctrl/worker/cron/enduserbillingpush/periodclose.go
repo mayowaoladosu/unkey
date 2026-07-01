@@ -29,14 +29,6 @@ import (
 // pageSize bounds each MySQL page of workspaces and identities.
 const pageSize = 100
 
-// batchSize bounds how many identity records go into one Push call. The
-// pusher posts items sequentially per record, workspaces are processed
-// sequentially, and each batch is one durable step — so the fan-out scales
-// with end-user count without unbounded concurrent Stripe bursts (the
-// cardinality note on plan U8; deploybilling's per-workspace 16-way fan-out
-// is deliberately not reused here).
-const batchSize = 50
-
 // UsageReader reads per-identity billable quantities from ClickHouse.
 type UsageReader interface {
 	GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]clickhouse.IdentityBillableUsage, error)
@@ -98,9 +90,13 @@ type Summary struct {
 	Errors        []string
 }
 
-// Run closes the given period for every Stripe-connected workspace.
-// Re-running a closed period is safe: rate cards are pinned per period, and
-// the pusher's deterministic idempotency keys dedup retried items.
+// Run closes the given period for every Stripe-connected workspace. The
+// period MUST be already closed (a past month): the caller passes the most
+// recently closed month, never the open one, because the additive Stripe
+// invoice items are only correct once a period's usage is final. Re-running a
+// closed period is safe and cheap: each identity is stamped pushed on success
+// (billing_period_rate_cards.pushed_at), so subsequent hourly ticks skip the
+// already-billed identities and only retry the ones that failed.
 func (p *PeriodClose) Run(ctx context.Context, year, month int) (Summary, error) {
 	summary := Summary{Workspaces: 0, RecordsPushed: 0, Errors: nil}
 
@@ -169,25 +165,6 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 
 	pushedTotal := 0
 	var errs []error
-	var batch []enduserbilling.UsageRecord
-
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		pushed, pushErr := p.pusher.Push(ctx, enduserbilling.PushRequest{
-			WorkspaceID:        ws.WorkspaceID,
-			ConnectedAccountID: connectedAccountID,
-			Year:               year,
-			Month:              month,
-			Records:            batch,
-		})
-		pushedTotal += pushed
-		if pushErr != nil {
-			errs = append(errs, pushErr)
-		}
-		batch = nil
-	}
 
 	for offset := 0; ; offset += pageSize {
 		identities, listErr := db.Query.ListBillingBoundIdentities(ctx, p.database.RO(), db.ListBillingBoundIdentitiesParams{
@@ -220,6 +197,15 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 				continue
 			}
 
+			// Run-once: a period already pushed for this identity is skipped.
+			// The push targets a closed period, so its usage is final; billing
+			// it once (rather than on every hourly re-tick) is what stops the
+			// additive invoice item from double-billing after Stripe's 24h
+			// idempotency window lapses.
+			if resolved.AlreadyPushed {
+				continue
+			}
+
 			amounts, priceErr := resolved.Price(u.Verifications, u.SpentCredits, u.RatelimitsPassed)
 			if priceErr != nil {
 				errs = append(errs, priceErr)
@@ -231,21 +217,36 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 				providerCustomerID = identity.BillingExternalCustomerID.String
 			}
 
-			batch = append(batch, enduserbilling.UsageRecord{
-				IdentityID:         identity.ID,
-				ExternalID:         identity.ExternalID,
-				ProviderCustomerID: providerCustomerID,
-				RateCardID:         resolved.Card.ID,
-				Verifications:      u.Verifications,
-				SpentCredits:       u.SpentCredits,
-				RatelimitsPassed:   u.RatelimitsPassed,
-				VerificationsCents: ratecard.RoundedCents(amounts.VerificationsCents),
-				CreditsCents:       ratecard.RoundedCents(amounts.CreditsCents),
-				RatelimitsCents:    ratecard.RoundedCents(amounts.RatelimitsCents),
-				Currency:           resolved.Card.Currency,
+			// Push one identity at a time so the pushed marker is exact: an
+			// identity is stamped only after its own push succeeds, so a
+			// partial failure retries just the failed identities next tick
+			// (a batch marker would either skip retries or re-push peers).
+			pushed, pushErr := p.pusher.Push(ctx, enduserbilling.PushRequest{
+				WorkspaceID:        ws.WorkspaceID,
+				ConnectedAccountID: connectedAccountID,
+				Year:               year,
+				Month:              month,
+				Records: []enduserbilling.UsageRecord{{
+					IdentityID:         identity.ID,
+					ExternalID:         identity.ExternalID,
+					ProviderCustomerID: providerCustomerID,
+					RateCardID:         resolved.Card.ID,
+					Verifications:      u.Verifications,
+					SpentCredits:       u.SpentCredits,
+					RatelimitsPassed:   u.RatelimitsPassed,
+					VerificationsCents: ratecard.RoundedCents(amounts.VerificationsCents),
+					CreditsCents:       ratecard.RoundedCents(amounts.CreditsCents),
+					RatelimitsCents:    ratecard.RoundedCents(amounts.RatelimitsCents),
+					Currency:           resolved.Card.Currency,
+				}},
 			})
-			if len(batch) >= batchSize {
-				flush()
+			pushedTotal += pushed
+			if pushErr != nil {
+				errs = append(errs, pushErr)
+				continue
+			}
+			if markErr := p.resolver.MarkPushed(ctx, ws.WorkspaceID, identity.ID, year, month); markErr != nil {
+				errs = append(errs, markErr)
 			}
 		}
 
@@ -253,7 +254,6 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 			break
 		}
 	}
-	flush()
 
 	return pushedTotal, errors.Join(errs...)
 }

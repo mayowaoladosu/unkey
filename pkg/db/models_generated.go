@@ -1093,6 +1093,7 @@ type BillingPeriodRateCard struct {
 	Month        int32                              `db:"month"`
 	RateCardID   string                             `db:"rate_card_id"`
 	ResolvedFrom BillingPeriodRateCardsResolvedFrom `db:"resolved_from"`
+	PushedAt     sql.NullInt64                      `db:"pushed_at"`
 	CreatedAt    int64                              `db:"created_at"`
 	UpdatedAt    sql.NullInt64                      `db:"updated_at"`
 }

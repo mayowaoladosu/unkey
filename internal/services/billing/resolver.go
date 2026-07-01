@@ -6,6 +6,7 @@ package billing
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -37,6 +38,11 @@ type ResolvedRateCard struct {
 	// Recorded is true when the resolution came from (or was persisted to)
 	// the period record, making it immutable for this period (R18).
 	Recorded bool
+	// AlreadyPushed is true when the period record has been stamped as pushed
+	// to the billing provider. The period-close skips these so a closed period
+	// bills exactly once even though the cron re-ticks hourly (defeats the
+	// double-bill that Stripe's 24h idempotency window cannot).
+	AlreadyPushed bool
 }
 
 // Resolver implements the KTD7 precedence: recorded period row, else
@@ -67,6 +73,7 @@ func (r *Resolver) Resolve(ctx context.Context, workspaceID, identityID string, 
 		}
 		card.ResolvedFrom = ResolvedFrom(recorded.ResolvedFrom)
 		card.Recorded = true
+		card.AlreadyPushed = recorded.PushedAt.Valid
 		return card, nil
 	}
 	if !db.IsNotFound(err) {
@@ -104,6 +111,27 @@ func (r *Resolver) ResolveAndRecord(ctx context.Context, workspaceID, identityID
 
 	// Re-read: INSERT IGNORE means a concurrent writer may have won.
 	return r.Resolve(ctx, workspaceID, identityID, year, month)
+}
+
+// MarkPushed stamps the period record as successfully pushed to the billing
+// provider. First-write-wins on the timestamp (the query COALESCEs), so a
+// retry after a crash keeps the original push time. A subsequent Resolve for
+// the same period then reports AlreadyPushed, which the period-close uses to
+// bill a closed period exactly once across hourly re-ticks.
+func (r *Resolver) MarkPushed(ctx context.Context, workspaceID, identityID string, year, month int) error {
+	now := time.Now().UnixMilli()
+	err := db.Query.MarkBillingPeriodRateCardPushed(ctx, r.database.RW(), db.MarkBillingPeriodRateCardPushedParams{
+		PushedAt:    sql.NullInt64{Int64: now, Valid: true},
+		UpdatedAt:   sql.NullInt64{Int64: now, Valid: true},
+		WorkspaceID: workspaceID,
+		IdentityID:  identityID,
+		Year:        int32(year),
+		Month:       int32(month),
+	})
+	if err != nil {
+		return fault.Wrap(err, fault.Internal("failed to mark period rate card pushed"))
+	}
+	return nil
 }
 
 // ResolveLive applies the live precedence (selection -> assignment ->
@@ -178,7 +206,7 @@ func (r *Resolver) loadCard(ctx context.Context, workspaceID, rateCardID string,
 	if err != nil {
 		return ResolvedRateCard{}, fault.Wrap(err, fault.Internal("failed to parse rate card config"))
 	}
-	return ResolvedRateCard{Card: card, Config: cfg, ResolvedFrom: "", Recorded: false}, nil
+	return ResolvedRateCard{Card: card, Config: cfg, ResolvedFrom: "", Recorded: false, AlreadyPushed: false}, nil
 }
 
 // Price computes the exact per-dimension and total cents for the quantities

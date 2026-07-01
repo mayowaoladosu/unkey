@@ -146,7 +146,9 @@ func TestPeriodClose(t *testing.T) {
 	require.Equal(t, int64(120), record.VerificationsCents, "120 verifications at 1 cent each")
 	require.Equal(t, "USD", record.Currency)
 
-	// The run pinned the period card (R18).
+	// The run pinned the period card (R18) and stamped it pushed so re-ticks
+	// skip it (run-once: the durable defense against double-billing once
+	// Stripe's 24h invoice-item idempotency window lapses).
 	recorded, err := db.Query.FindBillingPeriodRateCard(ctx, database.RO(), db.FindBillingPeriodRateCardParams{
 		WorkspaceID: workspaceID,
 		IdentityID:  stripeBound,
@@ -155,19 +157,18 @@ func TestPeriodClose(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, cardID, recorded.RateCardID)
+	require.True(t, recorded.PushedAt.Valid, "a successful push stamps pushed_at")
 
-	// Re-running the same closed period pushes the identical priced records
-	// (idempotency is completed downstream by the pusher's deterministic keys).
+	// Re-running the same closed period pushes NOTHING for this workspace: the
+	// identity is already marked pushed, so the additive invoice item is not
+	// re-sent on the hourly cadence.
 	before := len(pusher.requests)
 	summary, err = pc.Run(ctx, 2026, 6)
 	require.NoError(t, err)
 	require.Empty(t, summary.Errors)
-	var second *enduserbilling.PushRequest
+	require.Equal(t, 0, summary.RecordsPushed, "an already-pushed period bills nothing on re-run")
 	for i := before; i < len(pusher.requests); i++ {
-		if pusher.requests[i].WorkspaceID == workspaceID {
-			second = &pusher.requests[i]
-		}
+		require.NotEqual(t, workspaceID, pusher.requests[i].WorkspaceID,
+			"already-pushed identity must not be pushed again")
 	}
-	require.NotNil(t, second)
-	require.Equal(t, req.Records, second.Records, "re-run produces byte-identical records")
 }
