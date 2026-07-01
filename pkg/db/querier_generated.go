@@ -3251,6 +3251,23 @@ type Querier interface {
 	//  WHERE
 	//      id = ?
 	UpdateIdentity(ctx context.Context, db DBTX, arg UpdateIdentityParams) error
+	//UpdateIdentityBillingBinding
+	//
+	//  UPDATE identities
+	//  SET billing_provider = ?,
+	//      billing_external_customer_id = ?
+	//  WHERE workspace_id = ?
+	//    AND id = ?
+	//    AND deleted = false
+	UpdateIdentityBillingBinding(ctx context.Context, db DBTX, arg UpdateIdentityBillingBindingParams) error
+	//UpdateIdentityRateCard
+	//
+	//  UPDATE identities
+	//  SET rate_card_id = ?
+	//  WHERE workspace_id = ?
+	//    AND id = ?
+	//    AND deleted = false
+	UpdateIdentityRateCard(ctx context.Context, db DBTX, arg UpdateIdentityRateCardParams) error
 	//UpdateIdentitySelectedRateCard
 	//
 	//  UPDATE identities
