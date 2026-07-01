@@ -12,7 +12,8 @@ import (
 const clearWorkspaceBillingStripeConnect = `-- name: ClearWorkspaceBillingStripeConnect :exec
 UPDATE workspace_billing_settings
 SET stripe_connect_encrypted = NULL,
-    stripe_connect_encryption_key_id = NULL
+    stripe_connect_encryption_key_id = NULL,
+    stripe_connect_status = NULL
 WHERE workspace_id = ?
 `
 
@@ -21,7 +22,8 @@ WHERE workspace_id = ?
 //
 //	UPDATE workspace_billing_settings
 //	SET stripe_connect_encrypted = NULL,
-//	    stripe_connect_encryption_key_id = NULL
+//	    stripe_connect_encryption_key_id = NULL,
+//	    stripe_connect_status = NULL
 //	WHERE workspace_id = ?
 func (q *Queries) ClearWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, workspaceID string) error {
 	_, err := db.ExecContext(ctx, clearWorkspaceBillingStripeConnect, workspaceID)

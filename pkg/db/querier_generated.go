@@ -21,7 +21,8 @@ type Querier interface {
 	//
 	//  UPDATE workspace_billing_settings
 	//  SET stripe_connect_encrypted = NULL,
-	//      stripe_connect_encryption_key_id = NULL
+	//      stripe_connect_encryption_key_id = NULL,
+	//      stripe_connect_status = NULL
 	//  WHERE workspace_id = ?
 	ClearWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, workspaceID string) error
 	//CompareAndSwapDeploymentStatus
@@ -1307,7 +1308,7 @@ type Querier interface {
 	FindVerifiedCustomDomainByDomainExcludingWorkspace(ctx context.Context, db DBTX, arg FindVerifiedCustomDomainByDomainExcludingWorkspaceParams) (CustomDomain, error)
 	//FindWorkspaceBillingSettings
 	//
-	//  SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, created_at, updated_at
+	//  SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, stripe_connect_status, created_at, updated_at
 	//  FROM workspace_billing_settings
 	//  WHERE workspace_id = ?
 	FindWorkspaceBillingSettings(ctx context.Context, db DBTX, workspaceID string) (WorkspaceBillingSetting, error)
@@ -2796,11 +2797,13 @@ type Querier interface {
 	//    AND archived = false
 	//  ORDER BY name
 	ListSelectableRateCards(ctx context.Context, db DBTX, workspaceID string) ([]RateCard, error)
-	//ListStripeConnectedWorkspaces
+	// Only fully-linked workspaces are billed: accounts mid-onboarding
+	// (status "pending") are excluded until Stripe reports details_submitted.
 	//
-	//  SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, created_at, updated_at
+	//  SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, stripe_connect_status, created_at, updated_at
 	//  FROM workspace_billing_settings
 	//  WHERE stripe_connect_encrypted IS NOT NULL
+	//    AND stripe_connect_status = 'linked'
 	//  ORDER BY pk
 	//  LIMIT ? OFFSET ?
 	ListStripeConnectedWorkspaces(ctx context.Context, db DBTX, arg ListStripeConnectedWorkspacesParams) ([]WorkspaceBillingSetting, error)
@@ -2982,8 +2985,10 @@ type Querier interface {
 	//      workspace_id,
 	//      stripe_connect_encrypted,
 	//      stripe_connect_encryption_key_id,
+	//      stripe_connect_status,
 	//      created_at
 	//  ) VALUES (
+	//      ?,
 	//      ?,
 	//      ?,
 	//      ?,
@@ -2992,6 +2997,7 @@ type Querier interface {
 	//  ) ON DUPLICATE KEY UPDATE
 	//      stripe_connect_encrypted = VALUES(stripe_connect_encrypted),
 	//      stripe_connect_encryption_key_id = VALUES(stripe_connect_encryption_key_id),
+	//      stripe_connect_status = VALUES(stripe_connect_status),
 	//      updated_at = VALUES(created_at)
 	SetWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, arg SetWorkspaceBillingStripeConnectParams) error
 	//SetWorkspaceK8sNamespace

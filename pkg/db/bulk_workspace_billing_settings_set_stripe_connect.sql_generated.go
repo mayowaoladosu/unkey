@@ -9,9 +9,10 @@ import (
 )
 
 // bulkSetWorkspaceBillingStripeConnect is the base query for bulk insert
-const bulkSetWorkspaceBillingStripeConnect = `INSERT INTO workspace_billing_settings ( id, workspace_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, created_at ) VALUES %s ON DUPLICATE KEY UPDATE
+const bulkSetWorkspaceBillingStripeConnect = `INSERT INTO workspace_billing_settings ( id, workspace_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, stripe_connect_status, created_at ) VALUES %s ON DUPLICATE KEY UPDATE
     stripe_connect_encrypted = VALUES(stripe_connect_encrypted),
     stripe_connect_encryption_key_id = VALUES(stripe_connect_encryption_key_id),
+    stripe_connect_status = VALUES(stripe_connect_status),
     updated_at = VALUES(created_at)`
 
 // SetWorkspaceBillingStripeConnect performs bulk insert in a single query
@@ -24,7 +25,7 @@ func (q *BulkQueries) SetWorkspaceBillingStripeConnect(ctx context.Context, db D
 	// Build the bulk insert query
 	valueClauses := make([]string, len(args))
 	for i := range args {
-		valueClauses[i] = "( ?, ?, ?, ?, ? )"
+		valueClauses[i] = "( ?, ?, ?, ?, ?, ? )"
 	}
 
 	bulkQuery := fmt.Sprintf(bulkSetWorkspaceBillingStripeConnect, strings.Join(valueClauses, ", "))
@@ -36,6 +37,7 @@ func (q *BulkQueries) SetWorkspaceBillingStripeConnect(ctx context.Context, db D
 		allArgs = append(allArgs, arg.WorkspaceID)
 		allArgs = append(allArgs, arg.StripeConnectEncrypted)
 		allArgs = append(allArgs, arg.StripeConnectEncryptionKeyID)
+		allArgs = append(allArgs, arg.StripeConnectStatus)
 		allArgs = append(allArgs, arg.CreatedAt)
 	}
 

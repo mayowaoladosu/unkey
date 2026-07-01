@@ -5,6 +5,7 @@ CREATE TABLE `workspace_billing_settings` (
 	`default_rate_card_id` varchar(256),
 	`stripe_connect_encrypted` text,
 	`stripe_connect_encryption_key_id` varchar(256),
+	`stripe_connect_status` enum('pending','linked'),
 	`created_at` bigint NOT NULL,
 	`updated_at` bigint,
 	CONSTRAINT `workspace_billing_settings_pk` PRIMARY KEY(`pk`),

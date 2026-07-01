@@ -10,14 +10,14 @@ import (
 )
 
 const findWorkspaceBillingSettings = `-- name: FindWorkspaceBillingSettings :one
-SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, created_at, updated_at
+SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, stripe_connect_status, created_at, updated_at
 FROM workspace_billing_settings
 WHERE workspace_id = ?
 `
 
 // FindWorkspaceBillingSettings
 //
-//	SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, created_at, updated_at
+//	SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, stripe_connect_status, created_at, updated_at
 //	FROM workspace_billing_settings
 //	WHERE workspace_id = ?
 func (q *Queries) FindWorkspaceBillingSettings(ctx context.Context, db DBTX, workspaceID string) (WorkspaceBillingSetting, error) {
@@ -30,6 +30,7 @@ func (q *Queries) FindWorkspaceBillingSettings(ctx context.Context, db DBTX, wor
 		&i.DefaultRateCardID,
 		&i.StripeConnectEncrypted,
 		&i.StripeConnectEncryptionKeyID,
+		&i.StripeConnectStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

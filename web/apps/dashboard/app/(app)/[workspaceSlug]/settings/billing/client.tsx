@@ -20,6 +20,7 @@ import { ADMIN_ONLY_TOOLTIP } from "./components/constants";
 import { CurrentPlanCard } from "./components/current-plan-card";
 import { FreeTierAlert } from "./components/free-tier-alert";
 import { PlanSelectionModal } from "./components/plan-selection-modal";
+import { StripeConnectCard } from "./components/stripe-connect-card";
 import { SubscriptionStatus } from "./components/subscription-status";
 import { Usage } from "./components/usage";
 
@@ -140,6 +141,7 @@ export const Client: React.FC = () => {
                   </InfoTooltip>
                 </div>
               </SettingCard>
+              <StripeConnectCard isAdmin={isAdmin} />
             </SettingCardGroup>
 
             <PlanSelectionModal

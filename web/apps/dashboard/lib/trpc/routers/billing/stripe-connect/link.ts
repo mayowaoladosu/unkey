@@ -6,7 +6,7 @@ import { createVaultClient } from "@/lib/vault-client";
 import { TRPCError } from "@trpc/server";
 import { newId } from "@unkey/id";
 import { z } from "zod";
-import { workspaceProcedure } from "../../../trpc";
+import { requireWorkspaceAdmin, workspaceProcedure } from "../../../trpc";
 
 const vault = createVaultClient(VaultService);
 
@@ -25,6 +25,7 @@ export const linkStripeConnectInputSchema = z.object({
  * decrypter), never plaintext.
  */
 export const linkStripeConnect = workspaceProcedure
+  .use(requireWorkspaceAdmin)
   .input(linkStripeConnectInputSchema)
   .mutation(async ({ input, ctx }) => {
     const stripe = getStripeClient();
@@ -52,6 +53,7 @@ export const linkStripeConnect = workspaceProcedure
           defaultRateCardId: null,
           stripeConnectEncrypted: encrypted,
           stripeConnectEncryptionKeyId: keyId,
+          stripeConnectStatus: "linked",
           createdAt: Date.now(),
           updatedAt: null,
         })
@@ -59,6 +61,7 @@ export const linkStripeConnect = workspaceProcedure
           set: {
             stripeConnectEncrypted: encrypted,
             stripeConnectEncryptionKeyId: keyId,
+            stripeConnectStatus: "linked",
             updatedAt: sql`${Date.now()}`,
           },
         });

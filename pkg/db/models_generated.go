@@ -930,6 +930,48 @@ func (ns NullKeyMigrationsAlgorithm) Value() (driver.Value, error) {
 	return string(ns.KeyMigrationsAlgorithm), nil
 }
 
+type WorkspaceBillingSettingsStripeConnectStatus string
+
+const (
+	WorkspaceBillingSettingsStripeConnectStatusPending WorkspaceBillingSettingsStripeConnectStatus = "pending"
+	WorkspaceBillingSettingsStripeConnectStatusLinked  WorkspaceBillingSettingsStripeConnectStatus = "linked"
+)
+
+func (e *WorkspaceBillingSettingsStripeConnectStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WorkspaceBillingSettingsStripeConnectStatus(s)
+	case string:
+		*e = WorkspaceBillingSettingsStripeConnectStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WorkspaceBillingSettingsStripeConnectStatus: %T", src)
+	}
+	return nil
+}
+
+type NullWorkspaceBillingSettingsStripeConnectStatus struct {
+	WorkspaceBillingSettingsStripeConnectStatus WorkspaceBillingSettingsStripeConnectStatus
+	Valid                                       bool // Valid is true if WorkspaceBillingSettingsStripeConnectStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWorkspaceBillingSettingsStripeConnectStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.WorkspaceBillingSettingsStripeConnectStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WorkspaceBillingSettingsStripeConnectStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWorkspaceBillingSettingsStripeConnectStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WorkspaceBillingSettingsStripeConnectStatus), nil
+}
+
 type AcmeChallenge struct {
 	Pk            uint64                      `db:"pk"`
 	DomainID      string                      `db:"domain_id"`
@@ -1590,12 +1632,13 @@ type Workspace struct {
 }
 
 type WorkspaceBillingSetting struct {
-	Pk                           uint64         `db:"pk"`
-	ID                           string         `db:"id"`
-	WorkspaceID                  string         `db:"workspace_id"`
-	DefaultRateCardID            sql.NullString `db:"default_rate_card_id"`
-	StripeConnectEncrypted       sql.NullString `db:"stripe_connect_encrypted"`
-	StripeConnectEncryptionKeyID sql.NullString `db:"stripe_connect_encryption_key_id"`
-	CreatedAt                    int64          `db:"created_at"`
-	UpdatedAt                    sql.NullInt64  `db:"updated_at"`
+	Pk                           uint64                                          `db:"pk"`
+	ID                           string                                          `db:"id"`
+	WorkspaceID                  string                                          `db:"workspace_id"`
+	DefaultRateCardID            sql.NullString                                  `db:"default_rate_card_id"`
+	StripeConnectEncrypted       sql.NullString                                  `db:"stripe_connect_encrypted"`
+	StripeConnectEncryptionKeyID sql.NullString                                  `db:"stripe_connect_encryption_key_id"`
+	StripeConnectStatus          NullWorkspaceBillingSettingsStripeConnectStatus `db:"stripe_connect_status"`
+	CreatedAt                    int64                                           `db:"created_at"`
+	UpdatedAt                    sql.NullInt64                                   `db:"updated_at"`
 }

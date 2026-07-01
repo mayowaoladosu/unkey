@@ -16,8 +16,10 @@ INSERT INTO workspace_billing_settings (
     workspace_id,
     stripe_connect_encrypted,
     stripe_connect_encryption_key_id,
+    stripe_connect_status,
     created_at
 ) VALUES (
+    ?,
     ?,
     ?,
     ?,
@@ -26,15 +28,17 @@ INSERT INTO workspace_billing_settings (
 ) ON DUPLICATE KEY UPDATE
     stripe_connect_encrypted = VALUES(stripe_connect_encrypted),
     stripe_connect_encryption_key_id = VALUES(stripe_connect_encryption_key_id),
+    stripe_connect_status = VALUES(stripe_connect_status),
     updated_at = VALUES(created_at)
 `
 
 type SetWorkspaceBillingStripeConnectParams struct {
-	ID                           string         `db:"id"`
-	WorkspaceID                  string         `db:"workspace_id"`
-	StripeConnectEncrypted       sql.NullString `db:"stripe_connect_encrypted"`
-	StripeConnectEncryptionKeyID sql.NullString `db:"stripe_connect_encryption_key_id"`
-	CreatedAt                    int64          `db:"created_at"`
+	ID                           string                                          `db:"id"`
+	WorkspaceID                  string                                          `db:"workspace_id"`
+	StripeConnectEncrypted       sql.NullString                                  `db:"stripe_connect_encrypted"`
+	StripeConnectEncryptionKeyID sql.NullString                                  `db:"stripe_connect_encryption_key_id"`
+	StripeConnectStatus          NullWorkspaceBillingSettingsStripeConnectStatus `db:"stripe_connect_status"`
+	CreatedAt                    int64                                           `db:"created_at"`
 }
 
 // SetWorkspaceBillingStripeConnect
@@ -44,8 +48,10 @@ type SetWorkspaceBillingStripeConnectParams struct {
 //	    workspace_id,
 //	    stripe_connect_encrypted,
 //	    stripe_connect_encryption_key_id,
+//	    stripe_connect_status,
 //	    created_at
 //	) VALUES (
+//	    ?,
 //	    ?,
 //	    ?,
 //	    ?,
@@ -54,6 +60,7 @@ type SetWorkspaceBillingStripeConnectParams struct {
 //	) ON DUPLICATE KEY UPDATE
 //	    stripe_connect_encrypted = VALUES(stripe_connect_encrypted),
 //	    stripe_connect_encryption_key_id = VALUES(stripe_connect_encryption_key_id),
+//	    stripe_connect_status = VALUES(stripe_connect_status),
 //	    updated_at = VALUES(created_at)
 func (q *Queries) SetWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, arg SetWorkspaceBillingStripeConnectParams) error {
 	_, err := db.ExecContext(ctx, setWorkspaceBillingStripeConnect,
@@ -61,6 +68,7 @@ func (q *Queries) SetWorkspaceBillingStripeConnect(ctx context.Context, db DBTX,
 		arg.WorkspaceID,
 		arg.StripeConnectEncrypted,
 		arg.StripeConnectEncryptionKeyID,
+		arg.StripeConnectStatus,
 		arg.CreatedAt,
 	)
 	return err

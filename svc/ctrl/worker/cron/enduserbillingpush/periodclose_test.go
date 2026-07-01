@@ -80,7 +80,11 @@ func TestPeriodClose(t *testing.T) {
 		WorkspaceID:                  workspaceID,
 		StripeConnectEncrypted:       sql.NullString{Valid: true, String: "enc:acct_ws1"},
 		StripeConnectEncryptionKeyID: sql.NullString{Valid: true, String: "key_1"},
-		CreatedAt:                    time.Now().UnixMilli(),
+		StripeConnectStatus: db.NullWorkspaceBillingSettingsStripeConnectStatus{
+			Valid: true,
+			WorkspaceBillingSettingsStripeConnectStatus: db.WorkspaceBillingSettingsStripeConnectStatusLinked,
+		},
+		CreatedAt: time.Now().UnixMilli(),
 	}))
 
 	// Two identities bound to stripe_connect (one with a provider customer),

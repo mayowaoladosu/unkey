@@ -90,10 +90,17 @@ export const workspaceBillingSettings = mysqlTable("workspace_billing_settings",
   defaultRateCardId: varchar("default_rate_card_id", { length: 256 }),
   /**
    * Vault-encrypted Stripe Connect account reference (acct_...), null until
-   * a verified account link completes.
+   * onboarding starts.
    */
   stripeConnectEncrypted: text("stripe_connect_encrypted"),
   stripeConnectEncryptionKeyId: varchar("stripe_connect_encryption_key_id", { length: 256 }),
+  /**
+   * Onboarding state: "pending" from the moment a hosted onboarding session
+   * starts, "linked" once Stripe reports details_submitted (or a verified
+   * manual link completes). Only linked workspaces are billed at period
+   * close. Null when no account reference is stored.
+   */
+  stripeConnectStatus: mysqlEnum("stripe_connect_status", ["pending", "linked"]),
   ...lifecycleDates,
 });
 

@@ -92,7 +92,11 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		WorkspaceID:                  principal.WorkspaceID,
 		StripeConnectEncrypted:       sqlNullString(encrypted.GetEncrypted()),
 		StripeConnectEncryptionKeyID: sqlNullString(encrypted.GetKeyId()),
-		CreatedAt:                    time.Now().UnixMilli(),
+		StripeConnectStatus: db.NullWorkspaceBillingSettingsStripeConnectStatus{
+			Valid: true,
+			WorkspaceBillingSettingsStripeConnectStatus: db.WorkspaceBillingSettingsStripeConnectStatusLinked,
+		},
+		CreatedAt: time.Now().UnixMilli(),
 	})
 	if err != nil {
 		return fault.Wrap(err,
