@@ -27,6 +27,12 @@ type Querier interface {
 
 	GetBillableRatelimits(ctx context.Context, workspaceID string, year, month int) (int64, error)
 
+	// GetBillableUsagePerIdentity returns per-end-user billable quantities
+	// (VALID verifications, spent credits, attributed ratelimit passes) for a
+	// workspace in a specific month, one row per identity. Quantities only —
+	// pricing is applied downstream by the rate-card resolver.
+	GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]IdentityBillableUsage, error)
+
 	// GetBillableUsageAboveThreshold returns total billable usage for workspaces that exceed a minimum threshold.
 	// This pre-filters in ClickHouse rather than returning all workspaces, making it efficient for quota checking.
 	// Returns a map from workspace ID to total usage count (only for workspaces >= minUsage).
