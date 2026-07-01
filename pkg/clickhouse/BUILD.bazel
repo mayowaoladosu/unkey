@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "audit_logs.go",
         "billable_identity.go",
+        "billable_identity_backfill.go",
         "billable_ratelimits.go",
         "billable_usage.go",
         "billable_verifications.go",

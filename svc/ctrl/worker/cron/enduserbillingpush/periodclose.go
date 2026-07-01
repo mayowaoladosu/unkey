@@ -166,6 +166,11 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 	pushedTotal := 0
 	var errs []error
 
+	// One batch resolver per workspace: it reads the workspace billing
+	// settings once and caches each rate card, so resolving N identities costs
+	// O(1) settings + O(distinct cards) reads instead of O(N) of each.
+	resolver := p.resolver.NewBatch(ws.WorkspaceID)
+
 	for offset := 0; ; offset += pageSize {
 		identities, listErr := db.Query.ListBillingBoundIdentities(ctx, p.database.RO(), db.ListBillingBoundIdentitiesParams{
 			WorkspaceID:     ws.WorkspaceID,
@@ -187,7 +192,7 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 				continue
 			}
 
-			resolved, resolveErr := p.resolver.ResolveAndRecord(ctx, ws.WorkspaceID, identity.ID, year, month)
+			resolved, resolveErr := resolver.ResolveAndRecord(ctx, identity, year, month)
 			if resolveErr != nil {
 				if errors.Is(resolveErr, billing.ErrNoRateCard) {
 					errs = append(errs, fault.New("identity "+identity.ID+" has usage but no rate card resolves"))
@@ -245,7 +250,7 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 				errs = append(errs, pushErr)
 				continue
 			}
-			if markErr := p.resolver.MarkPushed(ctx, ws.WorkspaceID, identity.ID, year, month); markErr != nil {
+			if markErr := resolver.MarkPushed(ctx, identity.ID, year, month); markErr != nil {
 				errs = append(errs, markErr)
 			}
 		}

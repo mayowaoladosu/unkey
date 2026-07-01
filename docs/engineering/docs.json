@@ -215,6 +215,7 @@
             "group": "ClickHouse",
             "pages": [
               "infra/clickhouse/index",
+              "infra/clickhouse/billing-identity-backfill",
               {
                 "group": "Roles",
                 "pages": [

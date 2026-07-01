@@ -196,3 +196,75 @@ func TestResolvedCardPrices(t *testing.T) {
 	require.Equal(t, "50", ratecard.CentsString(amounts.VerificationsCents))
 	require.Equal(t, "50", ratecard.CentsString(amounts.TotalCents))
 }
+
+// TestBatchResolverMatchesSingleShot proves the caching batch path resolves and
+// pins the same cards the single-shot resolver reads back (R19 parity), and
+// that a repeated resolution in the same batch is stable (served from cache).
+func TestBatchResolverMatchesSingleShot(t *testing.T) {
+	database := newTestDB(t)
+	resolver := NewResolver(database)
+	ctx := context.Background()
+
+	workspaceID := uid.New(uid.WorkspacePrefix)
+	defaultCard := insertCard(t, database, workspaceID, "default", false, "0.1")
+	selectableCard := insertCard(t, database, workspaceID, "selectable", true, "0.2")
+	setDefault(t, database, workspaceID, defaultCard)
+
+	// idA falls through to the workspace default; idB has an end-user selection.
+	idA := insertIdentity(t, database, workspaceID, "user_a")
+	idB := insertIdentity(t, database, workspaceID, "user_b")
+	require.NoError(t, db.Query.UpdateIdentitySelectedRateCard(ctx, database.RW(), db.UpdateIdentitySelectedRateCardParams{
+		SelectedRateCardID: sql.NullString{Valid: true, String: selectableCard},
+		WorkspaceID:        workspaceID,
+		IdentityID:         idB,
+	}))
+
+	loadIdentity := func(id string) db.Identity {
+		row, err := db.Query.FindIdentityByID(ctx, database.RO(), db.FindIdentityByIDParams{
+			WorkspaceID: workspaceID, IdentityID: id, Deleted: false,
+		})
+		require.NoError(t, err)
+		return row
+	}
+
+	year, month := 2027, 3
+	batch := resolver.NewBatch(workspaceID)
+
+	ra, err := batch.ResolveAndRecord(ctx, loadIdentity(idA), year, month)
+	require.NoError(t, err)
+	require.Equal(t, defaultCard, ra.Card.ID)
+	require.Equal(t, ResolvedFromWorkspaceDefault, ra.ResolvedFrom)
+	require.True(t, ra.Recorded)
+	require.False(t, ra.AlreadyPushed)
+
+	rb, err := batch.ResolveAndRecord(ctx, loadIdentity(idB), year, month)
+	require.NoError(t, err)
+	require.Equal(t, selectableCard, rb.Card.ID)
+	require.Equal(t, ResolvedFromSelection, rb.ResolvedFrom)
+
+	// The single-shot resolver reads back the SAME pinned cards.
+	sa, err := resolver.Resolve(ctx, workspaceID, idA, year, month)
+	require.NoError(t, err)
+	require.Equal(t, ra.Card.ID, sa.Card.ID)
+	require.Equal(t, ra.ResolvedFrom, sa.ResolvedFrom)
+	require.True(t, sa.Recorded)
+
+	sb, err := resolver.Resolve(ctx, workspaceID, idB, year, month)
+	require.NoError(t, err)
+	require.Equal(t, rb.Card.ID, sb.Card.ID)
+	require.Equal(t, rb.ResolvedFrom, sb.ResolvedFrom)
+
+	// Re-resolving idA in the same batch is stable (cache-served) and stays
+	// recorded — not pushed until MarkPushed runs.
+	again, err := batch.ResolveAndRecord(ctx, loadIdentity(idA), year, month)
+	require.NoError(t, err)
+	require.Equal(t, defaultCard, again.Card.ID)
+	require.True(t, again.Recorded)
+	require.False(t, again.AlreadyPushed)
+
+	// After marking pushed, the batch reports it (run-once signal).
+	require.NoError(t, batch.MarkPushed(ctx, idA, year, month))
+	pushed, err := resolver.NewBatch(workspaceID).ResolveAndRecord(ctx, loadIdentity(idA), year, month)
+	require.NoError(t, err)
+	require.True(t, pushed.AlreadyPushed)
+}

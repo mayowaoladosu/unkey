@@ -226,3 +226,80 @@ func insertRatelimitsV3(t *testing.T, ctx context.Context, conn ch.Conn, events 
 	err = batch.Send()
 	require.NoError(t, err)
 }
+
+// TestBackfillBillableIdentityRollups proves the backfill is idempotent (a
+// re-run over an already-populated period does not double-count) and that it
+// reconstructs rollup rows from the source when the materialized views never
+// captured them.
+func TestBackfillBillableIdentityRollups(t *testing.T) {
+	chCfg := containers.ClickHouse(t)
+	dsn := chCfg.DSN
+
+	client, err := clickhouse.New(clickhouse.Config{URL: dsn})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, client.Close()) })
+	require.NoError(t, client.Ping(context.Background()))
+
+	opts, err := ch.ParseDSN(dsn)
+	require.NoError(t, err)
+	conn, err := ch.Open(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, conn.Close()) })
+
+	ctx := context.Background()
+
+	// A closed prior month, distinct from the now-based periods other subtests
+	// use so their rows never collide with this workspace's backfill.
+	now := time.Now()
+	firstOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	ts := firstOfThisMonth.AddDate(0, 0, -5)
+	year, month := ts.Year(), int(ts.Month())
+
+	workspaceID := uid.New(uid.WorkspacePrefix)
+	identityID := uid.New(uid.IdentityPrefix)
+
+	// 40 VALID verifications, 3 credits each -> 40 verifications, 120 credits.
+	batch := createIdentityVerifications(workspaceID, identityID, "user_backfill", 40, ts, "VALID", 3)
+	insertVerifications(t, ctx, conn, batch)
+
+	// The MV cascade populates the identity rollup.
+	require.Eventually(t, func() bool {
+		usage, uErr := client.GetBillableUsagePerIdentity(ctx, workspaceID, year, month)
+		return uErr == nil && len(usage) == 1 &&
+			usage[0].Verifications == 40 && usage[0].SpentCredits == 120
+	}, time.Minute, time.Second)
+
+	// Idempotency: a backfill over the already-populated period must not double.
+	require.NoError(t, client.BackfillBillableIdentityRollups(ctx, year, month))
+	usage, err := client.GetBillableUsagePerIdentity(ctx, workspaceID, year, month)
+	require.NoError(t, err)
+	require.Len(t, usage, 1)
+	require.Equal(t, int64(40), usage[0].Verifications, "backfill must not double-count an already-populated period")
+	require.Equal(t, int64(120), usage[0].SpentCredits)
+
+	// Simulate history the MVs never saw: delete the rollup rows directly. The
+	// source key_verifications_per_month_v3 still holds the period, so backfill
+	// can reconstruct it (the MVs alone never would — they only see new inserts).
+	for _, table := range []string{
+		"billable_verifications_per_identity_per_month_v1",
+		"billable_credits_per_identity_per_month_v1",
+	} {
+		require.NoError(t, conn.Exec(ctx,
+			"ALTER TABLE default."+table+" DELETE WHERE workspace_id = {ws:String} AND year = {y:Int32} AND month = {m:Int32} SETTINGS mutations_sync = 1",
+			ch.Named("ws", workspaceID), ch.Named("y", year), ch.Named("m", month),
+		))
+	}
+	require.Eventually(t, func() bool {
+		u, uErr := client.GetBillableUsagePerIdentity(ctx, workspaceID, year, month)
+		return uErr == nil && len(u) == 0
+	}, 30*time.Second, time.Second)
+
+	// Backfill rebuilds the rollup from the retained source.
+	require.NoError(t, client.BackfillBillableIdentityRollups(ctx, year, month))
+	usage, err = client.GetBillableUsagePerIdentity(ctx, workspaceID, year, month)
+	require.NoError(t, err)
+	require.Len(t, usage, 1)
+	require.Equal(t, identityID, usage[0].IdentityID)
+	require.Equal(t, int64(40), usage[0].Verifications, "backfill reconstructs verifications from the source")
+	require.Equal(t, int64(120), usage[0].SpentCredits, "backfill reconstructs credits from the source")
+}

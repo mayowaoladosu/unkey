@@ -155,10 +155,38 @@ func (r *Resolver) resolveLive(ctx context.Context, workspaceID, identityID stri
 		return ResolvedRateCard{}, fault.Wrap(err, fault.Internal("failed to load identity"))
 	}
 
+	load := func(rateCardID string, rejectArchived bool) (ResolvedRateCard, error) {
+		return r.loadCard(ctx, workspaceID, rateCardID, rejectArchived)
+	}
+	defaultCardID := func() (sql.NullString, error) {
+		settings, sErr := db.Query.FindWorkspaceBillingSettings(ctx, r.database.RO(), workspaceID)
+		if sErr != nil {
+			if db.IsNotFound(sErr) {
+				return sql.NullString{}, nil
+			}
+			return sql.NullString{}, fault.Wrap(sErr, fault.Internal("failed to load workspace billing settings"))
+		}
+		return settings.DefaultRateCardID, nil
+	}
+	return resolveLiveForIdentity(identity, load, defaultCardID)
+}
+
+// cardLoader fetches and parses a rate card, treating an archived card as not
+// found when rejectArchived is set. A batch caller backs it with a cache.
+type cardLoader func(rateCardID string, rejectArchived bool) (ResolvedRateCard, error)
+
+// resolveLiveForIdentity applies the KTD7 live precedence — end-user selection
+// (only while still selectable), then customer assignment, then workspace
+// default — for an already-loaded identity. Card reads go through load and the
+// workspace default id through defaultCardID, so a batch caller can cache both;
+// the single-shot and batch paths share this one precedence so R19 amount
+// parity cannot drift between them. defaultCardID is a thunk so the settings
+// read only happens when no selection/assignment card wins.
+func resolveLiveForIdentity(identity db.Identity, load cardLoader, defaultCardID func() (sql.NullString, error)) (ResolvedRateCard, error) {
 	// End-user selection wins only while the card is still in the workspace's
 	// selectable set; a revoked or archived card falls through silently.
 	if identity.SelectedRateCardID.Valid {
-		card, cardErr := r.loadCard(ctx, workspaceID, identity.SelectedRateCardID.String, true)
+		card, cardErr := load(identity.SelectedRateCardID.String, true)
 		if cardErr == nil && card.Card.Selectable {
 			card.ResolvedFrom = ResolvedFromSelection
 			return card, nil
@@ -166,23 +194,23 @@ func (r *Resolver) resolveLive(ctx context.Context, workspaceID, identityID stri
 	}
 
 	if identity.RateCardID.Valid {
-		card, cardErr := r.loadCard(ctx, workspaceID, identity.RateCardID.String, true)
+		card, cardErr := load(identity.RateCardID.String, true)
 		if cardErr == nil {
 			card.ResolvedFrom = ResolvedFromAssignment
 			return card, nil
 		}
 	}
 
-	settings, err := db.Query.FindWorkspaceBillingSettings(ctx, r.database.RO(), workspaceID)
-	if err == nil && settings.DefaultRateCardID.Valid {
-		card, cardErr := r.loadCard(ctx, workspaceID, settings.DefaultRateCardID.String, true)
+	dc, err := defaultCardID()
+	if err != nil {
+		return ResolvedRateCard{}, err
+	}
+	if dc.Valid {
+		card, cardErr := load(dc.String, true)
 		if cardErr == nil {
 			card.ResolvedFrom = ResolvedFromWorkspaceDefault
 			return card, nil
 		}
-	}
-	if err != nil && !db.IsNotFound(err) {
-		return ResolvedRateCard{}, fault.Wrap(err, fault.Internal("failed to load workspace billing settings"))
 	}
 
 	return ResolvedRateCard{}, ErrNoRateCard
@@ -213,4 +241,148 @@ func (r *Resolver) loadCard(ctx context.Context, workspaceID, rateCardID string,
 // under the resolved card.
 func (c ResolvedRateCard) Price(verifications, credits, ratelimits int64) (ratecard.Amounts, error) {
 	return c.Config.Price(verifications, credits, ratelimits)
+}
+
+// BatchResolver resolves rate cards for many identities in ONE workspace and
+// period while caching the reads that are constant across the batch: the
+// workspace billing settings (hence the default card id) are read once, and
+// each rate card is fetched and parsed once and reused across every identity
+// that resolves to it. It resolves from an already-loaded identity row, so it
+// never re-reads identities the caller already holds. This turns the O(N)
+// workspace-settings and rate-card reads of calling ResolveAndRecord per
+// identity into O(1) settings + O(distinct cards) reads.
+//
+// It assumes a single writer for the period's billing_period_rate_cards rows —
+// the period-close cron is single-flight per period (Restate serializes the VO
+// key) and is the only caller that records — so after recording a card it
+// trusts the insert instead of re-reading to detect a concurrent writer. Not
+// safe for concurrent use; do not share one BatchResolver across workspaces.
+type BatchResolver struct {
+	r           *Resolver
+	workspaceID string
+
+	settingsLoaded bool
+	defaultCardID  sql.NullString
+
+	// cards memoizes raw card loads (fetch + parse, no archived rejection) by
+	// rate card id; the archived/selectable checks are applied per call site.
+	cards map[string]cachedCard
+}
+
+type cachedCard struct {
+	card ResolvedRateCard
+	err  error
+}
+
+// NewBatch returns a BatchResolver scoped to one workspace. Reuse it across all
+// identities in that workspace and period, then discard it.
+func (r *Resolver) NewBatch(workspaceID string) *BatchResolver {
+	return &BatchResolver{
+		r:              r,
+		workspaceID:    workspaceID,
+		settingsLoaded: false,
+		defaultCardID:  sql.NullString{},
+		cards:          make(map[string]cachedCard),
+	}
+}
+
+// rawCard fetches and parses a card once, caching the result (success or
+// error) so repeated resolutions to the same card cost one read per batch.
+func (b *BatchResolver) rawCard(ctx context.Context, rateCardID string) (ResolvedRateCard, error) {
+	if hit, ok := b.cards[rateCardID]; ok {
+		return hit.card, hit.err
+	}
+	card, err := b.r.loadCard(ctx, b.workspaceID, rateCardID, false)
+	b.cards[rateCardID] = cachedCard{card: card, err: err}
+	return card, err
+}
+
+// cardLoader returns a loader that applies the archived check on top of the
+// per-batch card cache.
+func (b *BatchResolver) cardLoader(ctx context.Context) cardLoader {
+	return func(rateCardID string, rejectArchived bool) (ResolvedRateCard, error) {
+		card, err := b.rawCard(ctx, rateCardID)
+		if err != nil {
+			return ResolvedRateCard{}, err
+		}
+		if rejectArchived && card.Card.Archived {
+			return ResolvedRateCard{}, fault.New("rate card is archived")
+		}
+		return card, nil
+	}
+}
+
+// resolveDefaultCardID reads the workspace billing settings once per batch.
+func (b *BatchResolver) resolveDefaultCardID(ctx context.Context) (sql.NullString, error) {
+	if !b.settingsLoaded {
+		settings, err := db.Query.FindWorkspaceBillingSettings(ctx, b.r.database.RO(), b.workspaceID)
+		if err != nil && !db.IsNotFound(err) {
+			return sql.NullString{}, fault.Wrap(err, fault.Internal("failed to load workspace billing settings"))
+		}
+		if err == nil {
+			b.defaultCardID = settings.DefaultRateCardID
+		}
+		b.settingsLoaded = true
+	}
+	return b.defaultCardID, nil
+}
+
+// ResolveAndRecord resolves the card for the already-loaded identity and
+// persists it against the period (first write wins, R18), returning the card
+// in force. Equivalent to Resolver.ResolveAndRecord but sharing this batch's
+// caches; see BatchResolver for the single-writer assumption.
+func (b *BatchResolver) ResolveAndRecord(ctx context.Context, identity db.Identity, year, month int) (ResolvedRateCard, error) {
+	recorded, err := db.Query.FindBillingPeriodRateCard(ctx, b.r.database.RO(), db.FindBillingPeriodRateCardParams{
+		WorkspaceID: b.workspaceID,
+		IdentityID:  identity.ID,
+		Year:        int32(year),
+		Month:       int32(month),
+	})
+	if err == nil {
+		// Recorded rows keep an archived card (rejectArchived=false): the
+		// period was pinned to it and must re-price to the same amount.
+		card, cardErr := b.rawCard(ctx, recorded.RateCardID)
+		if cardErr != nil {
+			return ResolvedRateCard{}, cardErr
+		}
+		card.ResolvedFrom = ResolvedFrom(recorded.ResolvedFrom)
+		card.Recorded = true
+		card.AlreadyPushed = recorded.PushedAt.Valid
+		return card, nil
+	}
+	if !db.IsNotFound(err) {
+		return ResolvedRateCard{}, fault.Wrap(err, fault.Internal("failed to look up period rate card record"))
+	}
+
+	resolved, err := resolveLiveForIdentity(identity, b.cardLoader(ctx), func() (sql.NullString, error) {
+		return b.resolveDefaultCardID(ctx)
+	})
+	if err != nil {
+		return ResolvedRateCard{}, err
+	}
+
+	err = db.Query.InsertBillingPeriodRateCard(ctx, b.r.database.RW(), db.InsertBillingPeriodRateCardParams{
+		ID:           uid.New(uid.BillingPeriodRateCardPrefix),
+		WorkspaceID:  b.workspaceID,
+		IdentityID:   identity.ID,
+		Year:         int32(year),
+		Month:        int32(month),
+		RateCardID:   resolved.Card.ID,
+		ResolvedFrom: db.BillingPeriodRateCardsResolvedFrom(resolved.ResolvedFrom),
+		CreatedAt:    time.Now().UnixMilli(),
+	})
+	if err != nil {
+		return ResolvedRateCard{}, fault.Wrap(err, fault.Internal("failed to record period rate card"))
+	}
+	// Single writer (see type doc): the row we just INSERT IGNOREd is ours, so
+	// skip the re-read the shared ResolveAndRecord does to detect a concurrent
+	// recorder. It is newly recorded and therefore not yet pushed.
+	resolved.Recorded = true
+	resolved.AlreadyPushed = false
+	return resolved, nil
+}
+
+// MarkPushed stamps the identity+period as pushed; see Resolver.MarkPushed.
+func (b *BatchResolver) MarkPushed(ctx context.Context, identityID string, year, month int) error {
+	return b.r.MarkPushed(ctx, b.workspaceID, identityID, year, month)
 }
