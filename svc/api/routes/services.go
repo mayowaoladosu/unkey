@@ -9,6 +9,7 @@ import (
 	"github.com/unkeyed/unkey/internal/services/caches"
 	"github.com/unkeyed/unkey/internal/services/keys"
 	"github.com/unkeyed/unkey/internal/services/ratelimit"
+	"github.com/unkeyed/unkey/svc/api/internal/stripeconnect"
 
 	"github.com/unkeyed/unkey/internal/services/usagelimiter"
 	"github.com/unkeyed/unkey/pkg/auth"
@@ -62,6 +63,10 @@ type Services struct {
 	// BillingResolver resolves the rate card in force for an end-user
 	// identity and period, shared by the billing export routes.
 	BillingResolver *billing.Resolver
+
+	// StripeConnectVerifier proves control of a connected account before the
+	// link route persists it. Disabled verifier when no platform key is set.
+	StripeConnectVerifier stripeconnect.Verifier
 
 	// Caches holds various cache instances for performance optimization,
 	// including API metadata, key data, and rate limit namespace caches.

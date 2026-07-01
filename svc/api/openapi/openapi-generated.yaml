@@ -592,6 +592,33 @@ components:
                     description: One entry per end-user identity with billable usage in the period.
                     items:
                         "$ref": "#/components/schemas/V2BillingGetUsageResponseData"
+        V2BillingLinkStripeConnectRequestBody:
+            type: object
+            required:
+                - connectedAccountId
+            properties:
+                connectedAccountId:
+                    type: string
+                    pattern: "^acct_[a-zA-Z0-9]+$"
+                    description: The Stripe connected account id (acct_...) from Connect onboarding.
+            additionalProperties: false
+        V2BillingLinkStripeConnectResponseBody:
+            type: object
+            required:
+                - meta
+                - data
+            properties:
+                meta:
+                    $ref: "#/components/schemas/Meta"
+                data:
+                    type: object
+                    required:
+                        - connectedAccountId
+                    properties:
+                        connectedAccountId:
+                            type: string
+                            description: The verified, linked connected account id.
+                    additionalProperties: false
         V2BillingListPlansRequestBody:
             type: object
             required:
@@ -645,6 +672,25 @@ components:
                         rateCardId:
                             type: string
                             description: The recorded selection.
+                    additionalProperties: false
+        V2BillingUnlinkStripeConnectRequestBody:
+            type: object
+            additionalProperties: false
+        V2BillingUnlinkStripeConnectResponseBody:
+            type: object
+            required:
+                - meta
+                - data
+            properties:
+                meta:
+                    $ref: "#/components/schemas/Meta"
+                data:
+                    type: object
+                    required:
+                        - unlinked
+                    properties:
+                        unlinked:
+                            type: boolean
                     additionalProperties: false
         V2DeployCreateDeploymentRequestBody:
             type: object
@@ -5713,6 +5759,57 @@ paths:
             tags:
                 - billing
             x-speakeasy-name-override: getUsage
+    /v2/billing.linkStripeConnect:
+        post:
+            description: |
+                Verifies that the connected account belongs to Unkey's platform (complete
+                Stripe Connect onboarding first) and stores its reference encrypted. The
+                period-close push then targets this account. Requires the manage_billing
+                permission — grant it as sparingly as key-encryption permissions.
+            operationId: billing.linkStripeConnect
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/V2BillingLinkStripeConnectRequestBody'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/V2BillingLinkStripeConnectResponseBody'
+                    description: Account linked
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BadRequestErrorResponse'
+                    description: The account could not be verified as connected to Unkey's platform
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UnauthorizedErrorResponse'
+                    description: Missing or invalid authentication
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ForbiddenErrorResponse'
+                    description: Insufficient permissions
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InternalServerErrorResponse'
+                    description: Linking failed
+            security:
+                - rootKey: []
+            summary: Link a Stripe connected account for end-user billing
+            tags:
+                - billing
+            x-speakeasy-name-override: linkStripeConnect
     /v2/billing.listPlans:
         post:
             description: |
@@ -5825,6 +5922,49 @@ paths:
             tags:
                 - billing
             x-speakeasy-name-override: selectPlan
+    /v2/billing.unlinkStripeConnect:
+        post:
+            description: |
+                Deletes the stored connected-account reference; the period-close push
+                skips the workspace afterwards. Recorded billing periods are unaffected.
+            operationId: billing.unlinkStripeConnect
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/V2BillingUnlinkStripeConnectRequestBody'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/V2BillingUnlinkStripeConnectResponseBody'
+                    description: Account unlinked
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UnauthorizedErrorResponse'
+                    description: Missing or invalid authentication
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ForbiddenErrorResponse'
+                    description: Insufficient permissions
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InternalServerErrorResponse'
+                    description: Unlinking failed
+            security:
+                - rootKey: []
+            summary: Unlink the workspace's Stripe connected account
+            tags:
+                - billing
+            x-speakeasy-name-override: unlinkStripeConnect
     /v2/deploy.createDeployment:
         post:
             description: |

@@ -14,6 +14,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/restate/restateutil"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/billingmeter"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/enduserbillingpush"
 )
 
 // Config holds the handler's dependencies.
@@ -30,14 +31,20 @@ type Config struct {
 	// Heartbeat is pinged on successful completion. Must not be nil; use
 	// healthcheck.NewNoop() if monitoring is not configured.
 	Heartbeat healthcheck.Heartbeat
+	// EndUserBilling optionally closes the same billing period for end-user
+	// billing (customers billing their own users via Stripe Connect). Nil
+	// disables the phase. It shares this cron's monthly tick because the
+	// proto toolchain to mint a dedicated CronService RPC is unavailable.
+	EndUserBilling *enduserbillingpush.PeriodClose
 }
 
 // Handler executes RunDeployBillingPush.
 type Handler struct {
-	usage     UsageReader
-	pusher    billingmeter.Pusher
-	db        db.Database
-	heartbeat healthcheck.Heartbeat
+	usage          UsageReader
+	pusher         billingmeter.Pusher
+	db             db.Database
+	heartbeat      healthcheck.Heartbeat
+	endUserBilling *enduserbillingpush.PeriodClose
 }
 
 // New constructs a Handler.
@@ -50,10 +57,11 @@ func New(cfg Config) (*Handler, error) {
 		return nil, err
 	}
 	return &Handler{
-		usage:     cfg.UsageReader,
-		pusher:    cfg.Pusher,
-		db:        cfg.DB,
-		heartbeat: cfg.Heartbeat,
+		usage:          cfg.UsageReader,
+		pusher:         cfg.Pusher,
+		db:             cfg.DB,
+		heartbeat:      cfg.Heartbeat,
+		endUserBilling: cfg.EndUserBilling,
 	}, nil
 }
 
@@ -77,6 +85,18 @@ func (h *Handler) Handle(
 	p, err := billingperiod.Parse(period)
 	if err != nil {
 		return nil, fmt.Errorf("invalid billing period %q: %w", period, err)
+	}
+
+	// End-user billing phase: independent of Deploy usage, so it runs before
+	// the deploy-usage early return. One journaled step; errors inside a
+	// workspace are collected in the summary, not fatal to the deploy push.
+	if h.endUserBilling != nil {
+		_, err = restate.Run(ctx, func(rc restate.RunContext) (enduserbillingpush.Summary, error) {
+			return h.endUserBilling.Run(rc, p.Start().Year(), int(p.Start().Month()))
+		}, restate.WithName("end-user billing period close"))
+		if err != nil {
+			return nil, fmt.Errorf("end-user billing period close: %w", err)
+		}
 	}
 
 	nowTime, err := restateutil.Now(ctx)

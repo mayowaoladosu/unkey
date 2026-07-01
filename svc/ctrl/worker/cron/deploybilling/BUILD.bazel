@@ -20,6 +20,7 @@ go_library(
         "//pkg/restate/restateutil",
         "//svc/ctrl/internal/billingmeter",
         "//svc/ctrl/internal/db",
+        "//svc/ctrl/worker/cron/enduserbillingpush",
         "@com_github_restatedev_sdk_go//:sdk-go",
     ],
 )

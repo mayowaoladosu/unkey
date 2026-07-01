@@ -166,6 +166,11 @@ const (
 
 	// UpdateBilling permits recording an end-user's rate-card selection.
 	UpdateBilling ActionType = "update_billing"
+
+	// ManageBilling permits linking and unlinking the workspace's Stripe
+	// Connect account — the reference all money-movement dispatch targets.
+	// Grant it as sparingly as key-encryption permissions.
+	ManageBilling ActionType = "manage_billing"
 )
 
 // Predefined identity actions. These constants define operations that can be

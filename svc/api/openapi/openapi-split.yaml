@@ -139,6 +139,10 @@ paths:
     $ref: "./spec/paths/v2/billing/listPlans/index.yaml"
   /v2/billing.selectPlan:
     $ref: "./spec/paths/v2/billing/selectPlan/index.yaml"
+  /v2/billing.linkStripeConnect:
+    $ref: "./spec/paths/v2/billing/linkStripeConnect/index.yaml"
+  /v2/billing.unlinkStripeConnect:
+    $ref: "./spec/paths/v2/billing/unlinkStripeConnect/index.yaml"
 
   # API Endpoints
   /v2/apis.createApi:

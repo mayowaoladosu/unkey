@@ -57,6 +57,7 @@ type BulkQuerier interface {
 	InsertRatelimitOverrides(ctx context.Context, db DBTX, args []InsertRatelimitOverrideParams) error
 	InsertRoles(ctx context.Context, db DBTX, args []InsertRoleParams) error
 	InsertRolePermissions(ctx context.Context, db DBTX, args []InsertRolePermissionParams) error
+	SetWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, args []SetWorkspaceBillingStripeConnectParams) error
 	UpsertWorkspaceBillingSettingsDefaultRateCard(ctx context.Context, db DBTX, args []UpsertWorkspaceBillingSettingsDefaultRateCardParams) error
 	InsertWorkspaces(ctx context.Context, db DBTX, args []InsertWorkspaceParams) error
 	UpsertWorkspace(ctx context.Context, db DBTX, args []UpsertWorkspaceParams) error

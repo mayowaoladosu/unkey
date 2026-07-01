@@ -1008,6 +1008,23 @@ type V2BillingGetUsageResponseData struct {
 	Verifications int64 `json:"verifications"`
 }
 
+// V2BillingLinkStripeConnectRequestBody defines model for V2BillingLinkStripeConnectRequestBody.
+type V2BillingLinkStripeConnectRequestBody struct {
+	// ConnectedAccountId The Stripe connected account id (acct_...) from Connect onboarding.
+	ConnectedAccountId string `json:"connectedAccountId"`
+}
+
+// V2BillingLinkStripeConnectResponseBody defines model for V2BillingLinkStripeConnectResponseBody.
+type V2BillingLinkStripeConnectResponseBody struct {
+	Data struct {
+		// ConnectedAccountId The verified, linked connected account id.
+		ConnectedAccountId string `json:"connectedAccountId"`
+	} `json:"data"`
+
+	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
+	Meta Meta `json:"meta"`
+}
+
 // V2BillingListPlansRequestBody defines model for V2BillingListPlansRequestBody.
 type V2BillingListPlansRequestBody struct {
 	// ExternalId Your identifier for the end-user whose plans to list.
@@ -1057,6 +1074,19 @@ type V2BillingSelectPlanResponseBody struct {
 	Data struct {
 		// RateCardId The recorded selection.
 		RateCardId string `json:"rateCardId"`
+	} `json:"data"`
+
+	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
+	Meta Meta `json:"meta"`
+}
+
+// V2BillingUnlinkStripeConnectRequestBody defines model for V2BillingUnlinkStripeConnectRequestBody.
+type V2BillingUnlinkStripeConnectRequestBody = map[string]interface{}
+
+// V2BillingUnlinkStripeConnectResponseBody defines model for V2BillingUnlinkStripeConnectResponseBody.
+type V2BillingUnlinkStripeConnectResponseBody struct {
+	Data struct {
+		Unlinked bool `json:"unlinked"`
 	} `json:"data"`
 
 	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
@@ -2923,11 +2953,17 @@ type BillingGetInvoiceDraftJSONRequestBody = V2BillingGetInvoiceDraftRequestBody
 // BillingGetUsageJSONRequestBody defines body for BillingGetUsage for application/json ContentType.
 type BillingGetUsageJSONRequestBody = V2BillingGetUsageRequestBody
 
+// BillingLinkStripeConnectJSONRequestBody defines body for BillingLinkStripeConnect for application/json ContentType.
+type BillingLinkStripeConnectJSONRequestBody = V2BillingLinkStripeConnectRequestBody
+
 // BillingListPlansJSONRequestBody defines body for BillingListPlans for application/json ContentType.
 type BillingListPlansJSONRequestBody = V2BillingListPlansRequestBody
 
 // BillingSelectPlanJSONRequestBody defines body for BillingSelectPlan for application/json ContentType.
 type BillingSelectPlanJSONRequestBody = V2BillingSelectPlanRequestBody
+
+// BillingUnlinkStripeConnectJSONRequestBody defines body for BillingUnlinkStripeConnect for application/json ContentType.
+type BillingUnlinkStripeConnectJSONRequestBody = V2BillingUnlinkStripeConnectRequestBody
 
 // DeployCreateDeploymentJSONRequestBody defines body for DeployCreateDeployment for application/json ContentType.
 type DeployCreateDeploymentJSONRequestBody = V2DeployCreateDeploymentRequestBody

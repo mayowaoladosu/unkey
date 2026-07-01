@@ -1,0 +1,249 @@
+// Package enduserbillingpush closes a billing period for end-user billing:
+// it reads each Stripe-connected workspace's per-identity billable
+// quantities, resolves and pins the rate card per identity (R18), prices the
+// usage with the shared resolver (R19), and dispatches the priced records to
+// the workspace's connected account (R12).
+//
+// It shares the monthly billing-period tick with the Deploy billing push —
+// the proto toolchain required to mint a dedicated CronService RPC
+// (protoc-gen-go-restate) is not available in this change, so the handler
+// invokes this component as an optional, independently-configured second
+// phase of the same period key.
+package enduserbillingpush
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/unkeyed/unkey/internal/services/billing"
+	"github.com/unkeyed/unkey/pkg/assert"
+	"github.com/unkeyed/unkey/pkg/clickhouse"
+	"github.com/unkeyed/unkey/pkg/db"
+	"github.com/unkeyed/unkey/pkg/fault"
+	"github.com/unkeyed/unkey/pkg/logger"
+	"github.com/unkeyed/unkey/pkg/ratecard"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/enduserbilling"
+)
+
+// pageSize bounds each MySQL page of workspaces and identities.
+const pageSize = 100
+
+// batchSize bounds how many identity records go into one Push call. The
+// pusher posts items sequentially per record, workspaces are processed
+// sequentially, and each batch is one durable step — so the fan-out scales
+// with end-user count without unbounded concurrent Stripe bursts (the
+// cardinality note on plan U8; deploybilling's per-workspace 16-way fan-out
+// is deliberately not reused here).
+const batchSize = 50
+
+// UsageReader reads per-identity billable quantities from ClickHouse.
+type UsageReader interface {
+	GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]clickhouse.IdentityBillableUsage, error)
+}
+
+// Decrypter decrypts the workspace's Vault-encrypted connected account
+// reference.
+type Decrypter interface {
+	Decrypt(ctx context.Context, keyring, encrypted string) (string, error)
+}
+
+// Config holds the component's dependencies.
+type Config struct {
+	// DB is the application database (pkg/db). Must not be nil.
+	DB db.Database
+	// Usage reads the per-identity rollup. Must not be nil.
+	Usage UsageReader
+	// Vault decrypts connected-account references. Must not be nil.
+	Vault Decrypter
+	// Pusher dispatches priced records to the billing provider. Must not be
+	// nil; use enduserbilling.NewNoop() to disable pushing.
+	Pusher enduserbilling.MeterPusher
+}
+
+// PeriodClose orchestrates one end-user billing period close.
+type PeriodClose struct {
+	database db.Database
+	usage    UsageReader
+	vault    Decrypter
+	pusher   enduserbilling.MeterPusher
+	resolver *billing.Resolver
+}
+
+// New constructs a PeriodClose.
+func New(cfg Config) (*PeriodClose, error) {
+	if err := assert.All(
+		assert.NotNil(cfg.DB, "DB must not be nil"),
+		assert.NotNil(cfg.Usage, "Usage must not be nil"),
+		assert.NotNil(cfg.Vault, "Vault must not be nil"),
+		assert.NotNil(cfg.Pusher, "Pusher must not be nil; use enduserbilling.NewNoop()"),
+	); err != nil {
+		return nil, err
+	}
+	return &PeriodClose{
+		database: cfg.DB,
+		usage:    cfg.Usage,
+		vault:    cfg.Vault,
+		pusher:   cfg.Pusher,
+		resolver: billing.NewResolver(cfg.DB),
+	}, nil
+}
+
+// Summary reports what one run did. Errors are collected per workspace and
+// identity rather than aborting the whole run: one customer's
+// misconfiguration must not block another customer's billing.
+type Summary struct {
+	Workspaces    int
+	RecordsPushed int
+	Errors        []string
+}
+
+// Run closes the given period for every Stripe-connected workspace.
+// Re-running a closed period is safe: rate cards are pinned per period, and
+// the pusher's deterministic idempotency keys dedup retried items.
+func (p *PeriodClose) Run(ctx context.Context, year, month int) (Summary, error) {
+	summary := Summary{Workspaces: 0, RecordsPushed: 0, Errors: nil}
+
+	for offset := 0; ; offset += pageSize {
+		settings, err := db.Query.ListStripeConnectedWorkspaces(ctx, p.database.RO(), db.ListStripeConnectedWorkspacesParams{
+			Limit:  pageSize,
+			Offset: int32(offset),
+		})
+		if err != nil {
+			return summary, fault.Wrap(err, fault.Internal("failed to list stripe-connected workspaces"))
+		}
+		if len(settings) == 0 {
+			break
+		}
+
+		for _, ws := range settings {
+			summary.Workspaces++
+			pushed, wsErr := p.runWorkspace(ctx, ws, year, month)
+			summary.RecordsPushed += pushed
+			if wsErr != nil {
+				summary.Errors = append(summary.Errors, fmt.Sprintf("workspace %s: %s", ws.WorkspaceID, wsErr.Error()))
+			}
+		}
+
+		if len(settings) < pageSize {
+			break
+		}
+	}
+
+	logger.Info("end-user billing period close finished",
+		"year", year, "month", month,
+		"workspaces", summary.Workspaces,
+		"records_pushed", summary.RecordsPushed,
+		"errors", len(summary.Errors),
+	)
+	return summary, nil
+}
+
+func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSetting, year, month int) (int, error) {
+	if !ws.StripeConnectEncrypted.Valid {
+		return 0, nil
+	}
+	connectedAccountID, err := p.vault.Decrypt(ctx, ws.WorkspaceID, ws.StripeConnectEncrypted.String)
+	if err != nil {
+		return 0, fault.Wrap(err, fault.Internal("failed to decrypt connected account reference"))
+	}
+
+	usage, err := p.usage.GetBillableUsagePerIdentity(ctx, ws.WorkspaceID, year, month)
+	if err != nil {
+		return 0, fault.Wrap(err, fault.Internal("failed to read per-identity usage"))
+	}
+	usageByIdentity := make(map[string]clickhouse.IdentityBillableUsage, len(usage))
+	for _, u := range usage {
+		usageByIdentity[u.IdentityID] = u
+	}
+
+	pushedTotal := 0
+	var errs []error
+	var batch []enduserbilling.UsageRecord
+
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		pushed, pushErr := p.pusher.Push(ctx, enduserbilling.PushRequest{
+			WorkspaceID:        ws.WorkspaceID,
+			ConnectedAccountID: connectedAccountID,
+			Year:               year,
+			Month:              month,
+			Records:            batch,
+		})
+		pushedTotal += pushed
+		if pushErr != nil {
+			errs = append(errs, pushErr)
+		}
+		batch = nil
+	}
+
+	for offset := 0; ; offset += pageSize {
+		identities, listErr := db.Query.ListBillingBoundIdentities(ctx, p.database.RO(), db.ListBillingBoundIdentitiesParams{
+			WorkspaceID:     ws.WorkspaceID,
+			BillingProvider: db.IdentitiesBillingProviderStripeConnect,
+			Limit:           pageSize,
+			Offset:          int32(offset),
+		})
+		if listErr != nil {
+			errs = append(errs, fault.Wrap(listErr, fault.Internal("failed to list billing-bound identities")))
+			break
+		}
+		if len(identities) == 0 {
+			break
+		}
+
+		for _, identity := range identities {
+			u, hasUsage := usageByIdentity[identity.ID]
+			if !hasUsage {
+				continue
+			}
+
+			resolved, resolveErr := p.resolver.ResolveAndRecord(ctx, ws.WorkspaceID, identity.ID, year, month)
+			if resolveErr != nil {
+				if errors.Is(resolveErr, billing.ErrNoRateCard) {
+					errs = append(errs, fmt.Errorf("identity %s has usage but no rate card resolves", identity.ID))
+					continue
+				}
+				errs = append(errs, resolveErr)
+				continue
+			}
+
+			amounts, priceErr := resolved.Price(u.Verifications, u.SpentCredits, u.RatelimitsPassed)
+			if priceErr != nil {
+				errs = append(errs, priceErr)
+				continue
+			}
+
+			providerCustomerID := ""
+			if identity.BillingExternalCustomerID.Valid {
+				providerCustomerID = identity.BillingExternalCustomerID.String
+			}
+
+			batch = append(batch, enduserbilling.UsageRecord{
+				IdentityID:         identity.ID,
+				ExternalID:         identity.ExternalID,
+				ProviderCustomerID: providerCustomerID,
+				RateCardID:         resolved.Card.ID,
+				Verifications:      u.Verifications,
+				SpentCredits:       u.SpentCredits,
+				RatelimitsPassed:   u.RatelimitsPassed,
+				VerificationsCents: ratecard.RoundedCents(amounts.VerificationsCents),
+				CreditsCents:       ratecard.RoundedCents(amounts.CreditsCents),
+				RatelimitsCents:    ratecard.RoundedCents(amounts.RatelimitsCents),
+				Currency:           resolved.Card.Currency,
+			})
+			if len(batch) >= batchSize {
+				flush()
+			}
+		}
+
+		if len(identities) < pageSize {
+			break
+		}
+	}
+	flush()
+
+	return pushedTotal, errors.Join(errs...)
+}

@@ -16,6 +16,14 @@ type Querier interface {
 	//  SET token = ?, authorization = ?, updated_at = ?
 	//  WHERE domain_id = ?
 	ClearAcmeChallengeTokens(ctx context.Context, db DBTX, arg ClearAcmeChallengeTokensParams) error
+	// Unlink: delete the encrypted reference so the period-close push skips the
+	// workspace. Recorded period rate cards and rollups are unaffected.
+	//
+	//  UPDATE workspace_billing_settings
+	//  SET stripe_connect_encrypted = NULL,
+	//      stripe_connect_encryption_key_id = NULL
+	//  WHERE workspace_id = ?
+	ClearWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, workspaceID string) error
 	//CompareAndSwapDeploymentStatus
 	//
 	//  UPDATE deployments
@@ -2788,6 +2796,14 @@ type Querier interface {
 	//    AND archived = false
 	//  ORDER BY name
 	ListSelectableRateCards(ctx context.Context, db DBTX, workspaceID string) ([]RateCard, error)
+	//ListStripeConnectedWorkspaces
+	//
+	//  SELECT pk, id, workspace_id, default_rate_card_id, stripe_connect_encrypted, stripe_connect_encryption_key_id, created_at, updated_at
+	//  FROM workspace_billing_settings
+	//  WHERE stripe_connect_encrypted IS NOT NULL
+	//  ORDER BY pk
+	//  LIMIT ? OFFSET ?
+	ListStripeConnectedWorkspaces(ctx context.Context, db DBTX, arg ListStripeConnectedWorkspacesParams) ([]WorkspaceBillingSetting, error)
 	//ListWorkspaces
 	//
 	//  SELECT
@@ -2959,6 +2975,25 @@ type Querier interface {
 	//      tier = 'Free'
 	//  WHERE id = ?
 	ResetWorkspaceBilling(ctx context.Context, db DBTX, id string) error
+	//SetWorkspaceBillingStripeConnect
+	//
+	//  INSERT INTO workspace_billing_settings (
+	//      id,
+	//      workspace_id,
+	//      stripe_connect_encrypted,
+	//      stripe_connect_encryption_key_id,
+	//      created_at
+	//  ) VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  ) ON DUPLICATE KEY UPDATE
+	//      stripe_connect_encrypted = VALUES(stripe_connect_encrypted),
+	//      stripe_connect_encryption_key_id = VALUES(stripe_connect_encryption_key_id),
+	//      updated_at = VALUES(created_at)
+	SetWorkspaceBillingStripeConnect(ctx context.Context, db DBTX, arg SetWorkspaceBillingStripeConnectParams) error
 	//SetWorkspaceK8sNamespace
 	//
 	//  UPDATE `workspaces`

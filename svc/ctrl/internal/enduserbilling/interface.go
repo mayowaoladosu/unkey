@@ -24,6 +24,10 @@ type MeterPusher interface {
 // period.
 type PushRequest struct {
 	WorkspaceID string
+	// ConnectedAccountID is the customer's Stripe connected account
+	// (acct_...) the push targets, decrypted from the workspace's billing
+	// settings. Empty for providers that do not need it.
+	ConnectedAccountID string
 	// Year and Month identify the closed billing period the records cover.
 	Year  int
 	Month int
@@ -47,6 +51,13 @@ type UsageRecord struct {
 	Verifications    int64
 	SpentCredits     int64
 	RatelimitsPassed int64
+	// Amounts per dimension in whole cents (rounded half-up), computed by
+	// the shared rate-card resolver so the push and the invoice-draft API
+	// price identically (R19). Currency is the resolved card's ISO 4217 code.
+	VerificationsCents int64
+	CreditsCents       int64
+	RatelimitsCents    int64
+	Currency           string
 }
 
 // Positive reports whether the record carries any usage worth pushing.
