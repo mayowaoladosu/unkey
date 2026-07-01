@@ -17,6 +17,7 @@ import (
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/internal/services/analytics"
 	"github.com/unkeyed/unkey/internal/services/auditlogs"
+	"github.com/unkeyed/unkey/internal/services/billing"
 	cachesvc "github.com/unkeyed/unkey/internal/services/caches"
 	"github.com/unkeyed/unkey/internal/services/keys"
 	"github.com/unkeyed/unkey/internal/services/portal"
@@ -451,6 +452,7 @@ func Run(ctx context.Context, cfg Config) error {
 		Validator:            validator,
 		Ratelimit:            rlSvc,
 		Auditlogs:            auditlogSvc,
+		BillingResolver:      billing.NewResolver(database),
 		Caches:               caches,
 		Vault:                vaultClient,
 		CtrlDeploymentClient: ctrlDeploymentClient,

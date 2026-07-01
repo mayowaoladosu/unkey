@@ -5,6 +5,7 @@ import (
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/internal/services/analytics"
 	"github.com/unkeyed/unkey/internal/services/auditlogs"
+	"github.com/unkeyed/unkey/internal/services/billing"
 	"github.com/unkeyed/unkey/internal/services/caches"
 	"github.com/unkeyed/unkey/internal/services/keys"
 	"github.com/unkeyed/unkey/internal/services/ratelimit"
@@ -57,6 +58,10 @@ type Services struct {
 
 	// Auditlogs records security-relevant events for compliance and debugging.
 	Auditlogs auditlogs.AuditLogService
+
+	// BillingResolver resolves the rate card in force for an end-user
+	// identity and period, shared by the billing export routes.
+	BillingResolver *billing.Resolver
 
 	// Caches holds various cache instances for performance optimization,
 	// including API metadata, key data, and rate limit namespace caches.

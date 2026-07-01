@@ -15,6 +15,7 @@ go_library(
         "//gen/rpc/vault",
         "//internal/services/analytics",
         "//internal/services/auditlogs",
+        "//internal/services/billing",
         "//internal/services/caches",
         "//internal/services/keys",
         "//internal/services/portal",
