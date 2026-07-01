@@ -136,6 +136,16 @@ func (p *PeriodClose) Run(ctx context.Context, year, month int) (Summary, error)
 		"records_pushed", summary.RecordsPushed,
 		"errors", len(summary.Errors),
 	)
+	// Money-movement failures must not be reduced to an Info-level count.
+	// Surface each collected error at Error level with its workspace/identity
+	// context so monitoring and on-call see per-customer billing failures.
+	// Run still returns nil so one customer's failure does not abort billing
+	// for the rest; the caller decides how to act on a non-empty summary.
+	for _, e := range summary.Errors {
+		logger.Error("end-user billing failure during period close",
+			"year", year, "month", month, "detail", e,
+		)
+	}
 	return summary, nil
 }
 
@@ -203,7 +213,7 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 			resolved, resolveErr := p.resolver.ResolveAndRecord(ctx, ws.WorkspaceID, identity.ID, year, month)
 			if resolveErr != nil {
 				if errors.Is(resolveErr, billing.ErrNoRateCard) {
-					errs = append(errs, fmt.Errorf("identity %s has usage but no rate card resolves", identity.ID))
+					errs = append(errs, fault.New("identity "+identity.ID+" has usage but no rate card resolves"))
 					continue
 				}
 				errs = append(errs, resolveErr)

@@ -91,11 +91,22 @@ func (h *Handler) Handle(
 	// the deploy-usage early return. One journaled step; errors inside a
 	// workspace are collected in the summary, not fatal to the deploy push.
 	if h.endUserBilling != nil {
-		_, err = restate.Run(ctx, func(rc restate.RunContext) (enduserbillingpush.Summary, error) {
+		euSummary, euErr := restate.Run(ctx, func(rc restate.RunContext) (enduserbillingpush.Summary, error) {
 			return h.endUserBilling.Run(rc, p.Start().Year(), int(p.Start().Month()))
 		}, restate.WithName("end-user billing period close"))
-		if err != nil {
-			return nil, fmt.Errorf("end-user billing period close: %w", err)
+		if euErr != nil {
+			return nil, fmt.Errorf("end-user billing period close: %w", euErr)
+		}
+		// Per-workspace failures are collected in the summary rather than
+		// failing the step; surface them here so they are visible at the cron
+		// boundary instead of being discarded.
+		if len(euSummary.Errors) > 0 {
+			logger.Warn("end-user billing period close completed with per-workspace failures",
+				"billing_period", period,
+				"workspaces", euSummary.Workspaces,
+				"records_pushed", euSummary.RecordsPushed,
+				"failures", len(euSummary.Errors),
+			)
 		}
 	}
 

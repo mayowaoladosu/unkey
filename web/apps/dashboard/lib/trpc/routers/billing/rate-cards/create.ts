@@ -4,7 +4,7 @@ import { isDuplicateKeyError } from "@/lib/utils/db-errors";
 import { TRPCError } from "@trpc/server";
 import { newId } from "@unkey/id";
 import { z } from "zod";
-import { workspaceProcedure } from "../../../trpc";
+import { requireWorkspaceAdmin, workspaceProcedure } from "../../../trpc";
 import { currencySchema, rateCardConfigSchema, rateCardNameSchema } from "./schemas";
 
 export const createRateCardInputSchema = z.object({
@@ -15,6 +15,7 @@ export const createRateCardInputSchema = z.object({
 });
 
 export const createRateCard = workspaceProcedure
+  .use(requireWorkspaceAdmin)
   .input(createRateCardInputSchema)
   .mutation(async ({ input, ctx }) => {
     const rateCardId = newId("rateCard");

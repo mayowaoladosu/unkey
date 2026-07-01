@@ -46,8 +46,15 @@ export const startStripeConnectOnboarding = workspaceProcedure
           encrypted: settings.stripeConnectEncrypted,
         });
         accountId = plaintext;
-      } catch {
-        accountId = null; // fall through to creating a fresh account
+      } catch (err) {
+        // Decrypting a stale/rotated pending reference can fail; log it and
+        // fall through to minting a fresh connected account rather than
+        // silently swallowing the error.
+        console.warn("stripe connect: failed to decrypt pending account, creating fresh", {
+          workspaceId: ctx.workspace.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        accountId = null;
       }
     }
 

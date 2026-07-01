@@ -98,7 +98,11 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			TotalCentsRounded: nil,
 		}
 
-		resolved, resolveErr := h.Resolver.ResolveAndRecord(ctx, principal.WorkspaceID, row.IdentityID, req.Year, req.Month)
+		// A draft is a read/preview: it must NOT pin the period's rate card.
+		// Pinning happens at billing time in the period-close push. Using the
+		// non-persisting resolver keeps previewing an open month from freezing
+		// the card for a period still accruing usage.
+		resolved, resolveErr := h.Resolver.Resolve(ctx, principal.WorkspaceID, row.IdentityID, req.Year, req.Month)
 		switch {
 		case resolveErr == nil:
 			amounts, priceErr := resolved.Price(row.Verifications, row.SpentCredits, row.RatelimitsPassed)
@@ -120,7 +124,14 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 				priced(openapi.Ratelimits, row.RatelimitsPassed, amounts.RatelimitsCents),
 			}
 			entry.TotalCents = ptr.P(ratecard.CentsString(amounts.TotalCents))
-			entry.TotalCentsRounded = ptr.P(ratecard.RoundedCents(amounts.TotalCents))
+			// Stripe bills the sum of the per-line-item rounded amounts, so the
+			// draft total must be that same sum — not RoundedCents of the exact
+			// total, which can differ by a cent when two dimensions each round up.
+			entry.TotalCentsRounded = ptr.P(
+				ratecard.RoundedCents(amounts.VerificationsCents) +
+					ratecard.RoundedCents(amounts.CreditsCents) +
+					ratecard.RoundedCents(amounts.RatelimitsCents),
+			)
 		case errors.Is(resolveErr, billing.ErrNoRateCard):
 			// Quantity-only entry: nothing to price against, surfaced via
 			// priced=false rather than dropping the identity from the draft.

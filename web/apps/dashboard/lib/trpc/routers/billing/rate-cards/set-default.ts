@@ -3,7 +3,7 @@ import { db, schema, sql } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { newId } from "@unkey/id";
 import { z } from "zod";
-import { workspaceProcedure } from "../../../trpc";
+import { requireWorkspaceAdmin, workspaceProcedure } from "../../../trpc";
 
 export const setDefaultRateCardInputSchema = z.object({
   /** Null clears the workspace default. */
@@ -11,13 +11,15 @@ export const setDefaultRateCardInputSchema = z.object({
 });
 
 export const setDefaultRateCard = workspaceProcedure
+  .use(requireWorkspaceAdmin)
   .input(setDefaultRateCardInputSchema)
   .mutation(async ({ input, ctx }) => {
     if (input.rateCardId !== null) {
+      const rateCardId: string = input.rateCardId;
       const card = await db.query.rateCards.findFirst({
         where: (table, { and, eq }) =>
           and(
-            eq(table.id, input.rateCardId as string),
+            eq(table.id, rateCardId),
             eq(table.workspaceId, ctx.workspace.id),
             eq(table.archived, false),
           ),

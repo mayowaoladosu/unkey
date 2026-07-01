@@ -95,9 +95,16 @@ func (p *stripeConnectPusher) Push(ctx context.Context, req PushRequest) (int, e
 		if !record.Positive() {
 			continue
 		}
-		// A missing provider customer is an actionable configuration gap,
-		// not a silent skip: the identity has billable usage that cannot be
-		// invoiced until the customer sets the billing binding.
+		// Only records that will actually produce a priced line item need a
+		// provider customer. A free-tier identity has usage (Positive) but zero
+		// billable cents, so nothing is invoiced and a missing customer is not
+		// an error — skip it silently rather than reporting a spurious gap.
+		if record.VerificationsCents <= 0 && record.CreditsCents <= 0 && record.RatelimitsCents <= 0 {
+			continue
+		}
+		// A missing provider customer is an actionable configuration gap: the
+		// identity has billable amounts that cannot be invoiced until the
+		// customer sets the billing binding.
 		if record.ProviderCustomerID == "" {
 			errs = append(errs, fault.New(
 				"identity "+record.IdentityID+" has billable usage but no provider customer id",

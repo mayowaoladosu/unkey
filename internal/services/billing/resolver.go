@@ -176,7 +176,7 @@ func (r *Resolver) loadCard(ctx context.Context, workspaceID, rateCardID string,
 	}
 	cfg, err := ratecard.ParseConfig(card.Config)
 	if err != nil {
-		return ResolvedRateCard{}, err
+		return ResolvedRateCard{}, fault.Wrap(err, fault.Internal("failed to parse rate card config"))
 	}
 	return ResolvedRateCard{Card: card, Config: cfg, ResolvedFrom: "", Recorded: false}, nil
 }

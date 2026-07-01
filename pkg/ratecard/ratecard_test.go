@@ -101,6 +101,10 @@ func TestValidateTiersRejectsInvalidShapes(t *testing.T) {
 			tiers: []Tier{{FirstUnit: 0, LastUnit: nil, CentsPerUnit: ptr("1")}},
 		},
 		{
+			name:  "lastUnit below firstUnit (negative span)",
+			tiers: []Tier{{FirstUnit: 10, LastUnit: ptr(int64(5)), CentsPerUnit: ptr("1")}},
+		},
+		{
 			name:  "negative price",
 			tiers: []Tier{{FirstUnit: 1, LastUnit: nil, CentsPerUnit: ptr("-5")}},
 		},

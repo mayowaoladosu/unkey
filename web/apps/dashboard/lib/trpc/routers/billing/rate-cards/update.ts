@@ -2,7 +2,7 @@ import { insertAuditLogs } from "@/lib/audit";
 import { and, db, eq, schema } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { workspaceProcedure } from "../../../trpc";
+import { requireWorkspaceAdmin, workspaceProcedure } from "../../../trpc";
 import { rateCardNameSchema } from "./schemas";
 
 export const updateRateCardInputSchema = z.object({
@@ -18,6 +18,7 @@ export const updateRateCardInputSchema = z.object({
  * card (R18), so a price change is a new card, not an edit.
  */
 export const updateRateCard = workspaceProcedure
+  .use(requireWorkspaceAdmin)
   .input(updateRateCardInputSchema)
   .mutation(async ({ input, ctx }) => {
     const card = await db.query.rateCards.findFirst({

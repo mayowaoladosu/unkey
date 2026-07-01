@@ -82,6 +82,9 @@ func ValidateTiers(tiers []Tier) error {
 		if tier.LastUnit != nil && *tier.LastUnit < 1 {
 			return fault.New("lastUnit must be >= 1 or null")
 		}
+		if tier.LastUnit != nil && *tier.LastUnit < tier.FirstUnit {
+			return fault.New("lastUnit must be >= firstUnit")
+		}
 		if tier.CentsPerUnit != nil && !centsPerUnitRE.MatchString(*tier.CentsPerUnit) {
 			return fault.New("centsPerUnit must be a decimal string or null")
 		}

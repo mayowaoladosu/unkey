@@ -118,15 +118,16 @@ func TestGetInvoiceDraft(t *testing.T) {
 		}, time.Minute, time.Second)
 	})
 
-	t.Run("the draft pins the period card", func(t *testing.T) {
-		recorded, err := db.Query.FindBillingPeriodRateCard(context.Background(), h.DB.RO(), db.FindBillingPeriodRateCardParams{
+	t.Run("the draft is a preview and does NOT pin the period card", func(t *testing.T) {
+		// A draft/preview must not freeze the rate card for a period still
+		// accruing usage; pinning happens only in the period-close push.
+		_, err := db.Query.FindBillingPeriodRateCard(context.Background(), h.DB.RO(), db.FindBillingPeriodRateCardParams{
 			WorkspaceID: workspaceID,
 			IdentityID:  identity.ID,
 			Year:        int32(year),
 			Month:       int32(month),
 		})
-		require.NoError(t, err)
-		require.Equal(t, cardID, recorded.RateCardID)
+		require.True(t, db.IsNotFound(err), "getInvoiceDraft must not persist a period rate-card pin")
 	})
 }
 
