@@ -106,6 +106,13 @@ func (r *Resolver) ResolveAndRecord(ctx context.Context, workspaceID, identityID
 	return r.Resolve(ctx, workspaceID, identityID, year, month)
 }
 
+// ResolveLive applies the live precedence (selection -> assignment ->
+// workspace default) ignoring any recorded period — the card that will
+// govern periods not yet billed.
+func (r *Resolver) ResolveLive(ctx context.Context, workspaceID, identityID string) (ResolvedRateCard, error) {
+	return r.resolveLive(ctx, workspaceID, identityID)
+}
+
 // resolveLive applies selection -> assignment -> workspace default.
 func (r *Resolver) resolveLive(ctx context.Context, workspaceID, identityID string) (ResolvedRateCard, error) {
 	identity, err := db.Query.FindIdentityByID(ctx, r.database.RO(), db.FindIdentityByIDParams{
