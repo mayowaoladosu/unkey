@@ -37,7 +37,10 @@ export const updateRateCard = workspaceProcedure
           ...(input.archived !== undefined ? { archived: input.archived } : {}),
         })
         .where(
-          and(eq(schema.rateCards.id, input.rateCardId), eq(schema.rateCards.workspaceId, ctx.workspace.id)),
+          and(
+            eq(schema.rateCards.id, input.rateCardId),
+            eq(schema.rateCards.workspaceId, ctx.workspace.id),
+          ),
         );
 
       await insertAuditLogs(tx, {

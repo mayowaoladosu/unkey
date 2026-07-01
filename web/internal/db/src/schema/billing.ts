@@ -121,8 +121,11 @@ export const billingPeriodRateCards = mysqlTable(
     month: int("month").notNull(),
     rateCardId: varchar("rate_card_id", { length: 256 }).notNull(),
     /** Which precedence step produced the card (KTD7). */
-    resolvedFrom: mysqlEnum("resolved_from", ["selection", "assignment", "workspace_default"])
-      .notNull(),
+    resolvedFrom: mysqlEnum("resolved_from", [
+      "selection",
+      "assignment",
+      "workspace_default",
+    ]).notNull(),
     ...lifecycleDates,
   },
   (table) => ({

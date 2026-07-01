@@ -35,11 +35,11 @@ import { searchRolesPermissions } from "./authorization/roles/permissions/search
 import { queryRoles } from "./authorization/roles/query";
 import { upsertRole } from "./authorization/roles/upsert";
 import { queryDeployUsage } from "./billing/query-deploy-usage";
+import { queryUsage } from "./billing/query-usage";
 import { createRateCard } from "./billing/rate-cards/create";
 import { listRateCards } from "./billing/rate-cards/list";
 import { setDefaultRateCard } from "./billing/rate-cards/set-default";
 import { updateRateCard } from "./billing/rate-cards/update";
-import { queryUsage } from "./billing/query-usage";
 import { createApp } from "./deploy/app/create";
 import { deleteApp } from "./deploy/app/delete";
 import { listApps } from "./deploy/app/list";
