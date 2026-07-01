@@ -636,7 +636,7 @@ type Querier interface {
 	FindGithubRepoConnectionByProjectId(ctx context.Context, db DBTX, projectID string) (FindGithubRepoConnectionByProjectIdRow, error)
 	//FindIdentities
 	//
-	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, created_at, updated_at
+	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, billing_provider, billing_external_customer_id, rate_card_id, selected_rate_card_id, created_at, updated_at
 	//  FROM identities
 	//  WHERE workspace_id = ?
 	//   AND deleted = ?
@@ -644,14 +644,14 @@ type Querier interface {
 	FindIdentities(ctx context.Context, db DBTX, arg FindIdentitiesParams) ([]Identity, error)
 	//FindIdentitiesByExternalId
 	//
-	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, created_at, updated_at
+	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, billing_provider, billing_external_customer_id, rate_card_id, selected_rate_card_id, created_at, updated_at
 	//  FROM identities
 	//  WHERE workspace_id = ? AND external_id IN (/*SLICE:externalIds*/?) AND deleted = ?
 	FindIdentitiesByExternalId(ctx context.Context, db DBTX, arg FindIdentitiesByExternalIdParams) ([]Identity, error)
 	//FindIdentity
 	//
 	//  SELECT
-	//      i.pk, i.id, i.external_id, i.workspace_id, i.environment, i.meta, i.deleted, i.created_at, i.updated_at,
+	//      i.pk, i.id, i.external_id, i.workspace_id, i.environment, i.meta, i.deleted, i.billing_provider, i.billing_external_customer_id, i.rate_card_id, i.selected_rate_card_id, i.created_at, i.updated_at,
 	//      COALESCE(
 	//          (SELECT JSON_ARRAYAGG(
 	//              JSON_OBJECT(
@@ -683,7 +683,7 @@ type Querier interface {
 	FindIdentity(ctx context.Context, db DBTX, arg FindIdentityParams) (FindIdentityRow, error)
 	//FindIdentityByExternalID
 	//
-	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, created_at, updated_at
+	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, billing_provider, billing_external_customer_id, rate_card_id, selected_rate_card_id, created_at, updated_at
 	//  FROM identities
 	//  WHERE workspace_id = ?
 	//    AND external_id = ?
@@ -691,7 +691,7 @@ type Querier interface {
 	FindIdentityByExternalID(ctx context.Context, db DBTX, arg FindIdentityByExternalIDParams) (Identity, error)
 	//FindIdentityByID
 	//
-	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, created_at, updated_at
+	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, billing_provider, billing_external_customer_id, rate_card_id, selected_rate_card_id, created_at, updated_at
 	//  FROM identities
 	//  WHERE workspace_id = ?
 	//    AND id = ?
