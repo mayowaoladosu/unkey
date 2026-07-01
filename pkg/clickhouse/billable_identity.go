@@ -19,8 +19,8 @@ type IdentityBillableUsage struct {
 	// SpentCredits is the sum of credits consumed by this identity's verifications.
 	SpentCredits int64
 	// RatelimitsPassed is the count of passed, identity-attributed standalone
-	// ratelimit checks. Zero until ratelimit attribution (ratelimits_raw_v3) is
-	// populated; bare-identifier ratelimits are never attributed here.
+	// ratelimit checks (from ratelimits_raw_v3). Bare-identifier ratelimits
+	// that matched no identity are never attributed here.
 	RatelimitsPassed int64
 }
 
@@ -55,6 +55,11 @@ func (c *Client) GetBillableUsagePerIdentity(ctx context.Context, workspaceID st
 		UNION ALL
 		SELECT identity_id, external_id, toInt64(0), sum(spent_credits), toInt64(0)
 		FROM default.billable_credits_per_identity_per_month_v1
+		WHERE workspace_id = {workspace_id:String} AND year = {year:Int32} AND month = {month:Int32}
+		GROUP BY identity_id, external_id
+		UNION ALL
+		SELECT identity_id, external_id, toInt64(0), toInt64(0), sum(count)
+		FROM default.billable_ratelimits_per_identity_per_month_v1
 		WHERE workspace_id = {workspace_id:String} AND year = {year:Int32} AND month = {month:Int32}
 		GROUP BY identity_id, external_id
 	)

@@ -160,7 +160,7 @@ func Run(ctx context.Context, cfg Config) error {
 	var ch clickhouse.ClickHouse = clickhouse.NewNoop()
 	apiRequests := batch.NewNoop[schema.ApiRequest]()
 	keyVerifications := batch.NewNoop[schema.KeyVerification]()
-	ratelimits := batch.NewNoop[schema.Ratelimit]()
+	ratelimits := batch.NewNoop[schema.RatelimitV3]()
 
 	if cfg.ClickHouse.URL != "" {
 		chClient, chErr := clickhouse.New(clickhouse.Config{
@@ -189,7 +189,7 @@ func Run(ctx context.Context, cfg Config) error {
 			Drop:          true,
 			OnFlushError:  nil,
 		})
-		ratelimits = clickhouse.NewBuffer[schema.Ratelimit](chClient, "default.ratelimits_raw_v2", clickhouse.BufferConfig{
+		ratelimits = clickhouse.NewBuffer[schema.RatelimitV3](chClient, "default.ratelimits_raw_v3", clickhouse.BufferConfig{
 			Name:          "ratelimits",
 			BatchSize:     10_000,
 			BufferSize:    20_000,

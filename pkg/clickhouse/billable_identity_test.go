@@ -143,4 +143,86 @@ func TestGetBillableUsagePerIdentity(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, usage)
 	})
+
+	t.Run("attributed ratelimits count, bare identifiers stay unattributed", func(t *testing.T) {
+		workspaceID := uid.New(uid.WorkspacePrefix)
+		identityID := uid.New(uid.IdentityPrefix)
+
+		events := make([]schema.RatelimitV3, 0, 40)
+		// 15 passed checks attributed to user_rl.
+		events = append(events, createRatelimitsV3(workspaceID, identityID, "user_rl", 15, now, true)...)
+		// 5 blocked checks for the same identity: not billable.
+		events = append(events, createRatelimitsV3(workspaceID, identityID, "user_rl", 5, now, false)...)
+		// 20 passed checks with a bare identifier (no identity match).
+		events = append(events, createRatelimitsV3(workspaceID, "", "", 20, now, true)...)
+
+		insertRatelimitsV3(t, ctx, conn, events)
+
+		require.Eventually(t, func() bool {
+			usage, usageErr := client.GetBillableUsagePerIdentity(ctx, workspaceID, year, month)
+			if usageErr != nil || len(usage) != 1 {
+				return false
+			}
+			u := usage[0]
+			return u.ExternalID == "user_rl" && u.IdentityID == identityID &&
+				u.RatelimitsPassed == 15 && u.Verifications == 0 && u.SpentCredits == 0
+		}, time.Minute, time.Second)
+
+		// The mirror MV forwards v3 rows into the v2 raw table, keeping the
+		// workspace-grained billable rollup fed: all 35 passed checks count.
+		require.Eventually(t, func() bool {
+			count, countErr := client.GetBillableRatelimits(ctx, workspaceID, year, month)
+			return countErr == nil && count == 35
+		}, time.Minute, time.Second)
+	})
+}
+
+// createRatelimitsV3 creates identity-attributed ratelimit v3 events. Empty
+// identityID/externalID models a bare identifier that matched no identity.
+func createRatelimitsV3(workspaceID, identityID, externalID string, count int, timestamp time.Time, passed bool) []schema.RatelimitV3 {
+	events := make([]schema.RatelimitV3, count)
+	identifier := externalID
+	if identifier == "" {
+		identifier = uid.New(uid.IdentityPrefix)
+	}
+	var remaining uint64 = 50
+	if !passed {
+		remaining = 0
+	}
+	for i := range count {
+		events[i] = schema.RatelimitV3{
+			RequestID:   uid.New(uid.RequestPrefix),
+			Time:        timestamp.Add(time.Duration(i) * time.Second).UnixMilli(),
+			WorkspaceID: workspaceID,
+			NamespaceID: uid.New(uid.RatelimitNamespacePrefix),
+			Identifier:  identifier,
+			IdentityID:  identityID,
+			ExternalID:  externalID,
+			Passed:      passed,
+			Latency:     rand.Float64() * 10,
+			OverrideID:  "",
+			Limit:       100,
+			Remaining:   remaining,
+			ResetAt:     timestamp.Add(time.Minute).UnixMilli(),
+			Tokens:      1,
+		}
+	}
+	return events
+}
+
+func insertRatelimitsV3(t *testing.T, ctx context.Context, conn ch.Conn, events []schema.RatelimitV3) {
+	if len(events) == 0 {
+		return
+	}
+
+	batch, err := conn.PrepareBatch(ctx, "INSERT INTO default.ratelimits_raw_v3")
+	require.NoError(t, err)
+
+	for _, e := range events {
+		err = batch.AppendStruct(&e)
+		require.NoError(t, err)
+	}
+
+	err = batch.Send()
+	require.NoError(t, err)
 }

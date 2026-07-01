@@ -41,8 +41,9 @@ type Services struct {
 	// ApiRequests buffers API request events for ClickHouse.
 	ApiRequests *batch.BatchProcessor[schema.ApiRequest]
 
-	// RatelimitEvents buffers ratelimit events for ClickHouse.
-	RatelimitEvents *batch.BatchProcessor[schema.Ratelimit]
+	// RatelimitEvents buffers ratelimit events for ClickHouse. v3 carries
+	// end-user identity attribution resolved at check time.
+	RatelimitEvents *batch.BatchProcessor[schema.RatelimitV3]
 
 	// KeyVerifications buffers key verification outcomes for ClickHouse. Owned
 	// by the v2 keys.verifyKey handler.
