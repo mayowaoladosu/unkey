@@ -302,4 +302,11 @@ func TestBackfillBillableIdentityRollups(t *testing.T) {
 	require.Equal(t, identityID, usage[0].IdentityID)
 	require.Equal(t, int64(40), usage[0].Verifications, "backfill reconstructs verifications from the source")
 	require.Equal(t, int64(120), usage[0].SpentCredits, "backfill reconstructs credits from the source")
+
+	// The open (current) month and any future month are refused: backfilling a
+	// still-accruing period would rebuild from a moving source.
+	require.Error(t, client.BackfillBillableIdentityRollups(ctx, now.Year(), int(now.Month())),
+		"backfill must refuse the current (open) month")
+	require.Error(t, client.BackfillBillableIdentityRollups(ctx, now.Year()+1, 1),
+		"backfill must refuse a future month")
 }

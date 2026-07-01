@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"time"
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/unkeyed/unkey/pkg/fault"
@@ -32,8 +33,22 @@ import (
 //     only the most recently closed month can be reconstructed; older raw rows
 //     are gone and their monthly rollup, once written, is the only record.
 func (c *Client) BackfillBillableIdentityRollups(ctx context.Context, year, month int) error {
-	// mutations_sync=1 makes each ALTER ... DELETE block until it has applied on
-	// this node, so the following INSERT cannot race the delete it depends on.
+	// Refuse the open (current) or a future month: the backfill deletes and
+	// re-derives a period's rows from the source, which is only correct once
+	// the source is final. Running it on a month still accruing usage would
+	// rebuild from a moving source and under-count the tail. The doc-only
+	// "closed period" constraint is enforced here so an operator typo cannot
+	// silently corrupt live billing.
+	now := time.Now().UTC()
+	if year > now.Year() || (year == now.Year() && month >= int(now.Month())) {
+		return fault.New(fmt.Sprintf("refusing to backfill %04d-%02d: only a closed (past) month may be backfilled", year, month))
+	}
+
+	// mutations_sync=2 makes each ALTER ... DELETE block until it has applied on
+	// ALL replicas, so the following INSERT cannot race the delete it depends on
+	// even on a replicated cluster (mutations_sync=1 waits only for the
+	// initiating replica, leaving lagging replicas with the old rows to
+	// double-count against the re-inserted ones).
 	steps := []struct {
 		name         string
 		deleteFrom   string
@@ -84,7 +99,7 @@ GROUP BY workspace_id, identity_id, external_id,
 
 	for _, step := range steps {
 		deleteSQL := fmt.Sprintf(
-			"ALTER TABLE default.%s DELETE WHERE year = {year:Int32} AND month = {month:Int32} SETTINGS mutations_sync = 1",
+			"ALTER TABLE default.%s DELETE WHERE year = {year:Int32} AND month = {month:Int32} SETTINGS mutations_sync = 2",
 			step.deleteFrom,
 		)
 		if err := c.conn.Exec(ctx, deleteSQL, ch.Named("year", year), ch.Named("month", month)); err != nil {

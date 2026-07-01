@@ -266,12 +266,10 @@ type BatchResolver struct {
 
 	// cards memoizes raw card loads (fetch + parse, no archived rejection) by
 	// rate card id; the archived/selectable checks are applied per call site.
-	cards map[string]cachedCard
-}
-
-type cachedCard struct {
-	card ResolvedRateCard
-	err  error
+	// Only SUCCESSFUL loads are cached: caching an error would make one
+	// transient DB hiccup on a shared card fail every identity that resolves to
+	// it for the whole batch, instead of letting each retry.
+	cards map[string]ResolvedRateCard
 }
 
 // NewBatch returns a BatchResolver scoped to one workspace. Reuse it across all
@@ -282,19 +280,23 @@ func (r *Resolver) NewBatch(workspaceID string) *BatchResolver {
 		workspaceID:    workspaceID,
 		settingsLoaded: false,
 		defaultCardID:  sql.NullString{},
-		cards:          make(map[string]cachedCard),
+		cards:          make(map[string]ResolvedRateCard),
 	}
 }
 
-// rawCard fetches and parses a card once, caching the result (success or
-// error) so repeated resolutions to the same card cost one read per batch.
+// rawCard fetches and parses a card once, caching successful loads so repeated
+// resolutions to the same card cost one read per batch. Errors are not cached
+// (see the cards field) — a failed load re-attempts on the next identity.
 func (b *BatchResolver) rawCard(ctx context.Context, rateCardID string) (ResolvedRateCard, error) {
 	if hit, ok := b.cards[rateCardID]; ok {
-		return hit.card, hit.err
+		return hit, nil
 	}
 	card, err := b.r.loadCard(ctx, b.workspaceID, rateCardID, false)
-	b.cards[rateCardID] = cachedCard{card: card, err: err}
-	return card, err
+	if err != nil {
+		return ResolvedRateCard{}, err
+	}
+	b.cards[rateCardID] = card
+	return card, nil
 }
 
 // cardLoader returns a loader that applies the archived check on top of the

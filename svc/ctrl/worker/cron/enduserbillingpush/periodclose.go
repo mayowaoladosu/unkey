@@ -251,6 +251,20 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 				continue
 			}
 			if markErr := resolver.MarkPushed(ctx, identity.ID, year, month); markErr != nil {
+				// Money-critical: the usage was already pushed to the provider,
+				// but recording the run-once marker failed. The next tick sees
+				// AlreadyPushed=false and re-pushes; the provider's idempotency
+				// key dedups within its window, but a marker write that stays
+				// failed past that window risks a double charge. Surface it
+				// loudly at the site (not just in the aggregated tail) so on-call
+				// sees the exact identity at risk.
+				logger.Error("pushed to provider but failed to record pushed marker; identity will be re-pushed next tick",
+					"workspace_id", ws.WorkspaceID,
+					"identity_id", identity.ID,
+					"year", year,
+					"month", month,
+					"error", markErr.Error(),
+				)
 				errs = append(errs, markErr)
 			}
 		}
