@@ -40,6 +40,9 @@ import { createRateCard } from "./billing/rate-cards/create";
 import { listRateCards } from "./billing/rate-cards/list";
 import { setDefaultRateCard } from "./billing/rate-cards/set-default";
 import { updateRateCard } from "./billing/rate-cards/update";
+import { getStripeConnect } from "./billing/stripe-connect/get";
+import { linkStripeConnect } from "./billing/stripe-connect/link";
+import { unlinkStripeConnect } from "./billing/stripe-connect/unlink";
 import { createApp } from "./deploy/app/create";
 import { deleteApp } from "./deploy/app/delete";
 import { listApps } from "./deploy/app/list";
@@ -426,6 +429,11 @@ export const router = t.router({
       list: listRateCards,
       update: updateRateCard,
       setDefault: setDefaultRateCard,
+    }),
+    stripeConnect: t.router({
+      get: getStripeConnect,
+      link: linkStripeConnect,
+      unlink: unlinkStripeConnect,
     }),
   }),
   audit: t.router({
