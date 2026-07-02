@@ -41,6 +41,7 @@ function SuccessContent() {
   const updateCustomerMutation = trpc.stripe.updateCustomer.useMutation();
   const updateWorkspaceStripeCustomerMutation =
     trpc.stripe.updateWorkspaceStripeCustomer.useMutation();
+  const linkDeploySubscriptionMutation = trpc.stripe.linkDeploySubscription.useMutation();
 
   const trpcUtils = trpc.useUtils();
 
@@ -57,6 +58,7 @@ function SuccessContent() {
     const processStripeSession = async (
       updateCustomerFn: typeof updateCustomerMutation.mutateAsync,
       updateWorkspaceFn: typeof updateWorkspaceStripeCustomerMutation.mutateAsync,
+      linkDeployFn: typeof linkDeploySubscriptionMutation.mutateAsync,
     ) => {
       try {
         if (!isMounted) {
@@ -94,6 +96,41 @@ function SuccessContent() {
         const workspace = await trpcUtils.workspace.getById.fetch();
 
         if (!isMounted) {
+          return;
+        }
+
+        // Subscription-mode deploy checkout: Stripe already created and charged
+        // the subscription, so there is no setup intent to process. Link it onto
+        // the workspace via the server-verified mutation, then hand back to the
+        // projects landing (SuccessClient redirects on intent === "deploy").
+        // The checkout.session.completed webhook may have linked it already; the
+        // shared linker is idempotent, so this is a safe fast-path.
+        if (
+          intent === "deploy" &&
+          (sessionResponse.mode === "subscription" || sessionResponse.subscription)
+        ) {
+          try {
+            await linkDeployFn({ sessionId });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            if (!isMounted) {
+              return;
+            }
+            setError(`Failed to activate your Compute plan: ${errorMessage}`);
+            setLoading(false);
+            return;
+          }
+
+          if (!isMounted) {
+            return;
+          }
+
+          await trpcUtils.workspace.invalidate();
+          await trpcUtils.stripe.invalidate();
+          await trpcUtils.billing.invalidate();
+
+          setProcessedData({ workspaceSlug: workspace.slug });
+          setLoading(false);
           return;
         }
 
@@ -247,6 +284,7 @@ function SuccessContent() {
     processStripeSession(
       updateCustomerMutation.mutateAsync,
       updateWorkspaceStripeCustomerMutation.mutateAsync,
+      linkDeploySubscriptionMutation.mutateAsync,
     );
 
     // Cleanup function to prevent state updates after unmount
@@ -259,6 +297,7 @@ function SuccessContent() {
     trpcUtils,
     updateCustomerMutation.mutateAsync,
     updateWorkspaceStripeCustomerMutation.mutateAsync,
+    linkDeploySubscriptionMutation.mutateAsync,
   ]);
 
   if (loading) {

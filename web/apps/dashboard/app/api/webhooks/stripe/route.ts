@@ -7,6 +7,7 @@ import { freeTierQuotas } from "@/lib/quotas";
 import { deployBillingConfig, findApiItem } from "@/lib/stripe/deployBilling";
 import { grantDeployCreditsForInvoice } from "@/lib/stripe/deployCredits";
 import { detectDeployPlan } from "@/lib/stripe/deployPlan";
+import { linkDeploySubscription } from "@/lib/stripe/linkDeploySubscription";
 import { isPaymentRecovery, isPaymentRecoveryUpdate } from "@/lib/stripe/paymentUtils";
 import { validateAndParseQuotas } from "@/lib/stripe/productUtils";
 import {
@@ -143,7 +144,7 @@ export const POST = async (req: Request): Promise<Response> => {
   }
 
   const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: "2026-05-27.dahlia",
+    apiVersion: "2026-06-24.dahlia",
     typescript: true,
   });
 
@@ -498,6 +499,63 @@ export const POST = async (req: Request): Promise<Response> => {
         break;
       } catch (error) {
         console.error("Subscription creation webhook error:", {
+          error:
+            error instanceof Error
+              ? {
+                  message: error.message,
+                  stack: error.stack,
+                  name: error.name,
+                }
+              : error,
+          eventId: event.id,
+          eventType: event.type,
+        });
+        return new Response("Error", { status: 500 });
+      }
+    }
+
+    case "checkout.session.completed": {
+      try {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        // Only subscription-mode Compute checkouts need a workspace link.
+        // Setup-mode sessions (card vault) and API checkouts are handled by
+        // /success or need no link here.
+        if (session.mode !== "subscription" || !session.subscription) {
+          return new Response("OK", { status: 200 });
+        }
+        if (!session.client_reference_id) {
+          console.error("checkout.session.completed missing client_reference_id", {
+            sessionId: session.id,
+            eventId: event.id,
+          });
+          return new Response("OK", { status: 200 });
+        }
+
+        // Guaranteed link path: fires server-side even if the user never
+        // returns to /success, so a paid subscription is never left orphaned.
+        // The shared linker re-verifies payment/status and is idempotent, so a
+        // redelivery or a racing /success call cannot double-write.
+        const result = await linkDeploySubscription(stripe, {
+          sessionId: session.id,
+          expectedWorkspaceId: session.client_reference_id,
+          audit: { actor: { type: "system", id: "stripe" }, location: "", userAgent: undefined },
+        });
+
+        if (!result.ok) {
+          // A conflict (different existing subscription), unpaid, or no-plan
+          // state cannot be reconciled automatically. Log for ops and ack so
+          // Stripe stops retrying a state a retry cannot fix; transient DB/
+          // Stripe failures throw and fall to the 500 below for retry.
+          console.error("Failed to link Compute checkout subscription", {
+            sessionId: session.id,
+            eventId: event.id,
+            reason: result.reason,
+          });
+        }
+        return new Response("OK", { status: 200 });
+      } catch (error) {
+        console.error("Checkout session completed webhook error:", {
           error:
             error instanceof Error
               ? {

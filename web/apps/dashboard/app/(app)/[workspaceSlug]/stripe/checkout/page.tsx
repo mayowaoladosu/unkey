@@ -1,8 +1,10 @@
 import { getAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { stripeEnv } from "@/lib/env";
+import { formatDollars } from "@/lib/fmt";
 import { routes } from "@/lib/navigation/routes";
 import { getStripeClient } from "@/lib/stripe";
+import { deployBillingConfig, deployCheckoutLineItems } from "@/lib/stripe/deployBilling";
 import { getBaseUrl } from "@/lib/utils";
 import { Code, Empty } from "@unkey/ui";
 import type { Route } from "next";
@@ -77,6 +79,12 @@ export default async function StripeRedirect(props: {
   // VERCEL_BRANCH_URL rather than a deployment-specific VERCEL_URL.
   const baseUrl = getBaseUrl();
 
+  const successUrl = `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}${
+    intent ? `&intent=${intent}` : ""
+  }${intent === "deploy" && plan ? `&plan=${plan}` : ""}${
+    intent === "deploy" && from ? `&from=${from}` : ""
+  }`;
+
   // Dev/test only: Checkout cannot create customers under a Stripe test
   // clock, so when STRIPE_DEV_TEST_CLOCK is set we create a clocked customer
   // up front and hand it to the session. That makes every workspace set up
@@ -96,20 +104,74 @@ export default async function StripeRedirect(props: {
     devClockedCustomerId = customer.id;
   }
 
-  const session = await stripe.checkout.sessions.create({
-    client_reference_id: ws.id,
-    billing_address_collection: "auto",
-    mode: "setup",
-    success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}${
-      intent ? `&intent=${intent}` : ""
-    }${intent === "deploy" && plan ? `&plan=${plan}` : ""}${
-      intent === "deploy" && from ? `&from=${from}` : ""
-    }`,
-    currency: "USD",
-    ...(devClockedCustomerId
-      ? { customer: devClockedCustomerId }
-      : { customer_creation: "always" as const }),
-  });
+  // For the Compute-plan gate's no-card path, create the subscription in
+  // Checkout itself (mode: "subscription") so Stripe shows the plan name and
+  // monthly price and charges at checkout. Every other intent — and a
+  // workspace that already has a subscription, to avoid creating a second one
+  // — falls through to the card-vault setup session below. deployBillingConfig
+  // returns null when Compute billing is unconfigured, which also falls back.
+  const deployConfig =
+    intent === "deploy" && plan && !ws.stripeSubscriptionId ? await deployBillingConfig() : null;
+
+  let session: Stripe.Checkout.Session;
+  if (deployConfig && plan) {
+    // Resolve the selected plan's fee so the credits message names the right
+    // amount (credits equal the fee). Omit the message rather than fail the
+    // session if the price can't be resolved.
+    let submitMessage: string | undefined;
+    try {
+      const price = await stripe.prices.retrieve(deployConfig.planFeePriceIds[plan]);
+      if (price.unit_amount != null) {
+        const amount = formatDollars(price.unit_amount);
+        // Credits equal the plan fee actually charged on each invoice
+        // (netDeployFee sums the fee lines), so they are prorated at checkout
+        // and full each month. Word the message as "credits match the charge"
+        // rather than a fixed number, since Stripe itself shows the prorated
+        // amount due today and we do not recompute its proration here.
+        submitMessage = `Your plan fee is matched by usage credits: ${amount} each month, and a prorated first charge is matched by the same amount in credits.`;
+      }
+    } catch {
+      // Non-fatal: proceed without the credits message.
+    }
+
+    // billing_cycle_anchor_config on Checkout requires API version
+    // 2026-06-24.dahlia or later, which is the version getStripeClient pins
+    // (stripe-node types the constructor apiVersion as exactly the bundled
+    // version, so the whole client is on 2026-06-24.dahlia).
+    session = await stripe.checkout.sessions.create({
+      client_reference_id: ws.id,
+      billing_address_collection: "auto",
+      mode: "subscription",
+      line_items: deployCheckoutLineItems(deployConfig, plan),
+      subscription_data: {
+        // Match subscribeDeploy's shape so a Checkout-created Compute
+        // subscription is the same as one it creates: day-1 anchor and classic
+        // billing mode. subscribeDeploy pins proration_behavior "always_invoice",
+        // which Checkout does not accept; "create_prorations" is the closest
+        // Checkout-valid behavior and still collects the prorated partial period
+        // on the first invoice at checkout.
+        billing_cycle_anchor_config: { day_of_month: 1 },
+        billing_mode: { type: "classic" },
+        proration_behavior: "create_prorations",
+      },
+      ...(submitMessage ? { custom_text: { submit: { message: submitMessage } } } : {}),
+      // Subscription mode always creates a customer (so customer_creation is
+      // invalid here) and infers currency from the line-item prices.
+      ...(devClockedCustomerId ? { customer: devClockedCustomerId } : {}),
+      success_url: successUrl,
+    });
+  } else {
+    session = await stripe.checkout.sessions.create({
+      client_reference_id: ws.id,
+      billing_address_collection: "auto",
+      mode: "setup",
+      success_url: successUrl,
+      currency: "USD",
+      ...(devClockedCustomerId
+        ? { customer: devClockedCustomerId }
+        : { customer_creation: "always" as const }),
+    });
+  }
 
   if (!session.url) {
     return (

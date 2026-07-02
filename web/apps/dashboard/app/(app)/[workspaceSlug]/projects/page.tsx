@@ -70,11 +70,20 @@ export default function ProjectsPage() {
 
 /**
  * Handles the Compute-plan gate hand-off: reads ?pendingPlan&from from the URL
- * (set either by the has-card path or by /success after Stripe), subscribes the
- * plan, toasts the result, and on `from=create` opens the create-project
- * dialog. The card is on file by the time we get here, so subscribeDeploy needs
- * no Stripe round-trip. Params are stripped after capture so a refresh doesn't
- * re-fire, and a ref guards against double-firing within a render window.
+ * and toasts the result, opening the create-project dialog on `from=create`.
+ *
+ * Two entry conditions land here, and the entitlement-first check absorbs both:
+ * - Card on file (has-card path): the workspace is not yet subscribed, so
+ *   subscribeDeploy runs here (no Stripe round-trip — the card is vaulted).
+ * - Returning from a subscription-mode Compute checkout: /success (and the
+ *   checkout.session.completed webhook) already linked the subscription, so the
+ *   workspace is entitled and the entitlement check short-circuits to the
+ *   toast/dialog with no subscribeDeploy call.
+ *
+ * subscribeDeploy and its BAD_REQUEST decline-recovery stay for the has-card
+ * path and the setup-mode fallback (workspace already has a subscription, so it
+ * vaults a card and attaches Compute items on return). Params are stripped
+ * after capture so a refresh doesn't re-fire, and a ref guards double-firing.
  */
 function usePendingSubscribe() {
   const router = useRouter();
