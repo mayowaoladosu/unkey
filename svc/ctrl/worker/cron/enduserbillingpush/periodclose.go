@@ -163,6 +163,13 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 		return 0, err
 	}
 	if len(enabledKeyspaces) == 0 && len(enabledNamespaces) == 0 {
+		// A Stripe-connected workspace that has enabled nothing bills nothing.
+		// Log it: connecting Stripe but enabling no resources is a plausible
+		// misconfiguration (the customer expects usage to bill), and a silent
+		// skip would leave that invisible.
+		logger.Info("end-user billing skipped: workspace has no billable resources enabled",
+			"workspace_id", ws.WorkspaceID, "year", year, "month", month,
+		)
 		return 0, nil
 	}
 

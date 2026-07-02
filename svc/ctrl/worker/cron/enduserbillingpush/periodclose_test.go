@@ -184,3 +184,72 @@ func TestPeriodClose(t *testing.T) {
 			"already-pushed identity must not be pushed again")
 	}
 }
+
+// TestPeriodCloseSkipsWorkspaceWithNothingEnabled proves KTD3: a
+// Stripe-connected workspace that has enabled no keyspaces or namespaces bills
+// nothing, even when the identity has usage and resolves to a rate card.
+func TestPeriodCloseSkipsWorkspaceWithNothingEnabled(t *testing.T) {
+	cfg := containers.MySQL(t)
+	database, err := db.New(db.Config{PrimaryDSN: cfg.DSN, ReadOnlyDSN: ""})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = database.Close() })
+	ctx := context.Background()
+
+	workspaceID := uid.New(uid.WorkspacePrefix)
+
+	cents := "1"
+	config, err := json.Marshal(ratecard.Config{
+		Verifications: []ratecard.Tier{{FirstUnit: 1, LastUnit: nil, CentsPerUnit: &cents}},
+		Credits:       nil,
+		Ratelimits:    nil,
+	})
+	require.NoError(t, err)
+	cardID := uid.New(uid.RateCardPrefix)
+	require.NoError(t, db.Query.InsertRateCard(ctx, database.RW(), db.InsertRateCardParams{
+		ID: cardID, WorkspaceID: workspaceID, Name: "default", Currency: "USD",
+		Config: config, Selectable: false, CreatedAt: time.Now().UnixMilli(),
+	}))
+	require.NoError(t, db.Query.UpsertWorkspaceBillingSettingsDefaultRateCard(ctx, database.RW(), db.UpsertWorkspaceBillingSettingsDefaultRateCardParams{
+		ID: uid.New(uid.RateCardPrefix), WorkspaceID: workspaceID,
+		DefaultRateCardID: sql.NullString{Valid: true, String: cardID}, CreatedAt: time.Now().UnixMilli(),
+	}))
+	require.NoError(t, db.Query.SetWorkspaceBillingStripeConnect(ctx, database.RW(), db.SetWorkspaceBillingStripeConnectParams{
+		ID: uid.New(uid.RateCardPrefix), WorkspaceID: workspaceID,
+		StripeConnectEncrypted:       sql.NullString{Valid: true, String: "enc:acct_skip"},
+		StripeConnectEncryptionKeyID: sql.NullString{Valid: true, String: "key_1"},
+		StripeConnectStatus: db.NullWorkspaceBillingSettingsStripeConnectStatus{
+			Valid: true,
+			WorkspaceBillingSettingsStripeConnectStatus: db.WorkspaceBillingSettingsStripeConnectStatusLinked,
+		},
+		CreatedAt: time.Now().UnixMilli(),
+	}))
+
+	// A stripe-bound identity WITH usage, but NO billing_billable_resources row.
+	identityID := uid.New(uid.IdentityPrefix)
+	require.NoError(t, db.Query.InsertIdentity(ctx, database.RW(), db.InsertIdentityParams{
+		ID: identityID, ExternalID: "user_skip", WorkspaceID: workspaceID,
+		Environment: "default", CreatedAt: time.Now().UnixMilli(), Meta: json.RawMessage("{}"),
+	}))
+	require.NoError(t, db.Query.UpdateIdentityBillingBinding(ctx, database.RW(), db.UpdateIdentityBillingBindingParams{
+		BillingProvider:           db.IdentitiesBillingProviderStripeConnect,
+		BillingExternalCustomerID: sql.NullString{Valid: true, String: "cus_skip"},
+		WorkspaceID:               workspaceID,
+		IdentityID:                identityID,
+	}))
+
+	usage := &fakeUsage{rows: map[string][]clickhouse.IdentityBillableUsage{
+		workspaceID: {{WorkspaceID: workspaceID, IdentityID: identityID, ExternalID: "user_skip", Verifications: 500}},
+	}}
+	pusher := &recordingPusher{requests: nil}
+	pc, err := New(Config{DB: database, Usage: usage, Vault: &fakeVault{}, Pusher: pusher})
+	require.NoError(t, err)
+
+	summary, err := pc.Run(ctx, 2026, 6)
+	require.NoError(t, err)
+	require.Empty(t, summary.Errors)
+	require.Equal(t, 0, summary.RecordsPushed, "workspace with nothing enabled bills nothing")
+	for i := range pusher.requests {
+		require.NotEqual(t, workspaceID, pusher.requests[i].WorkspaceID,
+			"a workspace with no enabled resources must not be pushed")
+	}
+}
