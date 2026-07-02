@@ -69,13 +69,18 @@ export function buildWorkspaceSections(slug: string, segments: string[]): Resolv
       icon: InputSearch,
       isActive: top === "audit",
     },
-    {
-      key: "portal",
-      label: "Customer portal",
-      href: `/${slug}/portal`,
-      icon: WindowLayout,
-      isActive: top === "portal",
-    },
+    // HUMANS: the workspace-level Customer portal nav item is intentionally
+    // hidden while the prototype is under review — nav placement is still an
+    // open question with Meg (workspace level vs project/keyspace only). The
+    // route stays reachable at /[workspaceSlug]/portal for direct-URL review.
+    // Restore this entry (or delete the route) once placement is decided.
+    // {
+    //   key: "portal",
+    //   label: "Customer portal",
+    //   href: `/${slug}/portal`,
+    //   icon: WindowLayout,
+    //   isActive: top === "portal",
+    // },
     {
       key: "settings",
       label: "Settings",
