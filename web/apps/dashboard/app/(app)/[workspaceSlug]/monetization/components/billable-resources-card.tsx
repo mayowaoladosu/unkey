@@ -15,9 +15,10 @@ type ResourceType = "keyspace" | "namespace";
  */
 export const BillableResourcesCard: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
   const utils = trpc.useUtils();
-  const { data, isLoading } = trpc.billing.monetization.listBillableResources.useQuery(undefined, {
-    staleTime: 30_000,
-  });
+  const { data, isLoading, isError, error } = trpc.billing.monetization.listBillableResources.useQuery(
+    undefined,
+    { staleTime: 30_000 },
+  );
 
   const setResource = trpc.billing.monetization.setBillableResource.useMutation({
     onSuccess: () => {
@@ -37,6 +38,23 @@ export const BillableResourcesCard: React.FC<{ isAdmin: boolean }> = ({ isAdmin 
       <div className="flex w-full justify-center py-8">
         <Loading />
       </div>
+    );
+  }
+
+  // Surface load failures instead of silently rendering an empty list — an
+  // errored query must not read as "you have no keyspaces."
+  if (isError) {
+    return (
+      <SettingCardGroup>
+        <SettingCard title="Billable resources" description="" border="both">
+          <Empty>
+            <Empty.Title>Couldn't load billable resources</Empty.Title>
+            <Empty.Description>
+              {error?.message ?? "Please try again in a moment."}
+            </Empty.Description>
+          </Empty>
+        </SettingCard>
+      </SettingCardGroup>
     );
   }
 

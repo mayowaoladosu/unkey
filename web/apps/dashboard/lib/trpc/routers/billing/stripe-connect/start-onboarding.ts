@@ -110,11 +110,15 @@ export const startStripeConnectOnboarding = workspaceProcedure
       });
     }
 
-    const settingsUrl = `${getBaseUrl()}/${ctx.workspace.slug}/settings/billing`;
+    // Return to the Monetization page (where the Stripe Connect card now lives,
+    // moved out of Settings > Billing). The ?connect=return handler that
+    // finishes onboarding (pending -> linked) is rendered by that card, so the
+    // redirect must land on the page that hosts it.
+    const monetizationUrl = `${getBaseUrl()}/${ctx.workspace.slug}/monetization`;
     const link = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${settingsUrl}?connect=refresh`,
-      return_url: `${settingsUrl}?connect=return`,
+      refresh_url: `${monetizationUrl}?connect=refresh`,
+      return_url: `${monetizationUrl}?connect=return`,
       type: "account_onboarding",
     });
 
