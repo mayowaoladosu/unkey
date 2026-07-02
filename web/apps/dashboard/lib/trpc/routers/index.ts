@@ -40,6 +40,8 @@ import { createRateCard } from "./billing/rate-cards/create";
 import { listRateCards } from "./billing/rate-cards/list";
 import { setDefaultRateCard } from "./billing/rate-cards/set-default";
 import { updateRateCard } from "./billing/rate-cards/update";
+import { listBillableResources } from "./billing/monetization/list-billable-resources";
+import { setBillableResource } from "./billing/monetization/set-billable-resource";
 import { finishStripeConnectOnboarding } from "./billing/stripe-connect/finish-onboarding";
 import { getStripeConnect } from "./billing/stripe-connect/get";
 import { linkStripeConnect } from "./billing/stripe-connect/link";
@@ -438,6 +440,10 @@ export const router = t.router({
       finishOnboarding: finishStripeConnectOnboarding,
       link: linkStripeConnect,
       unlink: unlinkStripeConnect,
+    }),
+    monetization: t.router({
+      listBillableResources,
+      setBillableResource,
     }),
   }),
   audit: t.router({
