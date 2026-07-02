@@ -34,14 +34,14 @@ import { queryRolesPermissions } from "./authorization/roles/permissions/query-p
 import { searchRolesPermissions } from "./authorization/roles/permissions/search-permissions";
 import { queryRoles } from "./authorization/roles/query";
 import { upsertRole } from "./authorization/roles/upsert";
+import { listBillableResources } from "./billing/monetization/list-billable-resources";
+import { setBillableResource } from "./billing/monetization/set-billable-resource";
 import { queryDeployUsage } from "./billing/query-deploy-usage";
 import { queryUsage } from "./billing/query-usage";
 import { createRateCard } from "./billing/rate-cards/create";
 import { listRateCards } from "./billing/rate-cards/list";
 import { setDefaultRateCard } from "./billing/rate-cards/set-default";
 import { updateRateCard } from "./billing/rate-cards/update";
-import { listBillableResources } from "./billing/monetization/list-billable-resources";
-import { setBillableResource } from "./billing/monetization/set-billable-resource";
 import { finishStripeConnectOnboarding } from "./billing/stripe-connect/finish-onboarding";
 import { getStripeConnect } from "./billing/stripe-connect/get";
 import { linkStripeConnect } from "./billing/stripe-connect/link";
@@ -141,12 +141,14 @@ import { listEnvironments } from "./environment/list";
 import { githubRouter } from "./github";
 import { createIdentity } from "./identity/create";
 import { deleteIdentity } from "./identity/delete";
+import { getIdentityBilling } from "./identity/getBilling";
 import { getIdentityById } from "./identity/getById";
 import { queryIdentities } from "./identity/query";
 import { queryIdentityLogs } from "./identity/query-logs";
 import { queryIdentityTimeseries } from "./identity/query-timeseries";
 import { searchIdentities } from "./identity/search";
 import { searchIdentitiesWithRelations } from "./identity/searchWithRelations";
+import { updateIdentityBilling } from "./identity/updateBilling";
 import { updateIdentityMetadata } from "./identity/updateMetadata";
 import { updateIdentityRatelimit } from "./identity/updateRatelimit";
 import { createKey } from "./key/create";
@@ -481,6 +483,7 @@ export const router = t.router({
     query: queryIdentities,
     search: searchIdentities,
     getById: getIdentityById,
+    getBilling: getIdentityBilling,
     logs: t.router({
       query: queryIdentityLogs,
       timeseries: queryIdentityTimeseries,
@@ -488,6 +491,7 @@ export const router = t.router({
     update: t.router({
       metadata: updateIdentityMetadata,
       ratelimit: updateIdentityRatelimit,
+      billing: updateIdentityBilling,
     }),
   }),
   deploy: t.router({
