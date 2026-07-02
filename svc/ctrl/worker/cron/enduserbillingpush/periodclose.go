@@ -29,9 +29,10 @@ import (
 // pageSize bounds each MySQL page of workspaces and identities.
 const pageSize = 100
 
-// UsageReader reads per-identity billable quantities from ClickHouse.
+// UsageReader reads per-identity billable quantities from ClickHouse, scoped to
+// the keyspaces and ratelimit namespaces the workspace has enabled for billing.
 type UsageReader interface {
-	GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]clickhouse.IdentityBillableUsage, error)
+	GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int, enabledKeyspaces, enabledNamespaces []string) ([]clickhouse.IdentityBillableUsage, error)
 }
 
 // Decrypter decrypts the workspace's Vault-encrypted connected account
@@ -154,7 +155,18 @@ func (p *PeriodClose) runWorkspace(ctx context.Context, ws db.WorkspaceBillingSe
 		return 0, fault.Wrap(err, fault.Internal("failed to decrypt connected account reference"))
 	}
 
-	usage, err := p.usage.GetBillableUsagePerIdentity(ctx, ws.WorkspaceID, year, month)
+	// Only keyspaces/namespaces the workspace enabled for billing contribute
+	// usage. With nothing enabled there is nothing to bill — skip before the
+	// ClickHouse read.
+	enabledKeyspaces, enabledNamespaces, err := billing.LoadEnabledResources(ctx, p.database, ws.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	if len(enabledKeyspaces) == 0 && len(enabledNamespaces) == 0 {
+		return 0, nil
+	}
+
+	usage, err := p.usage.GetBillableUsagePerIdentity(ctx, ws.WorkspaceID, year, month, enabledKeyspaces, enabledNamespaces)
 	if err != nil {
 		return 0, fault.Wrap(err, fault.Internal("failed to read per-identity usage"))
 	}

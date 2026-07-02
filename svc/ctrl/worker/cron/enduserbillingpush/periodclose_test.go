@@ -20,7 +20,7 @@ type fakeUsage struct {
 	rows map[string][]clickhouse.IdentityBillableUsage
 }
 
-func (f *fakeUsage) GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]clickhouse.IdentityBillableUsage, error) {
+func (f *fakeUsage) GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int, enabledKeyspaces, enabledNamespaces []string) ([]clickhouse.IdentityBillableUsage, error) {
 	return f.rows[workspaceID], nil
 }
 
@@ -85,6 +85,18 @@ func TestPeriodClose(t *testing.T) {
 			WorkspaceBillingSettingsStripeConnectStatus: db.WorkspaceBillingSettingsStripeConnectStatusLinked,
 		},
 		CreatedAt: time.Now().UnixMilli(),
+	}))
+
+	// Enable one keyspace for billing so the workspace is not skipped as
+	// "nothing enabled". The fake usage reader ignores the filter, so which
+	// keyspace is enabled does not change the returned rows here — this only
+	// exercises the enablement gate in runWorkspace.
+	require.NoError(t, db.Query.UpsertBillingBillableResource(ctx, database.RW(), db.UpsertBillingBillableResourceParams{
+		ID:           uid.New(uid.RateCardPrefix),
+		WorkspaceID:  workspaceID,
+		ResourceType: db.BillingBillableResourcesResourceTypeKeyspace,
+		ResourceID:   uid.New(uid.KeySpacePrefix),
+		CreatedAt:    time.Now().UnixMilli(),
 	}))
 
 	// Two identities bound to stripe_connect (one with a provider customer),

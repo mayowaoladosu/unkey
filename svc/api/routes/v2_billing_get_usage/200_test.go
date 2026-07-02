@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/unkeyed/unkey/internal/services/billing"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
+	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
@@ -18,7 +20,7 @@ import (
 
 func TestGetUsage(t *testing.T) {
 	h := testutil.NewHarness(t, testutil.HarnessConfig{ClickHouse: true})
-	route := &handler.Handler{ClickHouse: h.ClickHouse}
+	route := &handler.Handler{ClickHouse: h.ClickHouse, Resolver: billing.NewResolver(h.DB)}
 	h.Register(route)
 
 	workspaceID := h.Resources().UserWorkspace.ID
@@ -27,6 +29,16 @@ func TestGetUsage(t *testing.T) {
 		"Content-Type":  {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", rootKey)},
 	}
+
+	// Enable the keyspace the usage is recorded under so it is in scope.
+	keySpaceID := uid.New(uid.KeySpacePrefix)
+	require.NoError(t, db.Query.UpsertBillingBillableResource(context.Background(), h.DB.RW(), db.UpsertBillingBillableResourceParams{
+		ID:           uid.New(uid.RateCardPrefix),
+		WorkspaceID:  workspaceID,
+		ResourceType: db.BillingBillableResourcesResourceTypeKeyspace,
+		ResourceID:   keySpaceID,
+		CreatedAt:    time.Now().UnixMilli(),
+	}))
 
 	identity := h.CreateIdentity(seed.CreateIdentityRequest{
 		WorkspaceID: workspaceID,
@@ -47,7 +59,7 @@ func TestGetUsage(t *testing.T) {
 			RequestID:    uid.New(uid.RequestPrefix),
 			Time:         now.Add(time.Duration(i) * time.Second).UnixMilli(),
 			WorkspaceID:  workspaceID,
-			KeySpaceID:   uid.New(uid.KeySpacePrefix),
+			KeySpaceID:   keySpaceID,
 			IdentityID:   identity.ID,
 			ExternalID:   "user_usage",
 			KeyID:        uid.New(uid.KeyPrefix),

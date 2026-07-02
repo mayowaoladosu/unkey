@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/unkeyed/unkey/internal/services/billing"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/fault"
@@ -22,6 +23,7 @@ type (
 // for one period, read from the pre-aggregated per-identity rollup (R8).
 type Handler struct {
 	ClickHouse clickhouse.ClickHouse
+	Resolver   *billing.Resolver
 }
 
 func (h *Handler) Method() string {
@@ -52,7 +54,16 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	usage, err := h.ClickHouse.GetBillableUsagePerIdentity(ctx, principal.WorkspaceID, req.Year, req.Month)
+	enabledKeyspaces, enabledNamespaces, err := h.Resolver.LoadEnabledResources(ctx, principal.WorkspaceID)
+	if err != nil {
+		return fault.Wrap(err,
+			fault.Code(codes.App.Internal.UnexpectedError.URN()),
+			fault.Internal("failed to load enabled billable resources"),
+			fault.Public("We're unable to load billable usage right now."),
+		)
+	}
+
+	usage, err := h.ClickHouse.GetBillableUsagePerIdentity(ctx, principal.WorkspaceID, req.Year, req.Month, enabledKeyspaces, enabledNamespaces)
 	if err != nil {
 		return fault.Wrap(err,
 			fault.Code(codes.App.Internal.UnexpectedError.URN()),

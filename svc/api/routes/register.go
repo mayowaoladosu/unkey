@@ -601,6 +601,7 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 		protectedMiddlewares,
 		&v2BillingGetUsage.Handler{
 			ClickHouse: svc.ClickHouse,
+			Resolver:   svc.BillingResolver,
 		},
 	)
 

@@ -25,7 +25,7 @@ func (n *noop) GetBillableRatelimits(ctx context.Context, workspaceID string, ye
 }
 
 // GetBillableUsagePerIdentity implements the Querier interface but always returns an empty slice.
-func (n *noop) GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]IdentityBillableUsage, error) {
+func (n *noop) GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int, enabledKeyspaces, enabledNamespaces []string) ([]IdentityBillableUsage, error) {
 	return nil, nil
 }
 

@@ -25,19 +25,33 @@ type IdentityBillableUsage struct {
 }
 
 // GetBillableUsagePerIdentity returns per-end-user billable quantities for a
-// workspace in a specific month, one row per identity. Identities with zero
-// usage in the month are absent from the result.
+// workspace in a specific month, one row per identity. Usage is SCOPED to the
+// enabled resources: verifications and credits are summed only over keyspaces
+// in enabledKeyspaces, and passed ratelimits only over namespaces in
+// enabledNamespaces (billing_billable_resources). An empty enabled set for a
+// dimension contributes nothing; if both are empty the result is empty.
+// Identities with zero billable usage in the month are absent from the result.
 //
 // Example:
 //
-//	usage, err := ch.GetBillableUsagePerIdentity(ctx, "ws_123abc", 2026, 7)
+//	usage, err := ch.GetBillableUsagePerIdentity(ctx, "ws_123abc", 2026, 7, keyspaces, namespaces)
 //	if err != nil {
 //	    return fmt.Errorf("failed to get per-identity usage: %w", err)
 //	}
-func (c *Client) GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int) ([]IdentityBillableUsage, error) {
+func (c *Client) GetBillableUsagePerIdentity(ctx context.Context, workspaceID string, year, month int, enabledKeyspaces, enabledNamespaces []string) ([]IdentityBillableUsage, error) {
+	// Normalize nil to an empty slice so the Array(String) bind is well-formed;
+	// `x IN []` then matches nothing, which is the correct "not enabled" result.
+	if enabledKeyspaces == nil {
+		enabledKeyspaces = []string{}
+	}
+	if enabledNamespaces == nil {
+		enabledNamespaces = []string{}
+	}
+
 	// UNION ALL over the per-identity rollups, collapsed to one row per identity.
 	// Each branch contributes its own metric and zeroes for the others, so the
-	// outer GROUP BY sums into a single combined row.
+	// outer GROUP BY sums into a single combined row. Verifications/credits are
+	// filtered to enabled keyspaces; ratelimits to enabled namespaces.
 	query := `
 	SELECT
 		identity_id,
@@ -49,18 +63,21 @@ func (c *Client) GetBillableUsagePerIdentity(ctx context.Context, workspaceID st
 		-- Literal zeroes are cast to Int64: bare 0 is UInt8, which would promote
 		-- the summed column to UInt64 and break the signed scan on the Go side.
 		SELECT identity_id, external_id, sum(count) AS verifications, toInt64(0) AS spent_credits, toInt64(0) AS ratelimits_passed
-		FROM default.billable_verifications_per_identity_per_month_v1
+		FROM default.billable_verifications_per_identity_per_month_v2
 		WHERE workspace_id = {workspace_id:String} AND year = {year:Int32} AND month = {month:Int32}
+			AND key_space_id IN ({keyspaces:Array(String)})
 		GROUP BY identity_id, external_id
 		UNION ALL
 		SELECT identity_id, external_id, toInt64(0), sum(spent_credits), toInt64(0)
-		FROM default.billable_credits_per_identity_per_month_v1
+		FROM default.billable_credits_per_identity_per_month_v2
 		WHERE workspace_id = {workspace_id:String} AND year = {year:Int32} AND month = {month:Int32}
+			AND key_space_id IN ({keyspaces:Array(String)})
 		GROUP BY identity_id, external_id
 		UNION ALL
 		SELECT identity_id, external_id, toInt64(0), toInt64(0), sum(count)
-		FROM default.billable_ratelimits_per_identity_per_month_v1
+		FROM default.billable_ratelimits_per_identity_per_month_v2
 		WHERE workspace_id = {workspace_id:String} AND year = {year:Int32} AND month = {month:Int32}
+			AND namespace_id IN ({namespaces:Array(String)})
 		GROUP BY identity_id, external_id
 	)
 	GROUP BY identity_id, external_id
@@ -72,6 +89,8 @@ func (c *Client) GetBillableUsagePerIdentity(ctx context.Context, workspaceID st
 		ch.Named("workspace_id", workspaceID),
 		ch.Named("year", year),
 		ch.Named("month", month),
+		ch.Named("keyspaces", enabledKeyspaces),
+		ch.Named("namespaces", enabledNamespaces),
 	)
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Internal("failed to query per-identity billable usage"))

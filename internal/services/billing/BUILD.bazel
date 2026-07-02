@@ -2,7 +2,10 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "billing",
-    srcs = ["resolver.go"],
+    srcs = [
+        "billable_resources.go",
+        "resolver.go",
+    ],
     importpath = "github.com/unkeyed/unkey/internal/services/billing",
     visibility = ["//:__subpackages__"],
     deps = [

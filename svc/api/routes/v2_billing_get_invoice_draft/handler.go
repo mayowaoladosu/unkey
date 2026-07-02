@@ -66,7 +66,17 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	usage, err := h.ClickHouse.GetBillableUsagePerIdentity(ctx, principal.WorkspaceID, req.Year, req.Month)
+	enabledKeyspaces, enabledNamespaces, err := h.Resolver.LoadEnabledResources(ctx, principal.WorkspaceID)
+	if err != nil {
+		return fault.Wrap(err,
+			fault.Code(codes.App.Internal.UnexpectedError.URN()),
+			fault.Internal("failed to load enabled billable resources"),
+			fault.Public("We're unable to load billable usage right now."),
+		)
+	}
+
+	// Preview must scope usage exactly like the period-close push (R19 parity).
+	usage, err := h.ClickHouse.GetBillableUsagePerIdentity(ctx, principal.WorkspaceID, req.Year, req.Month, enabledKeyspaces, enabledNamespaces)
 	if err != nil {
 		return fault.Wrap(err,
 			fault.Code(codes.App.Internal.UnexpectedError.URN()),

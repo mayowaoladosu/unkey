@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/unkeyed/unkey/svc/api/routes/v2_billing_get_usage",
     visibility = ["//visibility:public"],
     deps = [
+        "//internal/services/billing",
         "//pkg/clickhouse",
         "//pkg/codes",
         "//pkg/fault",
@@ -21,7 +22,9 @@ go_test(
     srcs = ["200_test.go"],
     deps = [
         ":v2_billing_get_usage",
+        "//internal/services/billing",
         "//pkg/clickhouse/schema",
+        "//pkg/db",
         "//pkg/uid",
         "//svc/api/internal/testutil",
         "//svc/api/internal/testutil/seed",

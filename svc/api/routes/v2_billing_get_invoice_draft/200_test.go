@@ -61,6 +61,16 @@ func TestGetInvoiceDraft(t *testing.T) {
 		CreatedAt:         time.Now().UnixMilli(),
 	}))
 
+	// Enable the keyspace that carries the usage so the draft is scoped to it.
+	keySpaceID := uid.New(uid.KeySpacePrefix)
+	require.NoError(t, db.Query.UpsertBillingBillableResource(context.Background(), h.DB.RW(), db.UpsertBillingBillableResourceParams{
+		ID:           uid.New(uid.RateCardPrefix),
+		WorkspaceID:  workspaceID,
+		ResourceType: db.BillingBillableResourcesResourceTypeKeyspace,
+		ResourceID:   keySpaceID,
+		CreatedAt:    time.Now().UnixMilli(),
+	}))
+
 	identity := h.CreateIdentity(seed.CreateIdentityRequest{
 		WorkspaceID: workspaceID,
 		ExternalID:  "user_draft",
@@ -79,7 +89,7 @@ func TestGetInvoiceDraft(t *testing.T) {
 			RequestID:    uid.New(uid.RequestPrefix),
 			Time:         now.Add(time.Duration(i) * time.Second).UnixMilli(),
 			WorkspaceID:  workspaceID,
-			KeySpaceID:   uid.New(uid.KeySpacePrefix),
+			KeySpaceID:   keySpaceID,
 			IdentityID:   identity.ID,
 			ExternalID:   "user_draft",
 			KeyID:        uid.New(uid.KeyPrefix),

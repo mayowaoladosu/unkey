@@ -56,43 +56,43 @@ func (c *Client) BackfillBillableIdentityRollups(ctx context.Context, year, mont
 	}{
 		{
 			name:       "verifications",
-			deleteFrom: "billable_verifications_per_identity_per_month_v1",
+			deleteFrom: "billable_verifications_per_identity_per_month_v2",
 			insertSelect: `
-INSERT INTO default.billable_verifications_per_identity_per_month_v1
-  (year, month, workspace_id, identity_id, external_id, count)
-SELECT toYear(time), toMonth(time), workspace_id, identity_id, external_id, sum(count)
+INSERT INTO default.billable_verifications_per_identity_per_month_v2
+  (year, month, workspace_id, key_space_id, identity_id, external_id, count)
+SELECT toYear(time), toMonth(time), workspace_id, key_space_id, identity_id, external_id, sum(count)
 FROM default.key_verifications_per_month_v3
 WHERE outcome = 'VALID' AND external_id != ''
   AND toYear(time) = {year:Int32} AND toMonth(time) = {month:Int32}
-GROUP BY workspace_id, identity_id, external_id, toYear(time), toMonth(time)`,
+GROUP BY workspace_id, key_space_id, identity_id, external_id, toYear(time), toMonth(time)`,
 		},
 		{
 			name:       "credits",
-			deleteFrom: "billable_credits_per_identity_per_month_v1",
+			deleteFrom: "billable_credits_per_identity_per_month_v2",
 			insertSelect: `
-INSERT INTO default.billable_credits_per_identity_per_month_v1
-  (year, month, workspace_id, identity_id, external_id, spent_credits)
-SELECT toYear(time), toMonth(time), workspace_id, identity_id, external_id, sum(spent_credits)
+INSERT INTO default.billable_credits_per_identity_per_month_v2
+  (year, month, workspace_id, key_space_id, identity_id, external_id, spent_credits)
+SELECT toYear(time), toMonth(time), workspace_id, key_space_id, identity_id, external_id, sum(spent_credits)
 FROM default.key_verifications_per_month_v3
 WHERE external_id != ''
   AND toYear(time) = {year:Int32} AND toMonth(time) = {month:Int32}
-GROUP BY workspace_id, identity_id, external_id, toYear(time), toMonth(time)`,
+GROUP BY workspace_id, key_space_id, identity_id, external_id, toYear(time), toMonth(time)`,
 		},
 		{
 			name:       "ratelimits",
-			deleteFrom: "billable_ratelimits_per_identity_per_month_v1",
+			deleteFrom: "billable_ratelimits_per_identity_per_month_v2",
 			insertSelect: `
-INSERT INTO default.billable_ratelimits_per_identity_per_month_v1
-  (year, month, workspace_id, identity_id, external_id, count)
+INSERT INTO default.billable_ratelimits_per_identity_per_month_v2
+  (year, month, workspace_id, namespace_id, identity_id, external_id, count)
 SELECT
   toYear(fromUnixTimestamp64Milli(time)),
   toMonth(fromUnixTimestamp64Milli(time)),
-  workspace_id, identity_id, external_id, toInt64(countIf(passed))
+  workspace_id, namespace_id, identity_id, external_id, toInt64(countIf(passed))
 FROM default.ratelimits_raw_v3
 WHERE external_id != ''
   AND toYear(fromUnixTimestamp64Milli(time)) = {year:Int32}
   AND toMonth(fromUnixTimestamp64Milli(time)) = {month:Int32}
-GROUP BY workspace_id, identity_id, external_id,
+GROUP BY workspace_id, namespace_id, identity_id, external_id,
   toYear(fromUnixTimestamp64Milli(time)), toMonth(fromUnixTimestamp64Milli(time))`,
 		},
 	}
