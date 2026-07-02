@@ -34,6 +34,7 @@ import { queryRolesPermissions } from "./authorization/roles/permissions/query-p
 import { searchRolesPermissions } from "./authorization/roles/permissions/search-permissions";
 import { queryRoles } from "./authorization/roles/query";
 import { upsertRole } from "./authorization/roles/upsert";
+import { createCustomerForIdentity } from "./billing/monetization/create-customer-for-identity";
 import { listBillableResources } from "./billing/monetization/list-billable-resources";
 import { setBillableResource } from "./billing/monetization/set-billable-resource";
 import { queryDeployUsage } from "./billing/query-deploy-usage";
@@ -446,6 +447,7 @@ export const router = t.router({
     monetization: t.router({
       listBillableResources,
       setBillableResource,
+      createCustomerForIdentity,
     }),
   }),
   audit: t.router({
