@@ -12,6 +12,7 @@ import {
   Nodes,
   ShieldKey,
   SquareBulletList,
+  WindowLayout,
 } from "@unkey/icons";
 import { routes } from "./routes";
 import type { ResolvedNavLink } from "./types";
@@ -69,6 +70,13 @@ export function buildWorkspaceSections(slug: string, segments: string[]): Resolv
       isActive: top === "audit",
     },
     {
+      key: "portal",
+      label: "Customer portal",
+      href: `/${slug}/portal`,
+      icon: WindowLayout,
+      isActive: top === "portal",
+    },
+    {
       key: "settings",
       label: "Settings",
       href: routes.settings.general({ workspaceSlug: slug }),
@@ -106,6 +114,13 @@ export function buildProjectLinks(
       href: routes.projects.requests(scope),
       icon: ArrowOppositeDirectionY,
       isActive: page === "requests",
+    },
+    {
+      key: "portal",
+      label: "Customer portal",
+      href: `/${slug}/projects/${projectId}/portal`,
+      icon: WindowLayout,
+      isActive: page === "portal",
     },
     {
       key: "settings",
@@ -216,6 +231,13 @@ export function buildApiLinks(
       icon: Key,
       isActive: page === "keys",
       disabled: !keyAuthId,
+    },
+    {
+      key: "portal",
+      label: "Customer portal",
+      href: `/${slug}/apis/${apiId}/portal`,
+      icon: WindowLayout,
+      isActive: page === "portal",
     },
     {
       key: "settings",

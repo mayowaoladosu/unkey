@@ -10,7 +10,8 @@ export type BreadcrumbDescriptor =
   | { type: "app"; projectId: string; appId: string }
   | { type: "api"; apiId: string }
   | { type: "namespace"; namespaceId: string }
-  | { type: "identity"; identityId: string };
+  | { type: "identity"; identityId: string }
+  | { type: "portal"; portalId: string };
 
 type RouteParams = {
   projectId?: string;
@@ -18,6 +19,7 @@ type RouteParams = {
   apiId?: string;
   namespaceId?: string;
   identityId?: string;
+  portalId?: string;
 };
 
 export function useBreadcrumbs(): BreadcrumbDescriptor[] {
@@ -41,6 +43,9 @@ export function useBreadcrumbs(): BreadcrumbDescriptor[] {
   if (params.identityId) {
     crumbs.push({ type: "identity", identityId: params.identityId });
   }
+  if (params.portalId) {
+    crumbs.push({ type: "portal", portalId: params.portalId });
+  }
   return crumbs;
 }
 
@@ -56,6 +61,9 @@ function resolveWorkspaceHref(slug: string, params: RouteParams): string {
   }
   if (params.identityId) {
     return `/${slug}/identities`;
+  }
+  if (params.portalId) {
+    return `/${slug}/portal`;
   }
   return `/${slug}`;
 }

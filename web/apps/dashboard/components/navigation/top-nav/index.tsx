@@ -15,6 +15,7 @@ import { TopNavFeedbackButton } from "./feedback-button";
 import { HelpButton } from "./help-button";
 import { IdentityCrumb } from "./identity-crumb";
 import { NamespaceCrumb } from "./namespace-crumb";
+import { PortalCrumb } from "./portal-crumb";
 import { ProjectCrumb } from "./project-crumb";
 import { UserButton } from "./user-button";
 import { WorkspaceCrumb } from "./workspace-crumb";
@@ -78,6 +79,8 @@ function CrumbForDescriptor({ descriptor }: { descriptor: BreadcrumbDescriptor }
       return <NamespaceCrumb namespaceId={descriptor.namespaceId} />;
     case "identity":
       return <IdentityCrumb identityId={descriptor.identityId} />;
+    case "portal":
+      return <PortalCrumb portalId={descriptor.portalId} />;
   }
 }
 
@@ -95,5 +98,7 @@ function crumbKey(descriptor: BreadcrumbDescriptor): string {
       return `namespace:${descriptor.namespaceId}`;
     case "identity":
       return `identity:${descriptor.identityId}`;
+    case "portal":
+      return `portal:${descriptor.portalId}`;
   }
 }
