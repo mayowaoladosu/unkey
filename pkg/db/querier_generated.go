@@ -73,6 +73,13 @@ type Querier interface {
 	//
 	//  DELETE FROM app_runtime_settings WHERE environment_id = ?
 	DeleteAppRuntimeSettingsByEnvironmentId(ctx context.Context, db DBTX, environmentID string) error
+	// Disables a keyspace/namespace for billing (removes it from the billable set).
+	//
+	//  DELETE FROM billing_billable_resources
+	//  WHERE workspace_id = ?
+	//    AND resource_type = ?
+	//    AND resource_id = ?
+	DeleteBillingBillableResource(ctx context.Context, db DBTX, arg DeleteBillingBillableResourceParams) error
 	//DeleteCiliumNetworkPoliciesByEnvironmentId
 	//
 	//  DELETE FROM cilium_network_policies WHERE environment_id = ?
@@ -2257,6 +2264,14 @@ type Querier interface {
 	//  ORDER BY id ASC
 	//  LIMIT ?
 	ListAppsByProject(ctx context.Context, db DBTX, arg ListAppsByProjectParams) ([]App, error)
+	// All resources a workspace has enabled for end-user billing. Presence of a row
+	// means the keyspace/namespace is billable; absence means excluded.
+	//
+	//  SELECT pk, id, workspace_id, resource_type, resource_id, created_at, updated_at
+	//  FROM billing_billable_resources
+	//  WHERE workspace_id = ?
+	//  ORDER BY resource_type, resource_id
+	ListBillingBillableResources(ctx context.Context, db DBTX, workspaceID string) ([]BillingBillableResource, error)
 	// Identities whose usage is pushed to a billing provider at period close.
 	//
 	//  SELECT pk, id, external_id, workspace_id, environment, meta, deleted, billing_provider, billing_external_customer_id, rate_card_id, selected_rate_card_id, created_at, updated_at
@@ -3584,6 +3599,24 @@ type Querier interface {
 	//      openapi_spec_path = VALUES(openapi_spec_path),
 	//      updated_at = VALUES(updated_at)
 	UpsertAppRuntimeSettings(ctx context.Context, db DBTX, arg UpsertAppRuntimeSettingsParams) error
+	// Enables a keyspace/namespace for billing. Idempotent: the unique
+	// (workspace_id, resource_type, resource_id) index makes a repeat enable a
+	// no-op rather than a duplicate row.
+	//
+	//  INSERT IGNORE INTO billing_billable_resources (
+	//      id,
+	//      workspace_id,
+	//      resource_type,
+	//      resource_id,
+	//      created_at
+	//  ) VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	UpsertBillingBillableResource(ctx context.Context, db DBTX, arg UpsertBillingBillableResourceParams) error
 	// Upserts a cluster by region_id. If the cluster already exists, updates the heartbeat timestamp.
 	//
 	//  INSERT INTO clusters (

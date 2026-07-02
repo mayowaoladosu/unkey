@@ -269,6 +269,48 @@ func (ns NullAppRuntimeSettingsUpstreamProtocol) Value() (driver.Value, error) {
 	return string(ns.AppRuntimeSettingsUpstreamProtocol), nil
 }
 
+type BillingBillableResourcesResourceType string
+
+const (
+	BillingBillableResourcesResourceTypeKeyspace  BillingBillableResourcesResourceType = "keyspace"
+	BillingBillableResourcesResourceTypeNamespace BillingBillableResourcesResourceType = "namespace"
+)
+
+func (e *BillingBillableResourcesResourceType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = BillingBillableResourcesResourceType(s)
+	case string:
+		*e = BillingBillableResourcesResourceType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for BillingBillableResourcesResourceType: %T", src)
+	}
+	return nil
+}
+
+type NullBillingBillableResourcesResourceType struct {
+	BillingBillableResourcesResourceType BillingBillableResourcesResourceType
+	Valid                                bool // Valid is true if BillingBillableResourcesResourceType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullBillingBillableResourcesResourceType) Scan(value interface{}) error {
+	if value == nil {
+		ns.BillingBillableResourcesResourceType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.BillingBillableResourcesResourceType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullBillingBillableResourcesResourceType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.BillingBillableResourcesResourceType), nil
+}
+
 type BillingPeriodRateCardsResolvedFrom string
 
 const (
@@ -1082,6 +1124,16 @@ type AppRuntimeSetting struct {
 	OpenapiSpecPath  sql.NullString                     `db:"openapi_spec_path"`
 	CreatedAt        int64                              `db:"created_at"`
 	UpdatedAt        sql.NullInt64                      `db:"updated_at"`
+}
+
+type BillingBillableResource struct {
+	Pk           uint64                               `db:"pk"`
+	ID           string                               `db:"id"`
+	WorkspaceID  string                               `db:"workspace_id"`
+	ResourceType BillingBillableResourcesResourceType `db:"resource_type"`
+	ResourceID   string                               `db:"resource_id"`
+	CreatedAt    int64                                `db:"created_at"`
+	UpdatedAt    sql.NullInt64                        `db:"updated_at"`
 }
 
 type BillingPeriodRateCard struct {

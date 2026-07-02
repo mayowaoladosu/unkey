@@ -167,3 +167,41 @@ export const billingPeriodRateCardsRelations = relations(billingPeriodRateCards,
     references: [rateCards.id],
   }),
 }));
+
+/**
+ * Which of a workspace's keyspaces and ratelimit namespaces are enabled for
+ * end-user billing. Enablement is opt-in: a resource is billed only when a row
+ * exists here (presence == enabled). Usage on resources with no row is excluded
+ * from an identity's billable quantities. `resource_id` is a keyspace id
+ * (key_auth.id, the ClickHouse key_space_id) or a ratelimit namespace id
+ * (ratelimit_namespaces.id, the ClickHouse namespace_id) per `resource_type`.
+ */
+export const billingBillableResources = mysqlTable(
+  "billing_billable_resources",
+  {
+    pk: bigint("pk", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    id: varchar("id", { length: 256 }).notNull().unique(),
+    workspaceId: varchar("workspace_id", { length: 256 }).notNull(),
+    /** Whether resource_id names a keyspace (key_auth) or a ratelimit namespace. */
+    resourceType: mysqlEnum("resource_type", ["keyspace", "namespace"]).notNull(),
+    resourceId: varchar("resource_id", { length: 256 }).notNull(),
+    ...lifecycleDates,
+  },
+  (table) => ({
+    uniqueResourcePerWorkspace: uniqueIndex("workspace_resource_idx").on(
+      table.workspaceId,
+      table.resourceType,
+      table.resourceId,
+    ),
+  }),
+);
+
+export const billingBillableResourcesRelations = relations(
+  billingBillableResources,
+  ({ one }) => ({
+    workspace: one(workspaces, {
+      fields: [billingBillableResources.workspaceId],
+      references: [workspaces.id],
+    }),
+  }),
+);
