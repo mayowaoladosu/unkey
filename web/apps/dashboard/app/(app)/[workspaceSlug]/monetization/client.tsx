@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc/client";
 import { Button, SettingCard, SettingCardGroup } from "@unkey/ui";
 import Link from "next/link";
 import { BillableResourcesCard } from "./components/billable-resources-card";
+import { RateCardsCard } from "./components/rate-cards-card";
 import { StripeConnectCard } from "./components/stripe-connect-card";
 
 /**
@@ -27,6 +28,8 @@ export const MonetizationClient: React.FC = () => {
         <SettingCardGroup>
           <StripeConnectCard isAdmin={isAdmin} />
         </SettingCardGroup>
+
+        <RateCardsCard isAdmin={isAdmin} />
 
         <BillableResourcesCard isAdmin={isAdmin} />
 
