@@ -3,7 +3,8 @@ import { trpc } from "@/lib/trpc/client";
 import { Button, InfoTooltip, SettingCard, toast } from "@unkey/ui";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { ADMIN_ONLY_TOOLTIP } from "./constants";
+
+const ADMIN_ONLY_TOOLTIP = "Admin access required to manage billing";
 
 /**
  * Stripe Connect card for end-user billing: the customer connects their own
