@@ -114,6 +114,19 @@ const (
 	// NotFound indicates the requested environment does not exist.
 	UnkeyDataErrorsEnvironmentNotFound URN = "err:unkey:data:environment_not_found"
 
+<<<<<<< HEAD
+=======
+	// EnvironmentVariable
+
+	// Duplicate indicates an environment variable key already exists.
+	UnkeyDataErrorsEnvironmentVariableDuplicate URN = "err:unkey:data:environment_variable_already_exists"
+
+	// Deployment
+
+	// NotFound indicates the requested deployment does not exist.
+	UnkeyDataErrorsDeploymentNotFound URN = "err:unkey:data:deployment_not_found"
+
+>>>>>>> ba9e4f6d4 (feat(api): create deployment endpoint (#6617))
 	// Migration
 
 	// NotFound indicates the requested migration was not found.
