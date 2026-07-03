@@ -148,7 +148,19 @@ export async function linkDeploySubscription(
     });
   });
 
-  await invalidateWorkspaceCache(ws.orgId);
+  // The write above is the source of truth and has committed. Cache
+  // invalidation is best-effort: a throw here must not turn a completed link
+  // into a webhook 500 (which retries into the alreadyLinked no-op below and
+  // never re-reaches this line) or a spurious /success error. The
+  // customer.subscription.* webhook and the cache TTL re-sync if this misses.
+  try {
+    await invalidateWorkspaceCache(ws.orgId);
+  } catch (err) {
+    console.error("Failed to invalidate workspace cache after linking Compute subscription", {
+      workspaceId: ws.id,
+      error: err instanceof Error ? err.message : err,
+    });
+  }
 
   return { ok: true, plan, alreadyLinked: false };
 }
