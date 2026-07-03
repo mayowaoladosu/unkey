@@ -1,7 +1,7 @@
 import { insertAuditLogs } from "@/lib/audit";
 import { db, eq, schema } from "@/lib/db";
 import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { type DeployPlan, detectDeployPlan } from "./deployPlan";
 
 /**
@@ -59,8 +59,15 @@ export async function linkDeploySubscription(
   let session: Stripe.Checkout.Session;
   try {
     session = await stripe.checkout.sessions.retrieve(input.sessionId);
-  } catch {
-    return { ok: false, reason: "session_not_found", message: "Checkout session not found." };
+  } catch (err) {
+    // Only a genuinely missing session is a permanent "not found". A transient
+    // Stripe failure (network, 429, 5xx) must propagate so the webhook returns
+    // 500 and Stripe retries — swallowing it here would ack the event and leave
+    // a paid subscription orphaned from a purely transient cause.
+    if (err instanceof Stripe.errors.StripeError && err.code === "resource_missing") {
+      return { ok: false, reason: "session_not_found", message: "Checkout session not found." };
+    }
+    throw err;
   }
 
   // Ownership: the session must have been created for this workspace. This is

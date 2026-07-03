@@ -17,6 +17,7 @@ import {
 } from "@/lib/stripe/subscriptionUtils";
 import {
   alertIsCancellingSubscription,
+  alertOrphanedDeploySubscription,
   alertPaymentFailed,
   alertPaymentRecovered,
   alertSubscriptionCancelled,
@@ -40,6 +41,61 @@ async function mirrorDeployPlan(
   if (changed) {
     await db.update(schema.workspaces).set({ deployPlan }).where(eq(schema.workspaces.id, ws.id));
   }
+}
+
+/**
+ * Links a subscription-mode Compute checkout to its workspace via the shared
+ * linker, shared by the `checkout.session.completed` and
+ * `checkout.session.async_payment_succeeded` events (the latter fires when a
+ * delayed-notification payment clears after `completed` reported it unpaid).
+ *
+ * Returns 200 for anything a retry cannot fix (not a subscription checkout,
+ * missing workspace ref, or a linker rejection); lets transient Stripe/DB
+ * errors from the linker propagate so the caller returns 500 and Stripe
+ * retries. A `subscription_conflict` means a paid, live subscription exists
+ * that will never link (a race minted a duplicate) — it bills until an operator
+ * intervenes, so page a human rather than only logging.
+ */
+async function linkComputeCheckoutSession(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+  eventId: string,
+): Promise<Response> {
+  if (session.mode !== "subscription" || !session.subscription) {
+    return new Response("OK", { status: 200 });
+  }
+  if (!session.client_reference_id) {
+    console.error("Compute checkout link event missing client_reference_id", {
+      sessionId: session.id,
+      eventId,
+    });
+    return new Response("OK", { status: 200 });
+  }
+
+  const result = await linkDeploySubscription(stripe, {
+    sessionId: session.id,
+    expectedWorkspaceId: session.client_reference_id,
+    audit: { actor: { type: "system", id: "stripe" }, location: "", userAgent: undefined },
+  });
+
+  if (!result.ok) {
+    console.error("Failed to link Compute checkout subscription", {
+      sessionId: session.id,
+      eventId,
+      reason: result.reason,
+    });
+    if (result.reason === "subscription_conflict") {
+      const subscriptionId =
+        typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+      await alertOrphanedDeploySubscription({
+        workspaceId: session.client_reference_id,
+        subscriptionId,
+        sessionId: session.id,
+        reason: result.reason,
+      });
+    }
+  }
+  return new Response("OK", { status: 200 });
 }
 
 /**
@@ -514,48 +570,19 @@ export const POST = async (req: Request): Promise<Response> => {
       }
     }
 
-    case "checkout.session.completed": {
+    // Guaranteed server-side link for the no-card Compute flow: fires even if
+    // the user never returns to /success. `completed` covers the immediate
+    // (card) case; `async_payment_succeeded` covers delayed-notification
+    // methods that reported unpaid at `completed` and only clear later. Both
+    // route through the same idempotent linker, so a racing /success call or a
+    // Stripe redelivery cannot double-write.
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
       try {
         const session = event.data.object as Stripe.Checkout.Session;
-
-        // Only subscription-mode Compute checkouts need a workspace link.
-        // Setup-mode sessions (card vault) and API checkouts are handled by
-        // /success or need no link here.
-        if (session.mode !== "subscription" || !session.subscription) {
-          return new Response("OK", { status: 200 });
-        }
-        if (!session.client_reference_id) {
-          console.error("checkout.session.completed missing client_reference_id", {
-            sessionId: session.id,
-            eventId: event.id,
-          });
-          return new Response("OK", { status: 200 });
-        }
-
-        // Guaranteed link path: fires server-side even if the user never
-        // returns to /success, so a paid subscription is never left orphaned.
-        // The shared linker re-verifies payment/status and is idempotent, so a
-        // redelivery or a racing /success call cannot double-write.
-        const result = await linkDeploySubscription(stripe, {
-          sessionId: session.id,
-          expectedWorkspaceId: session.client_reference_id,
-          audit: { actor: { type: "system", id: "stripe" }, location: "", userAgent: undefined },
-        });
-
-        if (!result.ok) {
-          // A conflict (different existing subscription), unpaid, or no-plan
-          // state cannot be reconciled automatically. Log for ops and ack so
-          // Stripe stops retrying a state a retry cannot fix; transient DB/
-          // Stripe failures throw and fall to the 500 below for retry.
-          console.error("Failed to link Compute checkout subscription", {
-            sessionId: session.id,
-            eventId: event.id,
-            reason: result.reason,
-          });
-        }
-        return new Response("OK", { status: 200 });
+        return await linkComputeCheckoutSession(stripe, session, event.id);
       } catch (error) {
-        console.error("Checkout session completed webhook error:", {
+        console.error("Checkout session link webhook error:", {
           error:
             error instanceof Error
               ? {

@@ -112,13 +112,26 @@ function SuccessContent() {
           try {
             await linkDeployFn({ sessionId });
           } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            // This mutation is only a fast-path; the checkout.session.completed
+            // webhook is the guaranteed linker. If it already linked (or a
+            // transient error hit after the write committed), the workspace is
+            // entitled — treat that as success rather than showing an alarming
+            // error for a charge that actually went through. Mirrors the
+            // entitlement-first check in projects/page.tsx usePendingSubscribe.
+            const entitled = await trpcUtils.stripe.getDeployEntitlement
+              .fetch(undefined, { staleTime: 0 })
+              .then((e) => Boolean(e?.entitled))
+              .catch(() => false);
             if (!isMounted) {
               return;
             }
-            setError(`Failed to activate your Compute plan: ${errorMessage}`);
-            setLoading(false);
-            return;
+            if (!entitled) {
+              const errorMessage = error instanceof Error ? error.message : "Unknown error";
+              setError(`Failed to activate your Compute plan: ${errorMessage}`);
+              setLoading(false);
+              return;
+            }
+            // Entitled despite the fast-path error — fall through to success.
           }
 
           if (!isMounted) {

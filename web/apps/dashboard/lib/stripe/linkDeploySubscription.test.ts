@@ -21,7 +21,7 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/audit", () => ({ insertAuditLogs: h.insertAuditLogs }));
 vi.mock("@/lib/workspace-cache", () => ({ invalidateWorkspaceCache: h.invalidateWorkspaceCache }));
 
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { linkDeploySubscription } from "./linkDeploySubscription";
 
 const WORKSPACE_ID = "ws_1";
@@ -54,14 +54,14 @@ function subscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subs
 function stubStripe(opts: {
   session?: Stripe.Checkout.Session;
   sub?: Stripe.Subscription;
-  sessionThrows?: boolean;
+  sessionError?: unknown;
 }): Stripe {
   return {
     checkout: {
       sessions: {
         retrieve: vi.fn(async () => {
-          if (opts.sessionThrows) {
-            throw new Error("no such session");
+          if (opts.sessionError !== undefined) {
+            throw opts.sessionError;
           }
           return opts.session ?? session();
         }),
@@ -70,6 +70,14 @@ function stubStripe(opts: {
     subscriptions: { retrieve: vi.fn(async () => opts.sub ?? subscription()) },
   } as unknown as Stripe;
 }
+
+// A real Stripe "resource_missing" error (the only shape that means the session
+// genuinely does not exist). instanceof Stripe.errors.StripeError must hold.
+const RESOURCE_MISSING = new Stripe.errors.StripeInvalidRequestError({
+  type: "invalid_request_error",
+  code: "resource_missing",
+  message: "No such checkout session",
+});
 
 describe("linkDeploySubscription", () => {
   beforeEach(() => {
@@ -128,14 +136,28 @@ describe("linkDeploySubscription", () => {
     expect(h.transaction).not.toHaveBeenCalled();
   });
 
-  it("returns session_not_found when the session cannot be retrieved", async () => {
-    const stripe = stubStripe({ sessionThrows: true });
+  it("returns session_not_found when Stripe reports the session is missing", async () => {
+    const stripe = stubStripe({ sessionError: RESOURCE_MISSING });
     const result = await linkDeploySubscription(stripe, {
       sessionId: "cs_missing",
       expectedWorkspaceId: WORKSPACE_ID,
       audit: AUDIT,
     });
     expect(result).toMatchObject({ ok: false, reason: "session_not_found" });
+  });
+
+  it("rethrows a transient Stripe error so the webhook retries (does not orphan)", async () => {
+    // A non-resource_missing failure (network/429/5xx) must propagate, not be
+    // swallowed as session_not_found — otherwise the webhook acks and never retries.
+    const stripe = stubStripe({ sessionError: new Error("network blip") });
+    await expect(
+      linkDeploySubscription(stripe, {
+        sessionId: "cs_1",
+        expectedWorkspaceId: WORKSPACE_ID,
+        audit: AUDIT,
+      }),
+    ).rejects.toThrow("network blip");
+    expect(h.transaction).not.toHaveBeenCalled();
   });
 
   it("writes customer + subscription + plan for a paid, active, unlinked workspace", async () => {

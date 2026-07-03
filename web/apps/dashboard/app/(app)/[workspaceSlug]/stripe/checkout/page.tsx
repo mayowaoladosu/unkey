@@ -138,28 +138,41 @@ export default async function StripeRedirect(props: {
     // 2026-06-24.dahlia or later, which is the version getStripeClient pins
     // (stripe-node types the constructor apiVersion as exactly the bundled
     // version, so the whole client is on 2026-06-24.dahlia).
-    session = await stripe.checkout.sessions.create({
-      client_reference_id: ws.id,
-      billing_address_collection: "auto",
-      mode: "subscription",
-      line_items: deployCheckoutLineItems(deployConfig, plan),
-      subscription_data: {
-        // Match subscribeDeploy's shape so a Checkout-created Compute
-        // subscription is the same as one it creates: day-1 anchor and classic
-        // billing mode. subscribeDeploy pins proration_behavior "always_invoice",
-        // which Checkout does not accept; "create_prorations" is the closest
-        // Checkout-valid behavior and still collects the prorated partial period
-        // on the first invoice at checkout.
-        billing_cycle_anchor_config: { day_of_month: 1 },
-        billing_mode: { type: "classic" },
-        proration_behavior: "create_prorations",
+    session = await stripe.checkout.sessions.create(
+      {
+        client_reference_id: ws.id,
+        billing_address_collection: "auto",
+        mode: "subscription",
+        line_items: deployCheckoutLineItems(deployConfig, plan),
+        subscription_data: {
+          // Match subscribeDeploy's shape so a Checkout-created Compute
+          // subscription is the same as one it creates: day-1 anchor and classic
+          // billing mode. subscribeDeploy pins proration_behavior "always_invoice",
+          // which Checkout does not accept; "create_prorations" is the closest
+          // Checkout-valid behavior and still collects the prorated partial period
+          // on the first invoice at checkout.
+          billing_cycle_anchor_config: { day_of_month: 1 },
+          billing_mode: { type: "classic" },
+          proration_behavior: "create_prorations",
+        },
+        ...(submitMessage ? { custom_text: { submit: { message: submitMessage } } } : {}),
+        // Subscription mode always creates a customer (so customer_creation is
+        // invalid here) and infers currency from the line-item prices.
+        ...(devClockedCustomerId ? { customer: devClockedCustomerId } : {}),
+        success_url: successUrl,
       },
-      ...(submitMessage ? { custom_text: { submit: { message: submitMessage } } } : {}),
-      // Subscription mode always creates a customer (so customer_creation is
-      // invalid here) and infers currency from the line-item prices.
-      ...(devClockedCustomerId ? { customer: devClockedCustomerId } : {}),
-      success_url: successUrl,
-    });
+      // Idempotency key so a retry within Stripe's window returns the SAME
+      // session instead of creating a second live, charged subscription — the
+      // race where the user pays, abandons before the link is written, then
+      // re-opens the gate (stripeSubscriptionId still null). Keyed by workspace
+      // + plan + origin, since success_url varies by `from` and a differing
+      // param under the same key would trip an idempotency mismatch. Omitted
+      // under the dev test clock, which mints a fresh customer per request (so
+      // params differ every time and the key would conflict).
+      devClockedCustomerId
+        ? undefined
+        : { idempotencyKey: `deploy-checkout:${ws.id}:${plan}:${from ?? ""}` },
+    );
   } else {
     session = await stripe.checkout.sessions.create({
       client_reference_id: ws.id,
