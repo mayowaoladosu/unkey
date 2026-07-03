@@ -377,7 +377,11 @@ func New(config Config) (*service, error) {
 			Capacity: 10_000,
 			Drop:     true,
 		}),
-		originCircuitBreaker: circuitbreaker.New[int64]("ratelimitOrigin"),
+		originCircuitBreaker: circuitbreaker.New[int64](
+			"ratelimitOrigin",
+			circuitbreaker.WithTimeout(originBreakerOpenTimeout),
+			circuitbreaker.WithFailureRatio(originBreakerFailureRatio, originBreakerMinRequests),
+		),
 		globalCircuitBreaker: circuitbreaker.New[any]("ratelimit_global_push"),
 		db:                   db.New(config.DB.RW(), config.DB.RO()),
 	}

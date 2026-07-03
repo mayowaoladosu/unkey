@@ -48,6 +48,11 @@ export const env = () =>
 
       WORKOS_API_KEY: z.string().optional(),
       WORKOS_CLIENT_ID: z.string().optional(),
+      // Publishable WorkOS client id, exposed to the browser so the Radar
+      // signal-collection library can run. Its presence also gates Radar on
+      // the client: local / non-WorkOS setups never set it, so the CDN script
+      // is never loaded. Safe to expose — WorkOS client ids are publishable.
+      NEXT_PUBLIC_WORKOS_CLIENT_ID: z.string().optional(),
       WORKOS_WEBHOOK_SECRET: z.string().optional(),
       NEXT_PUBLIC_WORKOS_REDIRECT_URI: z.string().optional(),
       WORKOS_COOKIE_PASSWORD: z.string().optional(),
@@ -81,6 +86,20 @@ export const githubAppSchema = z.object({
 const githubAppParsed = githubAppSchema.safeParse(process.env);
 export const githubAppEnv = () => (githubAppParsed.success ? githubAppParsed.data : null);
 
+// GitHub App OAuth (user-to-server) credentials. These are required to verify
+// that the caller who supplied an installation_id in the install callback can
+// actually access that installation on GitHub before we bind it to their
+// workspace. Kept separate from githubAppEnv so app-level read operations on
+// already-registered installations keep working even if OAuth is unconfigured,
+// while registerInstallation fails closed without it.
+export const githubOAuthSchema = z.object({
+  GITHUB_CLIENT_ID: z.string().min(1),
+  GITHUB_CLIENT_SECRET: z.string().min(1),
+});
+
+const githubOAuthParsed = githubOAuthSchema.safeParse(process.env);
+export const githubOAuthEnv = () => (githubOAuthParsed.success ? githubOAuthParsed.data : null);
+
 const stripeSchema = z.object({
   STRIPE_SECRET_KEY: z.string(),
   // The product ids, comma separated, from lowest to highest, pro first, and then enterprise plans
@@ -104,6 +123,11 @@ const stripeSchema = z.object({
   STRIPE_LOOKUP_DEPLOY_METER_MEMORY: z.string().optional(),
   STRIPE_LOOKUP_DEPLOY_METER_EGRESS: z.string().optional(),
   STRIPE_LOOKUP_DEPLOY_METER_DISK: z.string().optional(),
+  // Dev/test only: create Stripe customers under a test clock so the billing
+  // lifecycle can be time-traveled (advance the clock, invoices finalize for
+  // real, PDFs exist). Requires a test-mode key; see
+  // `unkey dev stripe clock` for advancing clocks and fetching invoices.
+  STRIPE_DEV_TEST_CLOCK: z.string().optional(),
 });
 
 const stripeParsed = stripeSchema.safeParse(process.env);
