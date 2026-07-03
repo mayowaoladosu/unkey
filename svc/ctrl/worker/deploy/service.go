@@ -6,7 +6,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/batch"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
-	"github.com/unkeyed/unkey/pkg/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	githubclient "github.com/unkeyed/unkey/svc/ctrl/worker/github"
 )
 
@@ -106,6 +106,10 @@ type Config struct {
 
 // New creates a new deployment workflow instance.
 func New(cfg Config) *Workflow {
+	// Reclaim build workspaces orphaned by a previous crash. Runs before any
+	// handler is bound, so no live workspace can match.
+	cleanupStaleRailpackWorkspaces()
+
 	return &Workflow{
 		UnimplementedDeployServiceServer: hydrav1.UnimplementedDeployServiceServer{},
 		db:                               cfg.DB,

@@ -1,5 +1,6 @@
 "use client";
 
+import { routes } from "@/lib/navigation/routes";
 import { useParams } from "next/navigation";
 import { useWorkspaceNavigation } from "./use-workspace-navigation";
 
@@ -45,13 +46,13 @@ export function useBreadcrumbs(): BreadcrumbDescriptor[] {
 
 function resolveWorkspaceHref(slug: string, params: RouteParams): string {
   if (params.apiId) {
-    return `/${slug}/apis`;
+    return routes.apis.list({ workspaceSlug: slug });
   }
   if (params.projectId) {
-    return `/${slug}/projects`;
+    return routes.projects.list({ workspaceSlug: slug });
   }
   if (params.namespaceId) {
-    return `/${slug}/ratelimits`;
+    return routes.ratelimits.list({ workspaceSlug: slug });
   }
   if (params.identityId) {
     return `/${slug}/identities`;

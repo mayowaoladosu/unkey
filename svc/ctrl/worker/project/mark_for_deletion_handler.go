@@ -7,8 +7,10 @@ import (
 
 	restate "github.com/restatedev/sdk-go"
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
+	"github.com/unkeyed/unkey/pkg/auditlog"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/logger"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/audit"
 )
 
 // MarkForDeletion enters the soft-delete grace window using the
@@ -56,6 +58,23 @@ func (s *Service) MarkForDeletion(
 		return nil, fmt.Errorf("schedule project: %w", err)
 	}
 
+	if err := audit.Insert(ctx, s.auditlogs, audit.Event{
+		Actor:         req.GetActor(),
+		CorrelationID: req.GetCorrelationId(),
+		WorkspaceID:   project.WorkspaceID,
+		Event:         auditlog.ProjectDeleteEvent,
+		Display:       fmt.Sprintf("Deleted project %s", project.ID),
+		Resource: auditlog.AuditLogResource{
+			ID:          project.ID,
+			Type:        auditlog.ProjectResourceType,
+			Meta:        map[string]any{"name": project.Name, "slug": project.Slug},
+			Name:        project.Name,
+			DisplayName: project.Name,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("insert audit log: %w", err)
+	}
+
 	// Cascade to live apps only. Independently-deleted apps already have
 	// a different deletion_id and stay untouched.
 	appIDs, err := restate.Run(ctx, func(runCtx restate.RunContext) ([]string, error) {
@@ -68,7 +87,11 @@ func (s *Service) MarkForDeletion(
 	for _, appID := range appIDs {
 		hydrav1.NewAppServiceClient(ctx, appID).
 			MarkForDeletion().
-			Send(&hydrav1.MarkAppForDeletionRequest{DeletionId: deletionID})
+			Send(&hydrav1.MarkAppForDeletionRequest{
+				DeletionId:    deletionID,
+				Actor:         req.GetActor(),
+				CorrelationId: req.GetCorrelationId(),
+			})
 	}
 
 	logger.Info("project mark for deletion cascade dispatched",

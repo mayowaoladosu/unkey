@@ -1,6 +1,8 @@
 -- name: ListAppsByProject :many
-SELECT sqlc.embed(apps)
+SELECT apps.*
 FROM apps
 WHERE project_id = sqlc.arg(project_id)
   AND deletion_id IS NULL
-ORDER BY created_at ASC;
+  AND id >= sqlc.arg(id_cursor)
+ORDER BY id ASC
+LIMIT ?;

@@ -8,18 +8,16 @@ import (
 	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
 	"github.com/unkeyed/unkey/pkg/assert"
-	"github.com/unkeyed/unkey/pkg/db"
+	"github.com/unkeyed/unkey/pkg/auditlog"
+	legacydb "github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/auth"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 )
 
 // DeleteProject schedules a project for permanent deletion. Mints the
-// deletion_id here so the same id flows through the entire cascade,
-// then fires the ProjectService.MarkForDeletion VO which inserts the
-// deletions row, points the project at it, and cascades through apps
-// and environments — every layer points at the same id. The
-// environment step also flips deployments to status='stopped' so
-// krane scales their pods to zero. The cron sweep performs the
+// deletion_id here so the same id flows through the entire cascade, then fires
+// the ProjectService.MarkForDeletion VO. The cron sweep performs the
 // permanent-delete cascade once the grace window elapses.
 //
 // If the project is already scheduled, returns the existing
@@ -31,13 +29,16 @@ func (s *Service) DeleteProject(
 	if err := auth.Authenticate(req, s.bearer); err != nil {
 		return nil, err
 	}
-	if err := assert.NotEmpty(req.Msg.GetProjectId(), "project_id is required"); err != nil {
+	if err := assert.All(
+		assert.NotEmpty(req.Msg.GetProjectId(), "project_id is required"),
+		assert.NotNil(req.Msg.GetActor(), "actor is required"),
+	); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	projectID := req.Msg.GetProjectId()
 
-	row, err := db.Query.FindProjectAnyById(ctx, s.db.RO(), projectID)
+	row, err := legacydb.Query.FindProjectAnyById(ctx, s.db.RO(), projectID)
 	if err != nil {
 		if db.IsNotFound(err) {
 			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("project not found: %s", projectID))
@@ -46,9 +47,9 @@ func (s *Service) DeleteProject(
 	}
 
 	if row.DeletionID.Valid {
-		// Already scheduled. Look up the existing T from the deletions
-		// row so the response carries the truth, not a new guess.
-		deletion, err := db.Query.FindDeletionById(ctx, s.db.RO(), row.DeletionID.String)
+		// Already scheduled. Look up the existing T from the deletions row so
+		// the response carries the truth, not a new guess.
+		deletion, err := legacydb.Query.FindDeletionById(ctx, s.db.RO(), row.DeletionID.String)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to load deletion row: %w", err))
 		}
@@ -64,6 +65,8 @@ func (s *Service) DeleteProject(
 	if _, err := client.MarkForDeletion().Send(ctx, &hydrav1.MarkProjectForDeletionRequest{
 		DeletionId:          deletionID,
 		DeletePermanentlyAt: deletePermanentlyAt,
+		Actor:               req.Msg.GetActor(),
+		CorrelationId:       auditlog.NewCorrelationID(),
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to trigger mark for deletion: %w", err))
 	}

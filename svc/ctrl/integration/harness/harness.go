@@ -27,11 +27,11 @@ import (
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/healthcheck"
 	restateadmin "github.com/unkeyed/unkey/pkg/restate/admin"
 	"github.com/unkeyed/unkey/pkg/testutil/containers"
 	"github.com/unkeyed/unkey/svc/ctrl/integration/seed"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/buildslot"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/clickhouseuser"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron"
@@ -192,10 +192,7 @@ func New(t *testing.T, opts ...Option) *Harness {
 	t.Logf("All containers started in %s", time.Since(start))
 
 	// Connect to MySQL
-	database, err := db.New(db.Config{
-		PrimaryDSN:  mysqlCfg.DSN,
-		ReadOnlyDSN: "",
-	})
+	database, err := db.New(mysqlCfg.DSN)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close()) })
 
@@ -228,11 +225,17 @@ func New(t *testing.T, opts ...Option) *Harness {
 		Clock:                     o.clock,
 		RatelimitDB:               ratelimitdb.New(database.RW(), database.RO()),
 		SlackQuotaCheckWebhookURL: "",
+		// Deploy billing push disabled in tests: nil reader + empty Stripe key
+		// make the handler a no-op.
+		BillingUsageReader: nil,
+		StripeSecretKey:    "",
 		Heartbeats: cron.Heartbeats{
-			QuotaCheck:      healthcheck.NewNoop(),
-			KeyRefill:       healthcheck.NewNoop(),
-			KeyLastUsedSync: healthcheck.NewNoop(),
-			AuditLogExport:  healthcheck.NewNoop(),
+			QuotaCheck:        healthcheck.NewNoop(),
+			KeyRefill:         healthcheck.NewNoop(),
+			KeyLastUsedSync:   healthcheck.NewNoop(),
+			AuditLogExport:    healthcheck.NewNoop(),
+			AuditLogCleanup:   healthcheck.NewNoop(),
+			DeployBillingPush: healthcheck.NewNoop(),
 		},
 	})
 	require.NoError(t, err)

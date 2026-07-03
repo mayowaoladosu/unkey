@@ -4,18 +4,19 @@ import { Logomark } from "@/components/logomark";
 import { useSidebar } from "@/components/ui/sidebar";
 import { type BreadcrumbDescriptor, useBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
+import { routes } from "@/lib/navigation/routes";
 import { Menu } from "@unkey/icons";
 import Link from "next/link";
 import { Fragment } from "react";
-import { HelpButton } from "../sidebar/help-button";
-import { UserButton } from "../sidebar/user-button";
 import { ApiCrumb } from "./api-crumb";
 import { AppCrumb } from "./app-crumb";
 import { CrumbSeparator } from "./crumb";
 import { TopNavFeedbackButton } from "./feedback-button";
+import { HelpButton } from "./help-button";
 import { IdentityCrumb } from "./identity-crumb";
 import { NamespaceCrumb } from "./namespace-crumb";
 import { ProjectCrumb } from "./project-crumb";
+import { UserButton } from "./user-button";
 import { WorkspaceCrumb } from "./workspace-crumb";
 
 export const TOP_NAV_HEIGHT = 52;
@@ -30,7 +31,11 @@ export function TopNav() {
       className="flex w-full shrink-0 items-center gap-1 border-b border-grayA-4 bg-gray-1 px-4"
       style={{ height: TOP_NAV_HEIGHT }}
     >
-      <Link href={`/${workspace.slug}`} aria-label="Unkey" className="inline-flex items-center">
+      <Link
+        href={routes.workspaces.overview({ workspaceSlug: workspace.slug })}
+        aria-label="Unkey"
+        className="inline-flex items-center"
+      >
         <Logomark />
       </Link>
       <div className="flex min-w-0 items-center gap-1">

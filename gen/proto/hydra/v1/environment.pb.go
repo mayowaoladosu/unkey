@@ -8,6 +8,7 @@ package hydrav1
 
 import (
 	_ "github.com/restatedev/sdk-go/generated/dev/restate/sdk"
+	v1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,8 +23,16 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// DeleteEnvironmentPermanentlyRequest carries the caller identity and
+// correlation ID into the durable workflow so the environment.delete audit log
+// is written as part of the retried deletion unit. Environment deletes are
+// cascade-only, so these always arrive from a parent app or project teardown.
 type DeleteEnvironmentPermanentlyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Actor *v1.ActorInfo          `protobuf:"bytes,1,opt,name=actor,proto3" json:"actor,omitempty"`
+	// correlation_id groups this deletion with the parent teardown's other audit
+	// events. Threaded down from the app/project workflow.
+	CorrelationId string `protobuf:"bytes,2,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -56,6 +65,20 @@ func (x *DeleteEnvironmentPermanentlyRequest) ProtoReflect() protoreflect.Messag
 // Deprecated: Use DeleteEnvironmentPermanentlyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteEnvironmentPermanentlyRequest) Descriptor() ([]byte, []int) {
 	return file_hydra_v1_environment_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *DeleteEnvironmentPermanentlyRequest) GetActor() *v1.ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *DeleteEnvironmentPermanentlyRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
 }
 
 type DeleteEnvironmentPermanentlyResponse struct {
@@ -97,6 +120,8 @@ func (*DeleteEnvironmentPermanentlyResponse) Descriptor() ([]byte, []int) {
 type MarkEnvironmentForDeletionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeletionId    string                 `protobuf:"bytes,1,opt,name=deletion_id,json=deletionId,proto3" json:"deletion_id,omitempty"`
+	Actor         *v1.ActorInfo          `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	CorrelationId string                 `protobuf:"bytes,3,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -134,6 +159,20 @@ func (*MarkEnvironmentForDeletionRequest) Descriptor() ([]byte, []int) {
 func (x *MarkEnvironmentForDeletionRequest) GetDeletionId() string {
 	if x != nil {
 		return x.DeletionId
+	}
+	return ""
+}
+
+func (x *MarkEnvironmentForDeletionRequest) GetActor() *v1.ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *MarkEnvironmentForDeletionRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
 	}
 	return ""
 }
@@ -258,12 +297,16 @@ var File_hydra_v1_environment_proto protoreflect.FileDescriptor
 
 const file_hydra_v1_environment_proto_rawDesc = "" +
 	"\n" +
-	"\x1ahydra/v1/environment.proto\x12\bhydra.v1\x1a\x18dev/restate/sdk/go.proto\"%\n" +
-	"#DeleteEnvironmentPermanentlyRequest\"&\n" +
-	"$DeleteEnvironmentPermanentlyResponse\"D\n" +
+	"\x1ahydra/v1/environment.proto\x12\bhydra.v1\x1a\x13ctrl/v1/actor.proto\x1a\x18dev/restate/sdk/go.proto\"v\n" +
+	"#DeleteEnvironmentPermanentlyRequest\x12(\n" +
+	"\x05actor\x18\x01 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
+	"\x0ecorrelation_id\x18\x02 \x01(\tR\rcorrelationId\"&\n" +
+	"$DeleteEnvironmentPermanentlyResponse\"\x95\x01\n" +
 	"!MarkEnvironmentForDeletionRequest\x12\x1f\n" +
 	"\vdeletion_id\x18\x01 \x01(\tR\n" +
-	"deletionId\"$\n" +
+	"deletionId\x12(\n" +
+	"\x05actor\x18\x02 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
+	"\x0ecorrelation_id\x18\x03 \x01(\tR\rcorrelationId\"$\n" +
 	"\"MarkEnvironmentForDeletionResponse\"<\n" +
 	"\x19RestoreEnvironmentRequest\x12\x1f\n" +
 	"\vdeletion_id\x18\x01 \x01(\tR\n" +
@@ -295,19 +338,22 @@ var file_hydra_v1_environment_proto_goTypes = []any{
 	(*MarkEnvironmentForDeletionResponse)(nil),   // 3: hydra.v1.MarkEnvironmentForDeletionResponse
 	(*RestoreEnvironmentRequest)(nil),            // 4: hydra.v1.RestoreEnvironmentRequest
 	(*RestoreEnvironmentResponse)(nil),           // 5: hydra.v1.RestoreEnvironmentResponse
+	(*v1.ActorInfo)(nil),                         // 6: ctrl.v1.ActorInfo
 }
 var file_hydra_v1_environment_proto_depIdxs = []int32{
-	0, // 0: hydra.v1.EnvironmentService.DeletePermanently:input_type -> hydra.v1.DeleteEnvironmentPermanentlyRequest
-	2, // 1: hydra.v1.EnvironmentService.MarkForDeletion:input_type -> hydra.v1.MarkEnvironmentForDeletionRequest
-	4, // 2: hydra.v1.EnvironmentService.Restore:input_type -> hydra.v1.RestoreEnvironmentRequest
-	1, // 3: hydra.v1.EnvironmentService.DeletePermanently:output_type -> hydra.v1.DeleteEnvironmentPermanentlyResponse
-	3, // 4: hydra.v1.EnvironmentService.MarkForDeletion:output_type -> hydra.v1.MarkEnvironmentForDeletionResponse
-	5, // 5: hydra.v1.EnvironmentService.Restore:output_type -> hydra.v1.RestoreEnvironmentResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6, // 0: hydra.v1.DeleteEnvironmentPermanentlyRequest.actor:type_name -> ctrl.v1.ActorInfo
+	6, // 1: hydra.v1.MarkEnvironmentForDeletionRequest.actor:type_name -> ctrl.v1.ActorInfo
+	0, // 2: hydra.v1.EnvironmentService.DeletePermanently:input_type -> hydra.v1.DeleteEnvironmentPermanentlyRequest
+	2, // 3: hydra.v1.EnvironmentService.MarkForDeletion:input_type -> hydra.v1.MarkEnvironmentForDeletionRequest
+	4, // 4: hydra.v1.EnvironmentService.Restore:input_type -> hydra.v1.RestoreEnvironmentRequest
+	1, // 5: hydra.v1.EnvironmentService.DeletePermanently:output_type -> hydra.v1.DeleteEnvironmentPermanentlyResponse
+	3, // 6: hydra.v1.EnvironmentService.MarkForDeletion:output_type -> hydra.v1.MarkEnvironmentForDeletionResponse
+	5, // 7: hydra.v1.EnvironmentService.Restore:output_type -> hydra.v1.RestoreEnvironmentResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_hydra_v1_environment_proto_init() }

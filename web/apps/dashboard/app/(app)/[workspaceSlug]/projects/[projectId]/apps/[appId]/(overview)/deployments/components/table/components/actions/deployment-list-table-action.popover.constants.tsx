@@ -3,10 +3,13 @@ import { useProjectData } from "@/app/(app)/[workspaceSlug]/projects/[projectId]
 import { type MenuItem, TableActionPopover } from "@/components/logs/table-action.popover";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import type { Deployment, Environment } from "@/lib/collections";
+import { routes } from "@/lib/navigation/routes";
 import {
   ArrowDottedRotateAnticlockwise,
   ArrowOppositeDirectionY,
   Ban,
+  Bolt,
+  BoltSlash,
   ChevronUp,
   Hammer2,
   Layers3,
@@ -18,6 +21,8 @@ import { getDeploymentActionEligibility } from "./deployment-action-eligibility"
 import { PromotionDialog } from "./promotion-dialog";
 import { RedeployDialog } from "./redeploy-dialog";
 import { RollbackDialog } from "./rollback-dialog";
+import { StopDialog } from "./stop-dialog";
+import { WakeDialog } from "./wake-dialog";
 
 type DeploymentListTableActionsProps = {
   selectedDeployment: Deployment;
@@ -39,12 +44,13 @@ export const DeploymentListTableActions = ({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: its okay
   const menuItems = useMemo((): MenuItem[] => {
-    const { canRollback, canPromote, canRedeploy, canCancel } = getDeploymentActionEligibility({
-      selectedDeployment,
-      currentDeploymentId,
-      isRolledBack,
-      environmentSlug: environment?.slug ?? null,
-    });
+    const { canRollback, canPromote, canRedeploy, canCancel, canStop, canWake } =
+      getDeploymentActionEligibility({
+        selectedDeployment,
+        currentDeploymentId,
+        isRolledBack,
+        environmentSlug: environment?.slug ?? null,
+      });
 
     return [
       {
@@ -78,6 +84,20 @@ export const DeploymentListTableActions = ({
           : undefined,
       },
       {
+        id: "wake",
+        label: "Wake deployment",
+        icon: <Bolt iconSize="md-regular" />,
+        disabled: !canWake,
+        ActionComponent: (props) => <WakeDialog {...props} deployment={selectedDeployment} />,
+      },
+      {
+        id: "stop",
+        label: "Stop deployment",
+        icon: <BoltSlash iconSize="md-regular" />,
+        disabled: !canStop,
+        ActionComponent: (props) => <StopDialog {...props} deployment={selectedDeployment} />,
+      },
+      {
         id: "redeploy",
         label: "Redeploy",
         icon: <ArrowDottedRotateAnticlockwise iconSize="md-regular" />,
@@ -99,7 +119,12 @@ export const DeploymentListTableActions = ({
         icon: <ArrowOppositeDirectionY iconSize="md-regular" />,
         onClick: () => {
           router.push(
-            `/${workspace.slug}/projects/${selectedDeployment.projectId}/requests?since=6h&deploymentId=contains:${selectedDeployment.id}`,
+            routes.projects.requests({
+              workspaceSlug: workspace.slug,
+              projectId: selectedDeployment.projectId,
+              since: "6h",
+              deploymentId: selectedDeployment.id,
+            }),
           );
         },
       },
@@ -109,7 +134,11 @@ export const DeploymentListTableActions = ({
         icon: <Layers3 iconSize="md-regular" />,
         onClick: () => {
           router.push(
-            `/${workspace.slug}/projects/${selectedDeployment.projectId}/logs?deploymentId=is:${selectedDeployment.id}`,
+            routes.projects.logs({
+              workspaceSlug: workspace.slug,
+              projectId: selectedDeployment.projectId,
+              deploymentId: selectedDeployment.id,
+            }),
           );
         },
       },
@@ -119,7 +148,13 @@ export const DeploymentListTableActions = ({
         icon: <Hammer2 iconSize="md-regular" />,
         onClick: () => {
           router.push(
-            `/${workspace.slug}/projects/${selectedDeployment.projectId}/apps/${selectedDeployment.appId}/deployments/${selectedDeployment.id}?build=true`,
+            routes.projects.apps.deployment({
+              workspaceSlug: workspace.slug,
+              projectId: selectedDeployment.projectId,
+              appId: selectedDeployment.appId,
+              deploymentId: selectedDeployment.id,
+              build: true,
+            }),
           );
         },
       },

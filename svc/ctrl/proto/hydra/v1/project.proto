@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package hydra.v1;
 
+import "ctrl/v1/actor.proto";
 import "dev/restate/sdk/go.proto";
 
 option go_package = "github.com/unkeyed/unkey/gen/proto/hydra/v1;hydrav1";
@@ -34,7 +35,16 @@ service ProjectService {
   rpc Restore(RestoreProjectRequest) returns (RestoreProjectResponse) {}
 }
 
-message DeleteProjectPermanentlyRequest {}
+// DeleteProjectPermanentlyRequest carries the caller identity and correlation ID
+// into the durable hard-delete workflow so the project.delete audit log is
+// written as part of the retried deletion unit, and the same correlation ID can
+// be threaded down to each cascaded app and environment delete.
+message DeleteProjectPermanentlyRequest {
+  ctrl.v1.ActorInfo actor = 1;
+  // correlation_id groups this hard delete with every cascaded app.delete and
+  // environment.delete audit event. Minted at the original delete RPC entry point.
+  string correlation_id = 2;
+}
 message DeleteProjectPermanentlyResponse {}
 
 message MarkProjectForDeletionRequest {
@@ -45,6 +55,10 @@ message MarkProjectForDeletionRequest {
   // root; cascaded children point at the same row via deletion_id and
   // do not duplicate the timestamp.
   int64 delete_permanently_at = 2;
+  // Actor and correlation are persisted in the journal so the eventual hard
+  // delete can emit the same audit trail as an immediate delete.
+  ctrl.v1.ActorInfo actor = 3;
+  string correlation_id = 4;
 }
 message MarkProjectForDeletionResponse {}
 

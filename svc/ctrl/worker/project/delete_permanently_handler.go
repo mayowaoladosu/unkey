@@ -21,7 +21,7 @@ import (
 // Key: project_id
 func (s *Service) DeletePermanently(
 	ctx restate.ObjectContext,
-	_ *hydrav1.DeleteProjectPermanentlyRequest,
+	req *hydrav1.DeleteProjectPermanentlyRequest,
 ) (*hydrav1.DeleteProjectPermanentlyResponse, error) {
 	projectID := restate.Key(ctx)
 
@@ -42,7 +42,10 @@ func (s *Service) DeletePermanently(
 		logger.Info("deleting app permanently", "project_id", projectID, "app_id", appID)
 		if _, err := hydrav1.NewAppServiceClient(ctx, appID).
 			DeletePermanently().
-			Request(&hydrav1.DeleteAppPermanentlyRequest{}); err != nil {
+			Request(&hydrav1.DeleteAppPermanentlyRequest{
+				Actor:         req.GetActor(),
+				CorrelationId: req.GetCorrelationId(),
+			}); err != nil {
 			return nil, fmt.Errorf("app %s permanent delete: %w", appID, err)
 		}
 	}

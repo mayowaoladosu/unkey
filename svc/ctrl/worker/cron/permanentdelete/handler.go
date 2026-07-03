@@ -23,8 +23,9 @@ import (
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
 	"github.com/unkeyed/unkey/pkg/assert"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
+	legacydb "github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/logger"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 )
 
 // Resource type values. Must match the strings written to the
@@ -80,8 +81,8 @@ func (h *Handler) Handle(
 ) (*hydrav1.RunPermanentDeleteResponse, error) {
 	cutoff := h.clock.Now().UnixMilli()
 
-	rows, err := restate.Run(ctx, func(rc restate.RunContext) ([]db.Deletion, error) {
-		return db.Query.ListDueDeletions(rc, h.db.RO(), db.ListDueDeletionsParams{
+	rows, err := restate.Run(ctx, func(rc restate.RunContext) ([]legacydb.Deletion, error) {
+		return legacydb.Query.ListDueDeletions(rc, h.db.RO(), legacydb.ListDueDeletionsParams{
 			DeletePermanentlyAt: cutoff,
 			Limit:               batchLimit,
 		})
@@ -104,7 +105,7 @@ func (h *Handler) Handle(
 		// tick stops dispatching this cascade. Wrap in restate.RunVoid
 		// for journaled retry on transient DB errors.
 		if err := restate.RunVoid(ctx, func(rc restate.RunContext) error {
-			return db.Query.DeleteDeletionById(rc, h.db.RW(), row.ID)
+			return legacydb.Query.DeleteDeletionById(rc, h.db.RW(), row.ID)
 		}, restate.WithName("delete deletion row")); err != nil {
 			aggregate = errors.Join(aggregate, fmt.Errorf("delete deletion row %s: %w", row.ID, err))
 			continue
@@ -138,7 +139,7 @@ func (h *Handler) Handle(
 // dispatch routes one deletion row to the right hard-delete VO. The
 // VOs are invoked synchronously via Request so the caller knows when
 // the cascade has finished and can remove the deletions row.
-func (h *Handler) dispatch(ctx restate.ObjectContext, row db.Deletion) error {
+func (h *Handler) dispatch(ctx restate.ObjectContext, row legacydb.Deletion) error {
 	switch row.ResourceType {
 	case resourceTypeProject:
 		_, err := hydrav1.NewProjectServiceClient(ctx, row.ResourceID).

@@ -1,5 +1,6 @@
 "use client";
 
+import { routes } from "@/lib/navigation/routes";
 import { trpc } from "@/lib/trpc/client";
 import { BookBookmark } from "@unkey/icons";
 import { Button, Empty } from "@unkey/ui";
@@ -48,7 +49,7 @@ export const ApiListClient = ({ workspaceSlug }: { workspaceSlug: string }) => {
 
   useEffect(() => {
     if (error) {
-      router.push("/new");
+      router.push(routes.workspaces.create());
     }
   }, [error, router]);
 
@@ -111,7 +112,7 @@ export const ApiListClient = ({ workspaceSlug }: { workspaceSlug: string }) => {
             </Empty.Description>
             {!isSearching && (
               <Empty.Actions className="mt-4">
-                <CreateApiButton defaultOpen={isNewApi} workspaceSlug={workspaceSlug} />
+                <CreateApiButton defaultOpen={isNewApi} workspaceSlug={workspaceSlug} size="md" />
                 <a
                   href="https://www.unkey.com/docs/introduction"
                   target="_blank"

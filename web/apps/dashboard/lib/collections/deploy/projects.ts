@@ -8,12 +8,25 @@ const schema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
+  // Apps inside the project, newest first, for the card's app stack.
+  appCount: z.number().int(),
+  apps: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      source: z.enum(["github", "code"]),
+      repository: z.string().nullable(),
+    }),
+  ),
   repositoryFullName: z.string().nullable(),
   latestDeploymentId: z.string().nullable(),
   currentDeploymentId: z.string().nullable(),
   isRolledBack: z.boolean(),
   // Flattened deployment fields for UI
   commitTitle: z.string().nullable(),
+  commitSha: z.string().nullable(),
+  forkRepositoryFullName: z.string().nullable(),
+  prNumber: z.number().int().nullable(),
   branch: z.string(),
   author: z.string().nullable(),
   authorAvatar: z.string().nullable(),
@@ -27,11 +40,11 @@ export const createProjectRequestSchema = z.object({
   slug: z
     .string()
     .trim()
-    .min(1, "Project slug is required")
+    .min(3, "Project slug must be at least 3 characters")
     .max(256, "Project slug too long")
     .regex(
-      /^[a-z0-9-]+$/,
-      "Project slug must contain only lowercase letters, numbers, and hyphens",
+      /^[a-zA-Z0-9_-]+$/,
+      "Project slug must contain only letters, numbers, hyphens, and underscores",
     ),
 });
 
@@ -43,7 +56,6 @@ export const projects = createCollection<Project, string>(
     queryClient,
     queryKey: ["projects"],
     retry: 3,
-    refetchInterval: 5000,
     queryFn: async () => {
       return await trpcClient.deploy.project.list.query();
     },

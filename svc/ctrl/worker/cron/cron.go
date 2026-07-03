@@ -17,9 +17,13 @@ import (
 	"github.com/unkeyed/unkey/pkg/assert"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/healthcheck"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/billingmeter"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/auditlogcleanup"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/auditlogexport"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/deploybilling"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/idlepreview"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/keylastusedsync"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/keyrefill"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/permanentdelete"
@@ -37,7 +41,10 @@ import (
 type Service struct {
 	hydrav1.UnimplementedCronServiceServer
 
+	auditLogCleanup  *auditlogcleanup.Handler
 	auditLogExport   *auditlogexport.Handler
+	deployBilling    *deploybilling.Handler
+	idlePreview      *idlepreview.Handler
 	keyLastUsedSync  *keylastusedsync.Handler
 	keyRefill        *keyrefill.Handler
 	permanentDelete  *permanentdelete.Handler
@@ -52,10 +59,12 @@ var _ hydrav1.CronServiceServer = (*Service)(nil)
 // not configured. This keeps each handler's heartbeat call unconditional
 // (no nil checks scattered through the codebase).
 type Heartbeats struct {
-	QuotaCheck      healthcheck.Heartbeat
-	KeyRefill       healthcheck.Heartbeat
-	KeyLastUsedSync healthcheck.Heartbeat
-	AuditLogExport  healthcheck.Heartbeat
+	QuotaCheck        healthcheck.Heartbeat
+	KeyRefill         healthcheck.Heartbeat
+	KeyLastUsedSync   healthcheck.Heartbeat
+	AuditLogExport    healthcheck.Heartbeat
+	AuditLogCleanup   healthcheck.Heartbeat
+	DeployBillingPush healthcheck.Heartbeat
 }
 
 // Config holds Service dependencies. All fields except
@@ -75,6 +84,14 @@ type Config struct {
 	// notifications. Empty disables Slack notifications.
 	SlackQuotaCheckWebhookURL string
 
+	// BillingUsageReader reads month-to-date Deploy usage for the billing
+	// push. Pass the concrete *clickhouse.Client (the meter query is not on
+	// the ClickHouse interface). Nil disables the push.
+	BillingUsageReader deploybilling.UsageReader
+	// StripeSecretKey authenticates the Deploy billing push to Stripe. Empty
+	// disables the push.
+	StripeSecretKey string
+
 	// Heartbeats is the per-task healthcheck wiring. Every field is required.
 	Heartbeats Heartbeats
 }
@@ -90,6 +107,8 @@ func New(cfg Config) (*Service, error) {
 		assert.NotNil(cfg.Heartbeats.KeyRefill, "Heartbeats.KeyRefill must not be nil; use healthcheck.NewNoop()"),
 		assert.NotNil(cfg.Heartbeats.KeyLastUsedSync, "Heartbeats.KeyLastUsedSync must not be nil; use healthcheck.NewNoop()"),
 		assert.NotNil(cfg.Heartbeats.AuditLogExport, "Heartbeats.AuditLogExport must not be nil; use healthcheck.NewNoop()"),
+		assert.NotNil(cfg.Heartbeats.AuditLogCleanup, "Heartbeats.AuditLogCleanup must not be nil; use healthcheck.NewNoop()"),
+		assert.NotNil(cfg.Heartbeats.DeployBillingPush, "Heartbeats.DeployBillingPush must not be nil; use healthcheck.NewNoop()"),
 	); err != nil {
 		return nil, err
 	}
@@ -141,10 +160,44 @@ func New(cfg Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	auditLogCleanupH, err := auditlogcleanup.New(auditlogcleanup.Config{
+		DB:        cfg.DB,
+		Heartbeat: cfg.Heartbeats.AuditLogCleanup,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// The push is enabled only when ClickHouse (usage source) and Stripe
+	// (sink) are both configured; otherwise it runs as a no-op so the cron
+	// binding and schedule stay uniform across environments.
+	var billingPusher billingmeter.Pusher = billingmeter.NewNoop()
+	if cfg.StripeSecretKey != "" {
+		billingPusher = billingmeter.NewStripe(cfg.StripeSecretKey)
+	}
+	deployBillingH, err := deploybilling.New(deploybilling.Config{
+		UsageReader: cfg.BillingUsageReader,
+		Pusher:      billingPusher,
+		DB:          cfg.DB,
+		Heartbeat:   cfg.Heartbeats.DeployBillingPush,
+	})
+	if err != nil {
+		return nil, err
+	}
+	idlePreviewH, err := idlepreview.New(idlepreview.Config{
+		DB:         cfg.DB,
+		Clickhouse: cfg.Clickhouse,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &Service{
 		UnimplementedCronServiceServer: hydrav1.UnimplementedCronServiceServer{},
+		auditLogCleanup:                auditLogCleanupH,
 		auditLogExport:                 auditLogExportH,
+		deployBilling:                  deployBillingH,
+		idlePreview:                    idlePreviewH,
 		keyLastUsedSync:                keyLastUsedSyncH,
 		keyRefill:                      keyRefillH,
 		permanentDelete:                permanentDeleteH,
@@ -193,4 +246,25 @@ func (s *Service) RunPermanentDelete(
 	req *hydrav1.RunPermanentDeleteRequest,
 ) (*hydrav1.RunPermanentDeleteResponse, error) {
 	return s.permanentDelete.Handle(ctx, req)
+}
+
+func (s *Service) RunAuditLogOutboxCleanup(
+	ctx restate.ObjectContext,
+	req *hydrav1.RunAuditLogOutboxCleanupRequest,
+) (*hydrav1.RunAuditLogOutboxCleanupResponse, error) {
+	return s.auditLogCleanup.Handle(ctx, req)
+}
+
+func (s *Service) RunDeployBillingPush(
+	ctx restate.ObjectContext,
+	req *hydrav1.RunDeployBillingPushRequest,
+) (*hydrav1.RunDeployBillingPushResponse, error) {
+	return s.deployBilling.Handle(ctx, req)
+}
+
+func (s *Service) RunScaleDownIdlePreviewDeployments(
+	ctx restate.ObjectContext,
+	req *hydrav1.RunScaleDownIdlePreviewDeploymentsRequest,
+) (*hydrav1.RunScaleDownIdlePreviewDeploymentsResponse, error) {
+	return s.idlePreview.Handle(ctx, req)
 }

@@ -8,6 +8,7 @@ package hydrav1
 
 import (
 	_ "github.com/restatedev/sdk-go/generated/dev/restate/sdk"
+	v1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,8 +23,16 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// DeleteProjectPermanentlyRequest carries the caller identity and correlation ID
+// into the durable hard-delete workflow so the project.delete audit log is
+// written as part of the retried deletion unit, and the same correlation ID can
+// be threaded down to each cascaded app and environment delete.
 type DeleteProjectPermanentlyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Actor *v1.ActorInfo          `protobuf:"bytes,1,opt,name=actor,proto3" json:"actor,omitempty"`
+	// correlation_id groups this hard delete with every cascaded app.delete and
+	// environment.delete audit event. Minted at the original delete RPC entry point.
+	CorrelationId string `protobuf:"bytes,2,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -56,6 +65,20 @@ func (x *DeleteProjectPermanentlyRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteProjectPermanentlyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteProjectPermanentlyRequest) Descriptor() ([]byte, []int) {
 	return file_hydra_v1_project_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *DeleteProjectPermanentlyRequest) GetActor() *v1.ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *DeleteProjectPermanentlyRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
 }
 
 type DeleteProjectPermanentlyResponse struct {
@@ -103,8 +126,12 @@ type MarkProjectForDeletionRequest struct {
 	// root; cascaded children point at the same row via deletion_id and
 	// do not duplicate the timestamp.
 	DeletePermanentlyAt int64 `protobuf:"varint,2,opt,name=delete_permanently_at,json=deletePermanentlyAt,proto3" json:"delete_permanently_at,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Actor and correlation are persisted in the journal so the eventual hard
+	// delete can emit the same audit trail as an immediate delete.
+	Actor         *v1.ActorInfo `protobuf:"bytes,3,opt,name=actor,proto3" json:"actor,omitempty"`
+	CorrelationId string        `protobuf:"bytes,4,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MarkProjectForDeletionRequest) Reset() {
@@ -149,6 +176,20 @@ func (x *MarkProjectForDeletionRequest) GetDeletePermanentlyAt() int64 {
 		return x.DeletePermanentlyAt
 	}
 	return 0
+}
+
+func (x *MarkProjectForDeletionRequest) GetActor() *v1.ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *MarkProjectForDeletionRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
 }
 
 type MarkProjectForDeletionResponse struct {
@@ -263,13 +304,17 @@ var File_hydra_v1_project_proto protoreflect.FileDescriptor
 
 const file_hydra_v1_project_proto_rawDesc = "" +
 	"\n" +
-	"\x16hydra/v1/project.proto\x12\bhydra.v1\x1a\x18dev/restate/sdk/go.proto\"!\n" +
-	"\x1fDeleteProjectPermanentlyRequest\"\"\n" +
-	" DeleteProjectPermanentlyResponse\"t\n" +
+	"\x16hydra/v1/project.proto\x12\bhydra.v1\x1a\x13ctrl/v1/actor.proto\x1a\x18dev/restate/sdk/go.proto\"r\n" +
+	"\x1fDeleteProjectPermanentlyRequest\x12(\n" +
+	"\x05actor\x18\x01 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
+	"\x0ecorrelation_id\x18\x02 \x01(\tR\rcorrelationId\"\"\n" +
+	" DeleteProjectPermanentlyResponse\"\xc5\x01\n" +
 	"\x1dMarkProjectForDeletionRequest\x12\x1f\n" +
 	"\vdeletion_id\x18\x01 \x01(\tR\n" +
 	"deletionId\x122\n" +
-	"\x15delete_permanently_at\x18\x02 \x01(\x03R\x13deletePermanentlyAt\" \n" +
+	"\x15delete_permanently_at\x18\x02 \x01(\x03R\x13deletePermanentlyAt\x12(\n" +
+	"\x05actor\x18\x03 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
+	"\x0ecorrelation_id\x18\x04 \x01(\tR\rcorrelationId\" \n" +
 	"\x1eMarkProjectForDeletionResponse\"\x17\n" +
 	"\x15RestoreProjectRequest\"\x18\n" +
 	"\x16RestoreProjectResponse2\xbc\x02\n" +
@@ -299,19 +344,22 @@ var file_hydra_v1_project_proto_goTypes = []any{
 	(*MarkProjectForDeletionResponse)(nil),   // 3: hydra.v1.MarkProjectForDeletionResponse
 	(*RestoreProjectRequest)(nil),            // 4: hydra.v1.RestoreProjectRequest
 	(*RestoreProjectResponse)(nil),           // 5: hydra.v1.RestoreProjectResponse
+	(*v1.ActorInfo)(nil),                     // 6: ctrl.v1.ActorInfo
 }
 var file_hydra_v1_project_proto_depIdxs = []int32{
-	0, // 0: hydra.v1.ProjectService.DeletePermanently:input_type -> hydra.v1.DeleteProjectPermanentlyRequest
-	2, // 1: hydra.v1.ProjectService.MarkForDeletion:input_type -> hydra.v1.MarkProjectForDeletionRequest
-	4, // 2: hydra.v1.ProjectService.Restore:input_type -> hydra.v1.RestoreProjectRequest
-	1, // 3: hydra.v1.ProjectService.DeletePermanently:output_type -> hydra.v1.DeleteProjectPermanentlyResponse
-	3, // 4: hydra.v1.ProjectService.MarkForDeletion:output_type -> hydra.v1.MarkProjectForDeletionResponse
-	5, // 5: hydra.v1.ProjectService.Restore:output_type -> hydra.v1.RestoreProjectResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6, // 0: hydra.v1.DeleteProjectPermanentlyRequest.actor:type_name -> ctrl.v1.ActorInfo
+	6, // 1: hydra.v1.MarkProjectForDeletionRequest.actor:type_name -> ctrl.v1.ActorInfo
+	0, // 2: hydra.v1.ProjectService.DeletePermanently:input_type -> hydra.v1.DeleteProjectPermanentlyRequest
+	2, // 3: hydra.v1.ProjectService.MarkForDeletion:input_type -> hydra.v1.MarkProjectForDeletionRequest
+	4, // 4: hydra.v1.ProjectService.Restore:input_type -> hydra.v1.RestoreProjectRequest
+	1, // 5: hydra.v1.ProjectService.DeletePermanently:output_type -> hydra.v1.DeleteProjectPermanentlyResponse
+	3, // 6: hydra.v1.ProjectService.MarkForDeletion:output_type -> hydra.v1.MarkProjectForDeletionResponse
+	5, // 7: hydra.v1.ProjectService.Restore:output_type -> hydra.v1.RestoreProjectResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_hydra_v1_project_proto_init() }

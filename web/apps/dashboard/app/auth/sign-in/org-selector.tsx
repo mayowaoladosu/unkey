@@ -1,7 +1,7 @@
 "use client";
 
 import type { Organization } from "@/lib/auth/types";
-import { AuthErrorCode } from "@/lib/auth/types";
+import { AuthErrorCode, SIGN_IN_URL } from "@/lib/auth/types";
 import {
   Button,
   DialogContainer,
@@ -14,6 +14,7 @@ import {
   SelectValue,
   toast,
 } from "@unkey/ui";
+import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useCallback, useContext, useMemo, useState } from "react";
@@ -60,7 +61,7 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({ organizations, lastOrg
     setIsOpen(false);
     // Clear pending auth state and redirect
     await clearPendingAuth();
-    router.push("/auth/sign-in");
+    router.push("/auth/sign-in" as Route);
   }, [router]);
 
   const submit = useCallback(
@@ -73,6 +74,20 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({ organizations, lastOrg
         setIsLoading(true);
         const result = await completeOrgSelection(orgId);
 
+        // The selected org requires MFA (or a Radar challenge) before it will
+        // issue a session. The challenge cookies were persisted server-side,
+        // so route to the matching challenge/enrollment UI. A user who isn't
+        // yet enrolled lands on the enrollment step and can set up MFA here —
+        // otherwise they could never sign in to that org. Keep the button in
+        // its loading state since we're navigating away.
+        if (!result.success && "challengeType" in result) {
+          const redirectSuffix = redirectParam
+            ? `&redirect=${encodeURIComponent(redirectParam)}`
+            : "";
+          window.location.href = `${SIGN_IN_URL}?challenge=${result.challengeType}${redirectSuffix}`;
+          return true;
+        }
+
         if (!result.success) {
           setError(result.message);
           setIsLoading(false);
@@ -80,7 +95,7 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({ organizations, lastOrg
 
           // If session expired, redirect to sign-in to clear stale state
           if (result.code === AuthErrorCode.PENDING_SESSION_EXPIRED) {
-            router.push("/auth/sign-in");
+            router.push("/auth/sign-in" as Route);
           }
 
           return false;

@@ -1,10 +1,11 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "project",
     srcs = [
         "create_project.go",
         "delete_project.go",
+        "deploy_gate.go",
         "restore_project.go",
         "service.go",
     ],
@@ -17,10 +18,21 @@ go_library(
         "//pkg/assert",
         "//pkg/clock",
         "//pkg/db",
+        "//pkg/auditlog",
+        "//pkg/logger",
         "//pkg/uid",
+        "//svc/ctrl/internal/actor",
+        "//svc/ctrl/internal/auditlogs",
         "//svc/ctrl/internal/auth",
-        "//svc/ctrl/services/app",
+        "//svc/ctrl/internal/db",
         "@com_connectrpc_connect//:connect",
         "@com_github_restatedev_sdk_go//ingress",
     ],
+)
+
+go_test(
+    name = "project_test",
+    srcs = ["deploy_gate_test.go"],
+    embed = [":project"],
+    deps = ["@com_github_stretchr_testify//require"],
 )

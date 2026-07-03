@@ -11,6 +11,7 @@ go_library(
         "//pkg/clock",
         "//pkg/db",
         "//pkg/logger",
+        "//svc/ctrl/internal/db",
         "@com_github_restatedev_sdk_go//:sdk-go",
     ],
 )

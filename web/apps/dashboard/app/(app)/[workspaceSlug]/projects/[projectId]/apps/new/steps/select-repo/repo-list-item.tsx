@@ -1,6 +1,6 @@
 import { Combobox } from "@/components/ui/combobox";
 import { trpc } from "@/lib/trpc/client";
-import { Check, CodeBranch, Magnifier } from "@unkey/icons";
+import { CodeBranch, Magnifier } from "@unkey/icons";
 import { Button, TimestampInfo } from "@unkey/ui";
 import { useMemo, useState } from "react";
 import { LanguageIcon } from "./language-icon";
@@ -21,14 +21,12 @@ export const RepoListItem = ({
   onSelect,
   disabled,
   loading,
-  hasMultipleAccounts,
 }: {
   repo: RepoItem;
   projectId: string;
   onSelect: (repo: RepoItem, selectedBranch: string) => void;
   disabled: boolean;
   loading: boolean;
-  hasMultipleAccounts: boolean;
 }) => {
   const [owner, repoName] = repo.fullName.split("/");
   const [selectedBranch, setSelectedBranch] = useState(repo.defaultBranch);
@@ -93,32 +91,14 @@ export const RepoListItem = ({
           {repoName}
         </div>
         <div className="flex items-center gap-0 text-[13px] text-gray-10 leading-3 max-w-52">
-          {hasMultipleAccounts ? (
-            <>
-              <span className="truncate shrink min-w-0">{owner}</span>
-              <span className="shrink-0">
-                &nbsp;·&nbsp;
-                <TimestampInfo value={repo.pushedAt ?? 0} displayType="relative" />
-              </span>
-            </>
-          ) : (
+          <span className="truncate shrink min-w-0">{owner}</span>
+          <span className="shrink-0">
+            &nbsp;·&nbsp;
             <TimestampInfo value={repo.pushedAt ?? 0} displayType="relative" />
-          )}
+          </span>
         </div>
       </div>
-      <div className="flex gap-2 items-center ml-auto shrink-0 w-40 justify-end">
-        {isLoading ? (
-          <div className="h-4 w-28 bg-grayA-3 rounded animate-pulse" />
-        ) : details.hasDockerfile ? (
-          <>
-            <Check className="text-success-9" iconSize="sm-regular" />
-            <span className="text-gray-11 text-xs">Dockerfile detected</span>
-          </>
-        ) : (
-          <span className="text-gray-11 text-xs">No Dockerfile</span>
-        )}
-      </div>
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center ml-auto">
         <div className="ml-6 w-[200px]">
           {isLoading ? (
             <div className="h-8 w-full bg-grayA-3 rounded-lg animate-pulse" />

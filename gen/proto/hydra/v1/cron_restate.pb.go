@@ -63,6 +63,23 @@ type CronServiceClient interface {
 	// their resource id, so a re-send is queued safely behind any
 	// in-flight cascade.
 	RunPermanentDelete(opts ...sdk_go.ClientOption) sdk_go.Client[*RunPermanentDeleteRequest, *RunPermanentDeleteResponse]
+	// RunAuditLogOutboxCleanup hard-deletes already-exported clickhouse_outbox
+	// rows (deleted_at stamped) older than the retention window so the outbox
+	// stays bounded. Stateless; key is the fixed slug "audit-log-outbox-cleanup"
+	// so a paused/wedged invocation cannot block other handlers. Daily schedule.
+	RunAuditLogOutboxCleanup(opts ...sdk_go.ClientOption) sdk_go.Client[*RunAuditLogOutboxCleanupRequest, *RunAuditLogOutboxCleanupResponse]
+	// RunDeployBillingPush computes month-to-date Deploy usage (CPU, memory,
+	// egress, disk) from ClickHouse and pushes each billable workspace's
+	// running total to Stripe as a meter event. The meters aggregate with
+	// formula "last", so the newest event in the period is the billed value
+	// and earlier ones are superseded. Key = billing period "YYYY-MM"; the
+	// pushed quantity is the absolute month-to-date total, so retries and
+	// overlapping ticks are harmless. Hourly schedule.
+	RunDeployBillingPush(opts ...sdk_go.ClientOption) sdk_go.Client[*RunDeployBillingPushRequest, *RunDeployBillingPushResponse]
+	// RunScaleDownIdlePreviewDeployments scans preview deployments and schedules
+	// idle ones to stop. Key is the fixed slug "idle-preview-deployments" so the
+	// scan is singleton-keyed without sharing a queue with other cron handlers.
+	RunScaleDownIdlePreviewDeployments(opts ...sdk_go.ClientOption) sdk_go.Client[*RunScaleDownIdlePreviewDeploymentsRequest, *RunScaleDownIdlePreviewDeploymentsResponse]
 }
 
 type cronServiceClient struct {
@@ -127,6 +144,30 @@ func (c *cronServiceClient) RunPermanentDelete(opts ...sdk_go.ClientOption) sdk_
 	return sdk_go.WithRequestType[*RunPermanentDeleteRequest](sdk_go.Object[*RunPermanentDeleteResponse](c.ctx, "hydra.v1.CronService", c.key, "RunPermanentDelete", cOpts...))
 }
 
+func (c *cronServiceClient) RunAuditLogOutboxCleanup(opts ...sdk_go.ClientOption) sdk_go.Client[*RunAuditLogOutboxCleanupRequest, *RunAuditLogOutboxCleanupResponse] {
+	cOpts := c.options
+	if len(opts) > 0 {
+		cOpts = append(append([]sdk_go.ClientOption{}, cOpts...), opts...)
+	}
+	return sdk_go.WithRequestType[*RunAuditLogOutboxCleanupRequest](sdk_go.Object[*RunAuditLogOutboxCleanupResponse](c.ctx, "hydra.v1.CronService", c.key, "RunAuditLogOutboxCleanup", cOpts...))
+}
+
+func (c *cronServiceClient) RunDeployBillingPush(opts ...sdk_go.ClientOption) sdk_go.Client[*RunDeployBillingPushRequest, *RunDeployBillingPushResponse] {
+	cOpts := c.options
+	if len(opts) > 0 {
+		cOpts = append(append([]sdk_go.ClientOption{}, cOpts...), opts...)
+	}
+	return sdk_go.WithRequestType[*RunDeployBillingPushRequest](sdk_go.Object[*RunDeployBillingPushResponse](c.ctx, "hydra.v1.CronService", c.key, "RunDeployBillingPush", cOpts...))
+}
+
+func (c *cronServiceClient) RunScaleDownIdlePreviewDeployments(opts ...sdk_go.ClientOption) sdk_go.Client[*RunScaleDownIdlePreviewDeploymentsRequest, *RunScaleDownIdlePreviewDeploymentsResponse] {
+	cOpts := c.options
+	if len(opts) > 0 {
+		cOpts = append(append([]sdk_go.ClientOption{}, cOpts...), opts...)
+	}
+	return sdk_go.WithRequestType[*RunScaleDownIdlePreviewDeploymentsRequest](sdk_go.Object[*RunScaleDownIdlePreviewDeploymentsResponse](c.ctx, "hydra.v1.CronService", c.key, "RunScaleDownIdlePreviewDeployments", cOpts...))
+}
+
 // CronServiceIngressClient is the ingress client API for hydra.v1.CronService service.
 //
 // This client is used to call the service from outside of a Restate context.
@@ -162,6 +203,23 @@ type CronServiceIngressClient interface {
 	// their resource id, so a re-send is queued safely behind any
 	// in-flight cascade.
 	RunPermanentDelete() ingress.Requester[*RunPermanentDeleteRequest, *RunPermanentDeleteResponse]
+	// RunAuditLogOutboxCleanup hard-deletes already-exported clickhouse_outbox
+	// rows (deleted_at stamped) older than the retention window so the outbox
+	// stays bounded. Stateless; key is the fixed slug "audit-log-outbox-cleanup"
+	// so a paused/wedged invocation cannot block other handlers. Daily schedule.
+	RunAuditLogOutboxCleanup() ingress.Requester[*RunAuditLogOutboxCleanupRequest, *RunAuditLogOutboxCleanupResponse]
+	// RunDeployBillingPush computes month-to-date Deploy usage (CPU, memory,
+	// egress, disk) from ClickHouse and pushes each billable workspace's
+	// running total to Stripe as a meter event. The meters aggregate with
+	// formula "last", so the newest event in the period is the billed value
+	// and earlier ones are superseded. Key = billing period "YYYY-MM"; the
+	// pushed quantity is the absolute month-to-date total, so retries and
+	// overlapping ticks are harmless. Hourly schedule.
+	RunDeployBillingPush() ingress.Requester[*RunDeployBillingPushRequest, *RunDeployBillingPushResponse]
+	// RunScaleDownIdlePreviewDeployments scans preview deployments and schedules
+	// idle ones to stop. Key is the fixed slug "idle-preview-deployments" so the
+	// scan is singleton-keyed without sharing a queue with other cron handlers.
+	RunScaleDownIdlePreviewDeployments() ingress.Requester[*RunScaleDownIdlePreviewDeploymentsRequest, *RunScaleDownIdlePreviewDeploymentsResponse]
 }
 
 type cronServiceIngressClient struct {
@@ -206,6 +264,21 @@ func (c *cronServiceIngressClient) RunRatelimitGlobalCountersCleanup() ingress.R
 func (c *cronServiceIngressClient) RunPermanentDelete() ingress.Requester[*RunPermanentDeleteRequest, *RunPermanentDeleteResponse] {
 	codec := encoding.ProtoJSONCodec
 	return ingress.NewRequester[*RunPermanentDeleteRequest, *RunPermanentDeleteResponse](c.client, c.serviceName, "RunPermanentDelete", &c.key, &codec)
+}
+
+func (c *cronServiceIngressClient) RunAuditLogOutboxCleanup() ingress.Requester[*RunAuditLogOutboxCleanupRequest, *RunAuditLogOutboxCleanupResponse] {
+	codec := encoding.ProtoJSONCodec
+	return ingress.NewRequester[*RunAuditLogOutboxCleanupRequest, *RunAuditLogOutboxCleanupResponse](c.client, c.serviceName, "RunAuditLogOutboxCleanup", &c.key, &codec)
+}
+
+func (c *cronServiceIngressClient) RunDeployBillingPush() ingress.Requester[*RunDeployBillingPushRequest, *RunDeployBillingPushResponse] {
+	codec := encoding.ProtoJSONCodec
+	return ingress.NewRequester[*RunDeployBillingPushRequest, *RunDeployBillingPushResponse](c.client, c.serviceName, "RunDeployBillingPush", &c.key, &codec)
+}
+
+func (c *cronServiceIngressClient) RunScaleDownIdlePreviewDeployments() ingress.Requester[*RunScaleDownIdlePreviewDeploymentsRequest, *RunScaleDownIdlePreviewDeploymentsResponse] {
+	codec := encoding.ProtoJSONCodec
+	return ingress.NewRequester[*RunScaleDownIdlePreviewDeploymentsRequest, *RunScaleDownIdlePreviewDeploymentsResponse](c.client, c.serviceName, "RunScaleDownIdlePreviewDeployments", &c.key, &codec)
 }
 
 // CronServiceServer is the server API for hydra.v1.CronService service.
@@ -260,6 +333,23 @@ type CronServiceServer interface {
 	// their resource id, so a re-send is queued safely behind any
 	// in-flight cascade.
 	RunPermanentDelete(ctx sdk_go.ObjectContext, req *RunPermanentDeleteRequest) (*RunPermanentDeleteResponse, error)
+	// RunAuditLogOutboxCleanup hard-deletes already-exported clickhouse_outbox
+	// rows (deleted_at stamped) older than the retention window so the outbox
+	// stays bounded. Stateless; key is the fixed slug "audit-log-outbox-cleanup"
+	// so a paused/wedged invocation cannot block other handlers. Daily schedule.
+	RunAuditLogOutboxCleanup(ctx sdk_go.ObjectContext, req *RunAuditLogOutboxCleanupRequest) (*RunAuditLogOutboxCleanupResponse, error)
+	// RunDeployBillingPush computes month-to-date Deploy usage (CPU, memory,
+	// egress, disk) from ClickHouse and pushes each billable workspace's
+	// running total to Stripe as a meter event. The meters aggregate with
+	// formula "last", so the newest event in the period is the billed value
+	// and earlier ones are superseded. Key = billing period "YYYY-MM"; the
+	// pushed quantity is the absolute month-to-date total, so retries and
+	// overlapping ticks are harmless. Hourly schedule.
+	RunDeployBillingPush(ctx sdk_go.ObjectContext, req *RunDeployBillingPushRequest) (*RunDeployBillingPushResponse, error)
+	// RunScaleDownIdlePreviewDeployments scans preview deployments and schedules
+	// idle ones to stop. Key is the fixed slug "idle-preview-deployments" so the
+	// scan is singleton-keyed without sharing a queue with other cron handlers.
+	RunScaleDownIdlePreviewDeployments(ctx sdk_go.ObjectContext, req *RunScaleDownIdlePreviewDeploymentsRequest) (*RunScaleDownIdlePreviewDeploymentsResponse, error)
 }
 
 // UnimplementedCronServiceServer should be embedded to have
@@ -287,6 +377,15 @@ func (UnimplementedCronServiceServer) RunRatelimitGlobalCountersCleanup(ctx sdk_
 func (UnimplementedCronServiceServer) RunPermanentDelete(ctx sdk_go.ObjectContext, req *RunPermanentDeleteRequest) (*RunPermanentDeleteResponse, error) {
 	return nil, sdk_go.TerminalError(fmt.Errorf("method RunPermanentDelete not implemented"), 501)
 }
+func (UnimplementedCronServiceServer) RunAuditLogOutboxCleanup(ctx sdk_go.ObjectContext, req *RunAuditLogOutboxCleanupRequest) (*RunAuditLogOutboxCleanupResponse, error) {
+	return nil, sdk_go.TerminalError(fmt.Errorf("method RunAuditLogOutboxCleanup not implemented"), 501)
+}
+func (UnimplementedCronServiceServer) RunDeployBillingPush(ctx sdk_go.ObjectContext, req *RunDeployBillingPushRequest) (*RunDeployBillingPushResponse, error) {
+	return nil, sdk_go.TerminalError(fmt.Errorf("method RunDeployBillingPush not implemented"), 501)
+}
+func (UnimplementedCronServiceServer) RunScaleDownIdlePreviewDeployments(ctx sdk_go.ObjectContext, req *RunScaleDownIdlePreviewDeploymentsRequest) (*RunScaleDownIdlePreviewDeploymentsResponse, error) {
+	return nil, sdk_go.TerminalError(fmt.Errorf("method RunScaleDownIdlePreviewDeployments not implemented"), 501)
+}
 func (UnimplementedCronServiceServer) testEmbeddedByValue() {}
 
 // UnsafeCronServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -312,5 +411,8 @@ func NewCronServiceServer(srv CronServiceServer, opts ...sdk_go.ServiceDefinitio
 	router = router.Handler("RunAuditLogExport", sdk_go.NewObjectHandler(srv.RunAuditLogExport))
 	router = router.Handler("RunRatelimitGlobalCountersCleanup", sdk_go.NewObjectHandler(srv.RunRatelimitGlobalCountersCleanup))
 	router = router.Handler("RunPermanentDelete", sdk_go.NewObjectHandler(srv.RunPermanentDelete))
+	router = router.Handler("RunAuditLogOutboxCleanup", sdk_go.NewObjectHandler(srv.RunAuditLogOutboxCleanup))
+	router = router.Handler("RunDeployBillingPush", sdk_go.NewObjectHandler(srv.RunDeployBillingPush))
+	router = router.Handler("RunScaleDownIdlePreviewDeployments", sdk_go.NewObjectHandler(srv.RunScaleDownIdlePreviewDeployments))
 	return router
 }

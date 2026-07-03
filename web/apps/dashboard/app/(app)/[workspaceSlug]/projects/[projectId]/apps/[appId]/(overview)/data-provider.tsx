@@ -2,12 +2,14 @@
 
 import { collection } from "@/lib/collections";
 import type { CustomDomain } from "@/lib/collections/deploy/custom-domains";
+import { isDeploymentInFlight } from "@/lib/collections/deploy/deployment-status";
 import { DEPLOYMENTS_DEFAULT_LIMIT, type Deployment } from "@/lib/collections/deploy/deployments";
 import type { Domain } from "@/lib/collections/deploy/domains";
 import type { Environment } from "@/lib/collections/deploy/environments";
 import type { Project } from "@/lib/collections/deploy/projects";
+import { useCollectionPolling } from "@/lib/collections/use-collection-polling";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useParams } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 import {
   type PropsWithChildren,
   createContext,
@@ -138,6 +140,21 @@ export const ProjectDataProvider = ({
     [projectId, appId],
   );
 
+  const hasInFlightDeployment = (deploymentsQuery.data ?? []).some((d) =>
+    isDeploymentInFlight(d.status),
+  );
+  const hasPendingDomain = (customDomainsQuery.data ?? []).some(
+    (d) => d.verificationStatus === "pending" || d.verificationStatus === "verifying",
+  );
+  useCollectionPolling(() => collection.deployments.utils.refetch(), {
+    intervalMs: 5000,
+    enabled: hasInFlightDeployment,
+  });
+  useCollectionPolling(() => collection.customDomains.utils.refetch(), {
+    intervalMs: 5000,
+    enabled: hasPendingDomain,
+  });
+
   const value = useMemo(() => {
     const domains = domainsQuery.data ?? [];
     const deployments = deploymentsQuery.data ?? [];
@@ -194,6 +211,13 @@ export const ProjectDataProvider = ({
     environmentsQuery,
     customDomainsQuery,
   ]);
+
+  // The projects collection holds every project in the workspace, so once it has
+  // finished loading an absent project means it does not exist (or is inaccessible).
+  // Checked after all hooks have run to keep hook ordering stable across renders.
+  if (!projectQuery.isLoading && !project) {
+    notFound();
+  }
 
   return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;
 };

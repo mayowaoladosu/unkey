@@ -41,6 +41,11 @@ const getScopeHeader = (scope: PermissionScope): ScopeHeader =>
       description: `${ROOT_KEY_MESSAGES.DESCRIPTIONS.PROJECT} ${name}`,
       key: id,
     }))
+    .with({ kind: "app" }, ({ name, id }) => ({
+      name,
+      description: `${ROOT_KEY_MESSAGES.DESCRIPTIONS.APP} ${name}`,
+      key: id,
+    }))
     .exhaustive();
 
 export const PermissionContentList = ({
@@ -80,10 +85,6 @@ export const PermissionContentList = ({
     0,
   );
 
-  if (totalPermissions === 0) {
-    return null;
-  }
-
   const handleCategoryToggleExpanded = useCallback((category: string, open: boolean) => {
     setExpandedCategories((prev) => {
       const newSet = new Set(prev);
@@ -95,6 +96,10 @@ export const PermissionContentList = ({
       return newSet;
     });
   }, []);
+
+  if (totalPermissions === 0) {
+    return null;
+  }
 
   const header = getScopeHeader(scope);
 

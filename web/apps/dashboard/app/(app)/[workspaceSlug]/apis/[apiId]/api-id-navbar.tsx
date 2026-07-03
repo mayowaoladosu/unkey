@@ -1,10 +1,10 @@
 "use client";
 
-import { QuickNavPopover } from "@/components/navbar-popover";
 import { NavbarActionButton } from "@/components/navigation/action-button";
 import { CopyableIDButton } from "@/components/navigation/copyable-id-button";
 import { Navbar } from "@/components/navigation/navbar";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
+import { routes } from "@/lib/navigation/routes";
 import { trpc } from "@/lib/trpc/client";
 import { getUnkeyClient } from "@/lib/unkey-client";
 import { useQuery } from "@tanstack/react-query";
@@ -14,32 +14,19 @@ import { useIsMobile } from "@unkey/ui";
 import { CreateKeyDialog } from "./_components/create-key";
 import { KeySettingsDialog } from "./_components/key-settings-dialog";
 
-// Types for better type safety
 interface ApiLayoutData {
   currentApi: {
     id: string;
     name: string;
-    workspaceId: string;
     keyAuthId: string | null;
     keyspaceDefaults: {
       prefix?: string;
       bytes?: number;
     } | null;
-    deleteProtection: boolean | null;
   };
-  workspaceApis: Array<{
-    id: string;
-    name: string;
-  }>;
   keyAuth: {
     id: string;
-    defaultPrefix: string | null;
-    defaultBytes: number | null;
-    sizeApprox: number;
   } | null;
-  workspace: {
-    id: string;
-  };
 }
 
 interface ApisNavbarProps {
@@ -57,7 +44,6 @@ interface LoadingNavbarProps {
 }
 
 interface NavbarContentProps {
-  apiId: string;
   keyspaceId?: string;
   keyId?: string;
   activePage?: {
@@ -74,7 +60,7 @@ interface NavbarContentProps {
 const LoadingNavbar = ({ workspace }: LoadingNavbarProps) => (
   <Navbar>
     <Navbar.Breadcrumbs icon={<Nodes />}>
-      <Navbar.Breadcrumbs.Link href={`/${workspace.slug}/apis`}>
+      <Navbar.Breadcrumbs.Link href={routes.apis.list({ workspaceSlug: workspace.slug })}>
         Keyspaces (APIs)
       </Navbar.Breadcrumbs.Link>
       <Navbar.Breadcrumbs.Link href="#" className="group" noop>
@@ -140,14 +126,14 @@ const NavbarContent = ({
     name: proxiedApiName ?? layoutData.currentApi.name,
   };
 
-  const base = `/${workspace.slug}/apis/${currentApi.id}`;
+  const base = routes.apis.detail({ workspaceSlug: workspace.slug, apiId: currentApi.id });
 
   return (
     <div className="w-full">
       <Navbar className="w-full flex justify-between">
         <Navbar.Breadcrumbs className="flex-1 w-full" icon={<Nodes />}>
           <Navbar.Breadcrumbs.Link
-            href={`/${workspace.slug}/apis`}
+            href={routes.apis.list({ workspaceSlug: workspace.slug })}
             className={isMobile ? "hidden" : "max-md:hidden"}
           >
             Keyspaces (APIs)
@@ -160,12 +146,7 @@ const NavbarContent = ({
             <div className="text-accent-10 group-hover:text-accent-12">{currentApi.name}</div>
           </Navbar.Breadcrumbs.Link>
           <Navbar.Breadcrumbs.Link href={activePage?.href ?? ""} noop active={!shouldFetchKey}>
-            <QuickNavPopover>
-              <div className="hover:bg-gray-3 rounded-lg flex items-center gap-1 p-1">
-                {activePage?.text ?? ""}
-                <ChevronExpandY className="size-4" />
-              </div>
-            </QuickNavPopover>
+            {activePage?.text ?? ""}
           </Navbar.Breadcrumbs.Link>
         </Navbar.Breadcrumbs>
         <Navbar.Actions>
@@ -213,11 +194,7 @@ export const ApisNavbar = ({ apiId, keyspaceId, keyId, activePage }: ApisNavbarP
   const isMobile = useIsMobile({ defaultValue: false });
 
   // Only make the query if we have a valid apiId
-  const {
-    data: layoutData,
-    isLoading,
-    error,
-  } = trpc.api.queryApiKeyDetails.useQuery(
+  const { data: layoutData, isLoading } = trpc.api.queryApiKeyDetails.useQuery(
     { apiId },
     {
       enabled: Boolean(apiId), // Only run query if apiId exists
@@ -239,15 +216,8 @@ export const ApisNavbar = ({ apiId, keyspaceId, keyId, activePage }: ApisNavbarP
     return <LoadingNavbar workspace={workspace} />;
   }
 
-  // Handle error state
-  if (error) {
-    console.error("Failed to fetch API layout data:", error);
-    return <LoadingNavbar workspace={workspace} />;
-  }
-
   return (
     <NavbarContent
-      apiId={apiId}
       keyspaceId={keyspaceId}
       keyId={keyId}
       activePage={activePage}

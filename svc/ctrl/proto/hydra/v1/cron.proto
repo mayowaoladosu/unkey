@@ -61,6 +61,26 @@ service CronService {
   // their resource id, so a re-send is queued safely behind any
   // in-flight cascade.
   rpc RunPermanentDelete(RunPermanentDeleteRequest) returns (RunPermanentDeleteResponse) {}
+
+  // RunAuditLogOutboxCleanup hard-deletes already-exported clickhouse_outbox
+  // rows (deleted_at stamped) older than the retention window so the outbox
+  // stays bounded. Stateless; key is the fixed slug "audit-log-outbox-cleanup"
+  // so a paused/wedged invocation cannot block other handlers. Daily schedule.
+  rpc RunAuditLogOutboxCleanup(RunAuditLogOutboxCleanupRequest) returns (RunAuditLogOutboxCleanupResponse) {}
+
+  // RunDeployBillingPush computes month-to-date Deploy usage (CPU, memory,
+  // egress, disk) from ClickHouse and pushes each billable workspace's
+  // running total to Stripe as a meter event. The meters aggregate with
+  // formula "last", so the newest event in the period is the billed value
+  // and earlier ones are superseded. Key = billing period "YYYY-MM"; the
+  // pushed quantity is the absolute month-to-date total, so retries and
+  // overlapping ticks are harmless. Hourly schedule.
+  rpc RunDeployBillingPush(RunDeployBillingPushRequest) returns (RunDeployBillingPushResponse) {}
+
+  // RunScaleDownIdlePreviewDeployments scans preview deployments and schedules
+  // idle ones to stop. Key is the fixed slug "idle-preview-deployments" so the
+  // scan is singleton-keyed without sharing a queue with other cron handlers.
+  rpc RunScaleDownIdlePreviewDeployments(RunScaleDownIdlePreviewDeploymentsRequest) returns (RunScaleDownIdlePreviewDeploymentsResponse) {}
 }
 
 message RunQuotaCheckRequest {}
@@ -104,3 +124,19 @@ message PermanentDeleteSweepResult {
   string resource = 1;
   int32 triggered = 2;
 }
+
+message RunAuditLogOutboxCleanupRequest {}
+message RunAuditLogOutboxCleanupResponse {
+  // Number of rows deleted.
+  int64 rows_deleted = 1;
+}
+
+message RunDeployBillingPushRequest {}
+
+// RunDeployBillingPushResponse is intentionally empty: the run's outcome
+// (workspaces and meters pushed) is logged by the handler, not consumed by a
+// caller.
+message RunDeployBillingPushResponse {}
+
+message RunScaleDownIdlePreviewDeploymentsRequest {}
+message RunScaleDownIdlePreviewDeploymentsResponse {}

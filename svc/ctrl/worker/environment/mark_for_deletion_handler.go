@@ -7,8 +7,10 @@ import (
 
 	restate "github.com/restatedev/sdk-go"
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
+	"github.com/unkeyed/unkey/pkg/auditlog"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/logger"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/audit"
 )
 
 // MarkForDeletion points the environment at the cascade's shared
@@ -63,6 +65,23 @@ func (s *Service) MarkForDeletion(
 			return nil
 		}, restate.WithName("set environment deletion id")); err != nil {
 			return nil, fmt.Errorf("set environment deletion id: %w", err)
+		}
+
+		if err := audit.Insert(ctx, s.auditlogs, audit.Event{
+			Actor:         req.GetActor(),
+			CorrelationID: req.GetCorrelationId(),
+			WorkspaceID:   env.WorkspaceID,
+			Event:         auditlog.EnvironmentDeleteEvent,
+			Display:       fmt.Sprintf("Deleted environment %s", env.Slug),
+			Resource: auditlog.AuditLogResource{
+				ID:          env.ID,
+				Type:        auditlog.EnvironmentResourceType,
+				Meta:        map[string]any{"slug": env.Slug, "appId": env.AppID, "projectId": env.ProjectID},
+				Name:        env.Slug,
+				DisplayName: env.Slug,
+			},
+		}); err != nil {
+			return nil, fmt.Errorf("insert audit log: %w", err)
 		}
 	}
 

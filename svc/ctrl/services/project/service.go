@@ -6,7 +6,8 @@ import (
 	restateingress "github.com/restatedev/sdk-go/ingress"
 	"github.com/unkeyed/unkey/gen/proto/ctrl/v1/ctrlv1connect"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/auditlogs"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 )
 
 // gracePeriod is the wall-clock window between a DeleteProject call and
@@ -19,10 +20,12 @@ const gracePeriod = 72 * time.Hour
 // associated resources.
 type Service struct {
 	ctrlv1connect.UnimplementedProjectServiceHandler
-	db      db.Database
-	clock   clock.Clock
-	restate *restateingress.Client
-	bearer  string
+	db                db.Database
+	clock             clock.Clock
+	restate           *restateingress.Client
+	auditlogs         auditlogs.AuditLogService
+	bearer            string
+	enforceDeployGate bool
 }
 
 // Config holds the configuration for creating a new [Service].
@@ -37,8 +40,16 @@ type Config struct {
 	// Restore VO chains.
 	Restate *restateingress.Client
 
+	// Auditlogs records project mutations within the same transaction as the write.
+	Auditlogs auditlogs.AuditLogService
+
 	// Bearer is the preshared token that callers must provide in the Authorization header.
 	Bearer string
+
+	// EnforceDeployGate hard-blocks project creation for workspaces without an
+	// Unkey Deploy entitlement. When false (default), the gate runs in observe
+	// mode: it logs when it would block but allows creation.
+	EnforceDeployGate bool
 }
 
 // New creates a new [Service] with the given configuration.
@@ -51,6 +62,8 @@ func New(cfg Config) *Service {
 		db:                                 cfg.Database,
 		clock:                              cfg.Clock,
 		restate:                            cfg.Restate,
+		auditlogs:                          cfg.Auditlogs,
 		bearer:                             cfg.Bearer,
+		enforceDeployGate:                  cfg.EnforceDeployGate,
 	}
 }

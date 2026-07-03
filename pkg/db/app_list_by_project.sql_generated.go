@@ -14,11 +14,15 @@ SELECT apps.pk, apps.id, apps.workspace_id, apps.project_id, apps.name, apps.slu
 FROM apps
 WHERE project_id = ?
   AND deletion_id IS NULL
-ORDER BY created_at ASC
+  AND id >= ?
+ORDER BY id ASC
+LIMIT ?
 `
 
-type ListAppsByProjectRow struct {
-	App App `db:"app"`
+type ListAppsByProjectParams struct {
+	ProjectID string `db:"project_id"`
+	IDCursor  string `db:"id_cursor"`
+	Limit     int32  `db:"limit"`
 }
 
 // ListAppsByProject
@@ -27,30 +31,32 @@ type ListAppsByProjectRow struct {
 //	FROM apps
 //	WHERE project_id = ?
 //	  AND deletion_id IS NULL
-//	ORDER BY created_at ASC
-func (q *Queries) ListAppsByProject(ctx context.Context, db DBTX, projectID string) ([]ListAppsByProjectRow, error) {
-	rows, err := db.QueryContext(ctx, listAppsByProject, projectID)
+//	  AND id >= ?
+//	ORDER BY id ASC
+//	LIMIT ?
+func (q *Queries) ListAppsByProject(ctx context.Context, db DBTX, arg ListAppsByProjectParams) ([]App, error) {
+	rows, err := db.QueryContext(ctx, listAppsByProject, arg.ProjectID, arg.IDCursor, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListAppsByProjectRow
+	var items []App
 	for rows.Next() {
-		var i ListAppsByProjectRow
+		var i App
 		if err := rows.Scan(
-			&i.App.Pk,
-			&i.App.ID,
-			&i.App.WorkspaceID,
-			&i.App.ProjectID,
-			&i.App.Name,
-			&i.App.Slug,
-			&i.App.DefaultBranch,
-			&i.App.CurrentDeploymentID,
-			&i.App.IsRolledBack,
-			&i.App.DeletionID,
-			&i.App.DeleteProtection,
-			&i.App.CreatedAt,
-			&i.App.UpdatedAt,
+			&i.Pk,
+			&i.ID,
+			&i.WorkspaceID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Slug,
+			&i.DefaultBranch,
+			&i.CurrentDeploymentID,
+			&i.IsRolledBack,
+			&i.DeletionID,
+			&i.DeleteProtection,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

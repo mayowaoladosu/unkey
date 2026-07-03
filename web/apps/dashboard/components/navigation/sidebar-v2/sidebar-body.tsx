@@ -7,10 +7,8 @@ import { useFlag } from "@/lib/flags/provider";
 import {
   buildApiLinks,
   buildAppLinks,
-  buildAuthorizationLinks,
   buildNamespaceLinks,
   buildProjectLinks,
-  buildSettingsLinks,
   buildWorkspaceSections,
 } from "@/lib/navigation/leaves";
 import { useSelectedLayoutSegments } from "next/navigation";
@@ -25,20 +23,21 @@ export function SidebarBody() {
     .filter((segment) => !segment.startsWith("("));
   const { slug } = useWorkspaceNavigation();
   const keyAuthId = useApiKeyAuthId(context.type === "api" ? context.apiId : undefined);
-  const deletionRecoveryPage = useFlag("deletionRecoveryPage");
+  const appOverview = useFlag("appOverview");
 
   const links = (() => {
     switch (context.type) {
       case "workspace":
       case "identity":
-        return buildWorkspaceSections(slug, segments);
+      // Settings and Authorization keep the top-level workspace nav in the
+      // global sidebar; their sub-pages live in a SecondaryNav rail (see the
+      // settings/authorization layouts).
       case "settings":
-        return buildSettingsLinks(slug, segments, { deletionRecoveryPage });
       case "authorization":
-        return buildAuthorizationLinks(slug, segments);
+        return buildWorkspaceSections(slug, segments);
       case "project":
         return context.appId
-          ? buildAppLinks(slug, context.projectId, context.appId, segments)
+          ? buildAppLinks(slug, context.projectId, context.appId, segments, appOverview)
           : buildProjectLinks(slug, context.projectId, segments);
       case "api":
         return buildApiLinks(slug, context.apiId, keyAuthId, segments);

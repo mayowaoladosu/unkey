@@ -1,7 +1,9 @@
 "use client";
 
+import { useAppHomeHref } from "@/hooks/use-app-home-href";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { collection } from "@/lib/collections";
+import { routes } from "@/lib/navigation/routes";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Github, Plus, Terminal } from "@unkey/icons";
 import { Crumb } from "./crumb";
@@ -9,6 +11,7 @@ import type { CrumbPopoverItem } from "./crumb-popover";
 
 export function AppCrumb({ projectId, appId }: { projectId: string; appId: string }) {
   const workspace = useWorkspaceNavigation();
+  const appHomeHref = useAppHomeHref();
   const appsQuery = useLiveQuery(
     (q) => q.from({ app: collection.apps }).where(({ app }) => eq(app.projectId, projectId)),
     [projectId],
@@ -19,7 +22,11 @@ export function AppCrumb({ projectId, appId }: { projectId: string; appId: strin
   const items: CrumbPopoverItem[] = apps.map((a) => ({
     id: a.id,
     label: a.name,
-    href: `/${workspace.slug}/projects/${projectId}/apps/${a.id}/deployments`,
+    href: appHomeHref({
+      workspaceSlug: workspace.slug,
+      projectId,
+      appId: a.id,
+    }),
   }));
 
   return (
@@ -33,7 +40,7 @@ export function AppCrumb({ projectId, appId }: { projectId: string; appId: strin
       }
       label={current?.name ?? appId}
       loading={appsQuery.isLoading}
-      href={`/${workspace.slug}/projects/${projectId}/apps/${appId}/deployments`}
+      href={appHomeHref({ workspaceSlug: workspace.slug, projectId, appId })}
       items={items}
       currentId={appId}
       searchPlaceholder="Find app..."
@@ -41,7 +48,7 @@ export function AppCrumb({ projectId, appId }: { projectId: string; appId: strin
       footer={{
         icon: Plus,
         label: "New app",
-        href: `/${workspace.slug}/projects/${projectId}/apps/new`,
+        href: routes.projects.apps.new({ workspaceSlug: workspace.slug, projectId }),
       }}
     />
   );

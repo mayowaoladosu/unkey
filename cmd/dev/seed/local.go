@@ -131,9 +131,9 @@ func seedLocal(ctx context.Context, cmd *cli.Command) error {
 			if !db.IsDuplicateKeyError(err) {
 				return fmt.Errorf("failed to create project: %w", err)
 			}
-			existing, err := db.Query.FindProjectByWorkspaceSlug(ctx, tx, db.FindProjectByWorkspaceSlugParams{
+			existing, err := db.Query.FindProjectByIdOrSlug(ctx, tx, db.FindProjectByIdOrSlugParams{
 				WorkspaceID: workspaceID,
-				Slug:        projectSlug,
+				Project:     projectSlug,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to find existing project: %w", err)
@@ -258,8 +258,9 @@ func seedLocal(ctx context.Context, cmd *cli.Command) error {
 				WorkspaceID:   workspaceID,
 				AppID:         appID,
 				EnvironmentID: previewEnvID,
-				Dockerfile:    "Dockerfile",
+				Dockerfile:    sql.NullString{Valid: true, String: "Dockerfile"},
 				DockerContext: ".",
+				BuildCommand:  sql.NullString{Valid: false, String: ""},
 				WatchPaths:    nil,
 				AutoDeploy:    true,
 				CreatedAt:     now,
@@ -269,8 +270,9 @@ func seedLocal(ctx context.Context, cmd *cli.Command) error {
 				WorkspaceID:   workspaceID,
 				AppID:         appID,
 				EnvironmentID: productionEnvID,
-				Dockerfile:    "Dockerfile",
+				Dockerfile:    sql.NullString{Valid: true, String: "Dockerfile"},
 				DockerContext: ".",
+				BuildCommand:  sql.NullString{Valid: false, String: ""},
 				WatchPaths:    nil,
 				AutoDeploy:    true,
 				CreatedAt:     now,

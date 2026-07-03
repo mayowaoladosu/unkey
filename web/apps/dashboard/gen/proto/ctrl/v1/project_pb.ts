@@ -4,13 +4,15 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { ActorInfo } from "./actor_pb";
+import { file_ctrl_v1_actor } from "./actor_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file ctrl/v1/project.proto.
  */
 export const file_ctrl_v1_project: GenFile = /*@__PURE__*/
-  fileDesc("ChVjdHJsL3YxL3Byb2plY3QucHJvdG8SB2N0cmwudjEiSAoUQ3JlYXRlUHJvamVjdFJlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEc2x1ZxgDIAEoCSIjChVDcmVhdGVQcm9qZWN0UmVzcG9uc2USCgoCaWQYASABKAkiKgoURGVsZXRlUHJvamVjdFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCSI2ChVEZWxldGVQcm9qZWN0UmVzcG9uc2USHQoVZGVsZXRlX3Blcm1hbmVudGx5X2F0GAEgASgDIisKFVJlc3RvcmVQcm9qZWN0UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJIhgKFlJlc3RvcmVQcm9qZWN0UmVzcG9uc2UyiQIKDlByb2plY3RTZXJ2aWNlElAKDUNyZWF0ZVByb2plY3QSHS5jdHJsLnYxLkNyZWF0ZVByb2plY3RSZXF1ZXN0Gh4uY3RybC52MS5DcmVhdGVQcm9qZWN0UmVzcG9uc2UiABJQCg1EZWxldGVQcm9qZWN0Eh0uY3RybC52MS5EZWxldGVQcm9qZWN0UmVxdWVzdBoeLmN0cmwudjEuRGVsZXRlUHJvamVjdFJlc3BvbnNlIgASUwoOUmVzdG9yZVByb2plY3QSHi5jdHJsLnYxLlJlc3RvcmVQcm9qZWN0UmVxdWVzdBofLmN0cmwudjEuUmVzdG9yZVByb2plY3RSZXNwb25zZSIAQosBCgtjb20uY3RybC52MUIMUHJvamVjdFByb3RvUAFaMWdpdGh1Yi5jb20vdW5rZXllZC91bmtleS9nZW4vcHJvdG8vY3RybC92MTtjdHJsdjGiAgNDWFiqAgdDdHJsLlYxygIHQ3RybFxWMeICE0N0cmxcVjFcR1BCTWV0YWRhdGHqAghDdHJsOjpWMWIGcHJvdG8z");
+  fileDesc("ChVjdHJsL3YxL3Byb2plY3QucHJvdG8SB2N0cmwudjEiawoUQ3JlYXRlUHJvamVjdFJlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEc2x1ZxgDIAEoCRIhCgVhY3RvchgEIAEoCzISLmN0cmwudjEuQWN0b3JJbmZvIiMKFUNyZWF0ZVByb2plY3RSZXNwb25zZRIKCgJpZBgBIAEoCSJNChREZWxldGVQcm9qZWN0UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEiEKBWFjdG9yGAIgASgLMhIuY3RybC52MS5BY3RvckluZm8iNgoVRGVsZXRlUHJvamVjdFJlc3BvbnNlEh0KFWRlbGV0ZV9wZXJtYW5lbnRseV9hdBgBIAEoAyIrChVSZXN0b3JlUHJvamVjdFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCSIYChZSZXN0b3JlUHJvamVjdFJlc3BvbnNlMokCCg5Qcm9qZWN0U2VydmljZRJQCg1DcmVhdGVQcm9qZWN0Eh0uY3RybC52MS5DcmVhdGVQcm9qZWN0UmVxdWVzdBoeLmN0cmwudjEuQ3JlYXRlUHJvamVjdFJlc3BvbnNlIgASUAoNRGVsZXRlUHJvamVjdBIdLmN0cmwudjEuRGVsZXRlUHJvamVjdFJlcXVlc3QaHi5jdHJsLnYxLkRlbGV0ZVByb2plY3RSZXNwb25zZSIAElMKDlJlc3RvcmVQcm9qZWN0Eh4uY3RybC52MS5SZXN0b3JlUHJvamVjdFJlcXVlc3QaHy5jdHJsLnYxLlJlc3RvcmVQcm9qZWN0UmVzcG9uc2UiAEKLAQoLY29tLmN0cmwudjFCDFByb2plY3RQcm90b1ABWjFnaXRodWIuY29tL3Vua2V5ZWQvdW5rZXkvZ2VuL3Byb3RvL2N0cmwvdjE7Y3RybHYxogIDQ1hYqgIHQ3RybC5WMcoCB0N0cmxcVjHiAhNDdHJsXFYxXEdQQk1ldGFkYXRh6gIIQ3RybDo6VjFiBnByb3RvMw", [file_ctrl_v1_actor]);
 
 /**
  * @generated from message ctrl.v1.CreateProjectRequest
@@ -30,6 +32,11 @@ export type CreateProjectRequest = Message<"ctrl.v1.CreateProjectRequest"> & {
    * @generated from field: string slug = 3;
    */
   slug: string;
+
+  /**
+   * @generated from field: ctrl.v1.ActorInfo actor = 4;
+   */
+  actor?: ActorInfo;
 };
 
 /**
@@ -64,6 +71,11 @@ export type DeleteProjectRequest = Message<"ctrl.v1.DeleteProjectRequest"> & {
    * @generated from field: string project_id = 1;
    */
   projectId: string;
+
+  /**
+   * @generated from field: ctrl.v1.ActorInfo actor = 2;
+   */
+  actor?: ActorInfo;
 };
 
 /**

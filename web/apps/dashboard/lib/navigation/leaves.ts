@@ -13,6 +13,7 @@ import {
   ShieldKey,
   SquareBulletList,
 } from "@unkey/icons";
+import { routes } from "./routes";
 import type { ResolvedNavLink } from "./types";
 
 export function buildWorkspaceSections(slug: string, segments: string[]): ResolvedNavLink[] {
@@ -21,21 +22,21 @@ export function buildWorkspaceSections(slug: string, segments: string[]): Resolv
     {
       key: "projects",
       label: "Projects",
-      href: `/${slug}/projects`,
+      href: routes.projects.list({ workspaceSlug: slug }),
       icon: Cube,
       isActive: top === "projects",
     },
     {
       key: "apis",
       label: "Keyspaces (APIs)",
-      href: `/${slug}/apis`,
+      href: routes.apis.list({ workspaceSlug: slug }),
       icon: Nodes,
       isActive: top === "apis",
     },
     {
       key: "ratelimits",
       label: "Ratelimit",
-      href: `/${slug}/ratelimits`,
+      href: routes.ratelimits.list({ workspaceSlug: slug }),
       icon: Gauge,
       isActive: top === "ratelimits",
     },
@@ -70,55 +71,9 @@ export function buildWorkspaceSections(slug: string, segments: string[]): Resolv
     {
       key: "settings",
       label: "Settings",
-      href: `/${slug}/settings/general`,
+      href: routes.settings.general({ workspaceSlug: slug }),
       icon: Gear,
       isActive: top === "settings",
-    },
-  ];
-}
-
-export function buildSettingsLinks(
-  slug: string,
-  segments: string[],
-  options: { deletionRecoveryPage?: boolean } = {},
-): ResolvedNavLink[] {
-  const page = segments[1];
-  const base = `/${slug}/settings`;
-  const links: ResolvedNavLink[] = [
-    { key: "general", label: "General", href: `${base}/general`, isActive: page === "general" },
-    { key: "team", label: "Team", href: `${base}/team`, isActive: page === "team" },
-    {
-      key: "root-keys",
-      label: "Root Keys",
-      href: `${base}/root-keys`,
-      isActive: page === "root-keys",
-    },
-    ...(options.deletionRecoveryPage
-      ? [
-          {
-            key: "scheduled-deletions",
-            label: "Scheduled Deletions",
-            href: `${base}/scheduled-deletions`,
-            isActive: page === "scheduled-deletions",
-          },
-        ]
-      : []),
-    { key: "billing", label: "Billing", href: `${base}/billing`, isActive: page === "billing" },
-  ];
-
-  return links;
-}
-
-export function buildAuthorizationLinks(slug: string, segments: string[]): ResolvedNavLink[] {
-  const page = segments[1];
-  const base = `/${slug}/authorization`;
-  return [
-    { key: "roles", label: "Roles", href: `${base}/roles`, isActive: page === "roles" },
-    {
-      key: "permissions",
-      label: "Permissions",
-      href: `${base}/permissions`,
-      isActive: page === "permissions",
     },
   ];
 }
@@ -129,33 +84,33 @@ export function buildProjectLinks(
   segments: string[],
 ): ResolvedNavLink[] {
   const page = segments[2];
-  const base = `/${slug}/projects/${projectId}`;
+  const scope = { workspaceSlug: slug, projectId };
   return [
     {
-      key: "overview",
-      label: "Overview",
-      href: base,
+      key: "apps",
+      label: "Apps",
+      href: routes.projects.detail(scope),
       icon: Cube,
       isActive: !page,
     },
     {
       key: "logs",
       label: "Logs",
-      href: `${base}/logs`,
+      href: routes.projects.logs(scope),
       icon: Layers3,
       isActive: page === "logs",
     },
     {
       key: "requests",
       label: "Requests",
-      href: `${base}/requests`,
+      href: routes.projects.requests(scope),
       icon: ArrowOppositeDirectionY,
       isActive: page === "requests",
     },
     {
       key: "settings",
-      label: "Settings",
-      href: `${base}/settings`,
+      label: "Project Settings",
+      href: routes.projects.settings(scope),
       icon: Gear,
       isActive: page === "settings",
     },
@@ -167,44 +122,22 @@ export function buildAppLinks(
   projectId: string,
   appId: string,
   segments: string[],
+  appOverviewEnabled: boolean,
 ): ResolvedNavLink[] {
   const page = segments[4];
-  const base = `/${slug}/projects/${projectId}/apps/${appId}`;
-  return [
-    {
-      key: "deployments",
-      label: "Deployments",
-      href: `${base}/deployments`,
-      icon: SquareBulletList,
-      isActive: page === "deployments",
-    },
-    {
-      key: "env-vars",
-      label: "Environment Variables",
-      href: `${base}/env-vars`,
-      icon: BracketsSquareDots,
-      isActive: page === "env-vars",
-    },
-    {
-      key: "sentinel-policies",
-      label: "Sentinel Policies",
-      href: `${base}/sentinel-policies`,
-      icon: ShieldKey,
-      isActive: page === "sentinel-policies",
-    },
-    {
-      key: "settings",
-      label: "Settings",
-      href: `${base}/settings`,
-      icon: Gear,
-      isActive: page === "settings",
-    },
-    // Project-level views scoped to this app; separated since they navigate
-    // out of the app section.
+  const scope = { workspaceSlug: slug, projectId, appId };
+  const overviewLink: ResolvedNavLink = {
+    key: "overview",
+    label: "Overview",
+    href: routes.projects.apps.overview(scope),
+    icon: Cube,
+    isActive: page === "overview",
+  };
+  const legacyLinks: ResolvedNavLink[] = [
     {
       key: "logs",
       label: "Logs",
-      href: `/${slug}/projects/${projectId}/logs?appId=${appId}`,
+      href: routes.projects.logs(scope),
       icon: Layers3,
       isActive: false,
       separatorAbove: true,
@@ -212,15 +145,47 @@ export function buildAppLinks(
     {
       key: "requests",
       label: "Requests",
-      href: `/${slug}/projects/${projectId}/requests?since=6h&appId=${appId}`,
+      href: routes.projects.requests({ ...scope, since: "6h" }),
       icon: ArrowOppositeDirectionY,
       isActive: false,
     },
+  ];
+  return [
+    ...(appOverviewEnabled ? [overviewLink] : []),
+    {
+      key: "deployments",
+      label: "Deployments",
+      href: routes.projects.apps.deployments(scope),
+      icon: SquareBulletList,
+      isActive: page === "deployments",
+    },
+    {
+      key: "env-vars",
+      label: "Environment Variables",
+      href: routes.projects.apps.envVars(scope),
+      icon: BracketsSquareDots,
+      isActive: page === "env-vars",
+    },
+    {
+      key: "sentinel-policies",
+      label: "Sentinel Policies",
+      href: routes.projects.apps.sentinelPolicies(scope),
+      icon: ShieldKey,
+      isActive: page === "sentinel-policies",
+    },
+    {
+      key: "settings",
+      label: "App Settings",
+      href: routes.projects.apps.settings(scope),
+      icon: Gear,
+      isActive: page === "settings",
+    },
+    ...(appOverviewEnabled ? [] : legacyLinks),
     // Will be polished and added back in the future iterations
     // {
     //   key: "openapi-diff",
     //   label: "OpenAPI Diff",
-    //   href: `${base}/openapi-diff`,
+    //   href: routes.projects.apps.openapiDiff(...),
     //   icon: Nodes,
     //   isActive: page === "openapi-diff",
     // },
@@ -234,19 +199,20 @@ export function buildApiLinks(
   segments: string[],
 ): ResolvedNavLink[] {
   const page = segments[2];
-  const base = `/${slug}/apis/${apiId}`;
   return [
     {
       key: "requests",
       label: "Requests",
-      href: base,
+      href: routes.apis.detail({ workspaceSlug: slug, apiId }),
       icon: ArrowOppositeDirectionY,
       isActive: !page,
     },
     {
       key: "keys",
       label: "Keys",
-      href: keyAuthId ? `${base}/keys/${keyAuthId}` : base,
+      href: keyAuthId
+        ? routes.apis.keys.list({ workspaceSlug: slug, apiId, keyAuthId })
+        : routes.apis.detail({ workspaceSlug: slug, apiId }),
       icon: Key,
       isActive: page === "keys",
       disabled: !keyAuthId,
@@ -254,7 +220,7 @@ export function buildApiLinks(
     {
       key: "settings",
       label: "Settings",
-      href: `${base}/settings`,
+      href: routes.apis.settings({ workspaceSlug: slug, apiId }),
       icon: Gear,
       isActive: page === "settings",
     },
@@ -267,33 +233,33 @@ export function buildNamespaceLinks(
   segments: string[],
 ): ResolvedNavLink[] {
   const page = segments[2];
-  const base = `/${slug}/ratelimits/${namespaceId}`;
+  const scope = { workspaceSlug: slug, namespaceId };
   return [
     {
       key: "requests",
       label: "Requests",
-      href: base,
+      href: routes.ratelimits.detail(scope),
       icon: ArrowOppositeDirectionY,
       isActive: !page,
     },
     {
       key: "logs",
       label: "Logs",
-      href: `${base}/logs`,
+      href: routes.ratelimits.logs(scope),
       icon: Layers3,
       isActive: page === "logs",
     },
     {
       key: "settings",
       label: "Settings",
-      href: `${base}/settings`,
+      href: routes.ratelimits.settings(scope),
       icon: Gear,
       isActive: page === "settings",
     },
     {
       key: "overrides",
       label: "Overrides",
-      href: `${base}/overrides`,
+      href: routes.ratelimits.overrides(scope),
       icon: ArrowDottedRotateAnticlockwise,
       isActive: page === "overrides",
     },

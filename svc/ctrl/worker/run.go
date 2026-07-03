@@ -26,7 +26,6 @@ import (
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/healthcheck"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/otel"
@@ -37,12 +36,14 @@ import (
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
 	"github.com/unkeyed/unkey/pkg/runner"
 	"github.com/unkeyed/unkey/pkg/uid"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	"github.com/unkeyed/unkey/svc/ctrl/services/acme/providers"
 	workerapp "github.com/unkeyed/unkey/svc/ctrl/worker/app"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/buildslot"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/certificate"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/clickhouseuser"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/deploybilling"
 	workercustomdomain "github.com/unkeyed/unkey/svc/ctrl/worker/customdomain"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/deploy"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/deployment"
@@ -53,6 +54,7 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/worker/keylastusedsync"
 
 	ratelimitdb "github.com/unkeyed/unkey/internal/services/ratelimit/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/auditlogs"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/openapi"
 	workerproject "github.com/unkeyed/unkey/svc/ctrl/worker/project"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/routing"
@@ -126,6 +128,7 @@ func Run(ctx context.Context, cfg Config) error {
 	reg.MustRegister(collectors.NewGoCollector())
 	//nolint:exhaustruct
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	reg.MustRegister(prometheus.NewSystemMetricsCollector())
 	lazy.SetRegistry(reg)
 	buildinfo.RegisterBuildInfoMetrics("worker")
 
@@ -143,10 +146,7 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	// Initialize database
-	database, err := db.New(db.Config{
-		PrimaryDSN:  cfg.Database.Primary,
-		ReadOnlyDSN: cfg.Database.ReadonlyReplica,
-	})
+	database, err := db.New(cfg.Database)
 	if err != nil {
 		return fmt.Errorf("unable to create db: %w", err)
 	}
@@ -171,6 +171,10 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	var ch clickhouse.ClickHouse = clickhouse.NewNoop()
+	// Billing usage reader is the concrete *clickhouse.Client: the meter query
+	// (GetInstanceMeterUsage) is not on the ClickHouse interface. Nil until
+	// ClickHouse is configured, which leaves the billing push disabled.
+	var billingUsageReader deploybilling.UsageReader
 	buildSteps := batch.NewNoop[schema.BuildStepV1]()
 	buildStepLogs := batch.NewNoop[schema.BuildStepLogV1]()
 
@@ -182,6 +186,7 @@ func Run(ctx context.Context, cfg Config) error {
 			logger.Error("failed to create clickhouse client, continuing with noop", "error", chErr)
 		} else {
 			ch = chClient
+			billingUsageReader = chClient
 
 			buildSteps = clickhouse.NewBuffer[schema.BuildStepV1](chClient, "default.build_steps_v1", clickhouse.BufferConfig{
 				Name:          "build_steps",
@@ -209,8 +214,13 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 	}
 
-	// Restate Server - uses logging.GetHandler() for slog integration
-	restateSrv := restateServer.NewRestate().WithLogger(logger.GetHandler(), false)
+	// Restate Server. The SDK logs "Handling invocation" / "Invocation
+	// completed successfully" at INFO on every invocation, and several crons
+	// tick every minute, so its INFO chatter drowns out real signal. Give it a
+	// WARN-gated view of our handler: its warnings and errors (e.g. invocation
+	// panics) still surface, its routine success noise is dropped, and the
+	// app's own INFO/DEBUG logs (which honor UNKEY_LOG_LEVEL) are unaffected.
+	restateSrv := restateServer.NewRestate().WithLogger(logger.AtLevel(logger.GetHandler(), slog.LevelWarn), false)
 
 	// Shared Restate admin client used both for service registration and
 	// for in-flight invocation cancellation (e.g. superseded sibling cleanup).
@@ -299,15 +309,35 @@ func Run(ctx context.Context, cfg Config) error {
 		AllowUnauthenticatedDeployments: ptr.SafeDeref(cfg.GitHub).AllowUnauthenticatedDeployments,
 	})))
 
-	restateSrv.Bind(hydrav1.NewProjectServiceServer(workerproject.New(workerproject.Config{
-		DB: database,
-	})))
-	restateSrv.Bind(hydrav1.NewAppServiceServer(workerapp.New(workerapp.Config{
-		DB: database,
-	})))
+	// Deletion workflows write their audit logs as durable steps, so the audit
+	// record is tied to the retried deletion unit rather than the enqueueing RPC.
+	auditlogSvc, err := auditlogs.New(auditlogs.Config{DB: database})
+	if err != nil {
+		return fmt.Errorf("failed to create audit log service: %w", err)
+	}
+
+	projectSvc, err := workerproject.New(workerproject.Config{
+		DB:        database,
+		Auditlogs: auditlogSvc,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create project worker service: %w", err)
+	}
+	restateSrv.Bind(hydrav1.NewProjectServiceServer(projectSvc))
+
+	appSvc, err := workerapp.New(workerapp.Config{
+		DB:        database,
+		Auditlogs: auditlogSvc,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create app worker service: %w", err)
+	}
+	restateSrv.Bind(hydrav1.NewAppServiceServer(appSvc))
+
 	envSvc, err := workerenvironment.New(workerenvironment.Config{
-		DB:    database,
-		Admin: restateAdminClient,
+		DB:        database,
+		Admin:     restateAdminClient,
+		Auditlogs: auditlogSvc,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create environment worker service: %w", err)
@@ -442,11 +472,15 @@ func Run(ctx context.Context, cfg Config) error {
 		Clock:                     clk,
 		RatelimitDB:               ratelimitdb.New(database.RW(), database.RO()),
 		SlackQuotaCheckWebhookURL: cfg.Slack.QuotaCheckWebhookURL,
+		BillingUsageReader:        billingUsageReader,
+		StripeSecretKey:           cfg.Billing.StripeSecretKey,
 		Heartbeats: cron.Heartbeats{
-			QuotaCheck:      cronHeartbeat(cfg.Heartbeat.QuotaCheckURL),
-			KeyRefill:       cronHeartbeat(cfg.Heartbeat.KeyRefillURL),
-			KeyLastUsedSync: cronHeartbeat(cfg.Heartbeat.KeyLastUsedSyncURL),
-			AuditLogExport:  cronHeartbeat(cfg.Heartbeat.AuditLogExportURL),
+			QuotaCheck:        cronHeartbeat(cfg.Heartbeat.QuotaCheckURL),
+			KeyRefill:         cronHeartbeat(cfg.Heartbeat.KeyRefillURL),
+			KeyLastUsedSync:   cronHeartbeat(cfg.Heartbeat.KeyLastUsedSyncURL),
+			AuditLogExport:    cronHeartbeat(cfg.Heartbeat.AuditLogExportURL),
+			AuditLogCleanup:   cronHeartbeat(cfg.Heartbeat.AuditLogOutboxCleanupURL),
+			DeployBillingPush: cronHeartbeat(cfg.Heartbeat.DeployBillingPushURL),
 		},
 	})
 	if err != nil {
@@ -482,6 +516,18 @@ func Run(ctx context.Context, cfg Config) error {
 		restate.WithMaxAttempts(5),
 		restate.PauseOnMaxAttempts(),
 	)
+	// AuditLogOutboxCleanup mirrors the ratelimit cleanup policy: a
+	// stateless, cutoff-bounded DELETE the hot path doesn't depend on, so
+	// pausing for an operator to inspect a real failure beats killing
+	// silently. The daily cadence means a paused run is caught well before
+	// the next tick.
+	cronAuditLogCleanupRetry := restate.WithInvocationRetryPolicy(
+		restate.WithInitialInterval(100*time.Millisecond),
+		restate.WithExponentiationFactor(2.0),
+		restate.WithMaxInterval(5*time.Second),
+		restate.WithMaxAttempts(5),
+		restate.PauseOnMaxAttempts(),
+	)
 	// AuditLogExport runs every minute and is idempotent: any failure is
 	// recovered by the next tick, not by replaying journals from
 	// yesterday. 1h journal retention keeps enough debugging headroom for
@@ -497,6 +543,7 @@ func Run(ctx context.Context, cfg Config) error {
 		// policy lets an operator inspect a real failure rather than killing
 		// silently.
 		ConfigureHandler("RunPermanentDelete", cronRatelimitGCCRetry).
+		ConfigureHandler("RunAuditLogOutboxCleanup", cronAuditLogCleanupRetry).
 		ConfigureHandler("RunAuditLogExport", restate.WithJournalRetention(1*time.Hour)))
 	logger.Info("CronService enabled")
 

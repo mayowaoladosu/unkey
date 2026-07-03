@@ -7,8 +7,10 @@ import (
 
 	restate "github.com/restatedev/sdk-go"
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
+	"github.com/unkeyed/unkey/pkg/auditlog"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/logger"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/audit"
 )
 
 // MarkForDeletion points the app at the cascade's shared deletion_id
@@ -66,6 +68,23 @@ func (s *Service) MarkForDeletion(
 		return nil, fmt.Errorf("set app deletion id: %w", err)
 	}
 
+	if err := audit.Insert(ctx, s.auditlogs, audit.Event{
+		Actor:         req.GetActor(),
+		CorrelationID: req.GetCorrelationId(),
+		WorkspaceID:   app.WorkspaceID,
+		Event:         auditlog.AppDeleteEvent,
+		Display:       fmt.Sprintf("Deleted app %s", app.ID),
+		Resource: auditlog.AuditLogResource{
+			ID:          app.ID,
+			Type:        auditlog.AppResourceType,
+			Meta:        map[string]any{"name": app.Name, "slug": app.Slug, "projectId": app.ProjectID},
+			Name:        app.Name,
+			DisplayName: app.Name,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("insert audit log: %w", err)
+	}
+
 	envIDs, err := restate.Run(ctx, func(runCtx restate.RunContext) ([]string, error) {
 		return db.Query.ListLiveEnvironmentIdsByApp(runCtx, s.db.RO(), appID)
 	}, restate.WithName("list live environments"))
@@ -76,7 +95,11 @@ func (s *Service) MarkForDeletion(
 	for _, envID := range envIDs {
 		hydrav1.NewEnvironmentServiceClient(ctx, envID).
 			MarkForDeletion().
-			Send(&hydrav1.MarkEnvironmentForDeletionRequest{DeletionId: deletionID})
+			Send(&hydrav1.MarkEnvironmentForDeletionRequest{
+				DeletionId:    deletionID,
+				Actor:         req.GetActor(),
+				CorrelationId: req.GetCorrelationId(),
+			})
 	}
 
 	logger.Info("app mark for deletion cascade dispatched",

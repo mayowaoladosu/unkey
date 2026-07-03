@@ -8,6 +8,7 @@ package hydrav1
 
 import (
 	_ "github.com/restatedev/sdk-go/generated/dev/restate/sdk"
+	v1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,8 +23,16 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// DeleteAppPermanentlyRequest carries the caller identity and correlation ID
+// into the durable workflow so the app.delete audit log can be written as part
+// of the retried deletion unit rather than best-effort on the synchronous RPC path.
 type DeleteAppPermanentlyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Actor *v1.ActorInfo          `protobuf:"bytes,1,opt,name=actor,proto3" json:"actor,omitempty"`
+	// correlation_id groups this deletion with the other audit events from the
+	// same teardown (project -> app -> environment cascade). Minted at the RPC
+	// entry point and threaded down.
+	CorrelationId string `protobuf:"bytes,2,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -56,6 +65,20 @@ func (x *DeleteAppPermanentlyRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteAppPermanentlyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAppPermanentlyRequest) Descriptor() ([]byte, []int) {
 	return file_hydra_v1_app_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *DeleteAppPermanentlyRequest) GetActor() *v1.ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *DeleteAppPermanentlyRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
 }
 
 type DeleteAppPermanentlyResponse struct {
@@ -97,7 +120,9 @@ func (*DeleteAppPermanentlyResponse) Descriptor() ([]byte, []int) {
 type MarkAppForDeletionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// deletion_id is the single shared id minted at the cascade root.
-	DeletionId    string `protobuf:"bytes,1,opt,name=deletion_id,json=deletionId,proto3" json:"deletion_id,omitempty"`
+	DeletionId    string        `protobuf:"bytes,1,opt,name=deletion_id,json=deletionId,proto3" json:"deletion_id,omitempty"`
+	Actor         *v1.ActorInfo `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	CorrelationId string        `protobuf:"bytes,3,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -135,6 +160,20 @@ func (*MarkAppForDeletionRequest) Descriptor() ([]byte, []int) {
 func (x *MarkAppForDeletionRequest) GetDeletionId() string {
 	if x != nil {
 		return x.DeletionId
+	}
+	return ""
+}
+
+func (x *MarkAppForDeletionRequest) GetActor() *v1.ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *MarkAppForDeletionRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
 	}
 	return ""
 }
@@ -261,12 +300,16 @@ var File_hydra_v1_app_proto protoreflect.FileDescriptor
 
 const file_hydra_v1_app_proto_rawDesc = "" +
 	"\n" +
-	"\x12hydra/v1/app.proto\x12\bhydra.v1\x1a\x18dev/restate/sdk/go.proto\"\x1d\n" +
-	"\x1bDeleteAppPermanentlyRequest\"\x1e\n" +
-	"\x1cDeleteAppPermanentlyResponse\"<\n" +
+	"\x12hydra/v1/app.proto\x12\bhydra.v1\x1a\x13ctrl/v1/actor.proto\x1a\x18dev/restate/sdk/go.proto\"n\n" +
+	"\x1bDeleteAppPermanentlyRequest\x12(\n" +
+	"\x05actor\x18\x01 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
+	"\x0ecorrelation_id\x18\x02 \x01(\tR\rcorrelationId\"\x1e\n" +
+	"\x1cDeleteAppPermanentlyResponse\"\x8d\x01\n" +
 	"\x19MarkAppForDeletionRequest\x12\x1f\n" +
 	"\vdeletion_id\x18\x01 \x01(\tR\n" +
-	"deletionId\"\x1c\n" +
+	"deletionId\x12(\n" +
+	"\x05actor\x18\x02 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
+	"\x0ecorrelation_id\x18\x03 \x01(\tR\rcorrelationId\"\x1c\n" +
 	"\x1aMarkAppForDeletionResponse\"4\n" +
 	"\x11RestoreAppRequest\x12\x1f\n" +
 	"\vdeletion_id\x18\x01 \x01(\tR\n" +
@@ -299,19 +342,22 @@ var file_hydra_v1_app_proto_goTypes = []any{
 	(*MarkAppForDeletionResponse)(nil),   // 3: hydra.v1.MarkAppForDeletionResponse
 	(*RestoreAppRequest)(nil),            // 4: hydra.v1.RestoreAppRequest
 	(*RestoreAppResponse)(nil),           // 5: hydra.v1.RestoreAppResponse
+	(*v1.ActorInfo)(nil),                 // 6: ctrl.v1.ActorInfo
 }
 var file_hydra_v1_app_proto_depIdxs = []int32{
-	0, // 0: hydra.v1.AppService.DeletePermanently:input_type -> hydra.v1.DeleteAppPermanentlyRequest
-	2, // 1: hydra.v1.AppService.MarkForDeletion:input_type -> hydra.v1.MarkAppForDeletionRequest
-	4, // 2: hydra.v1.AppService.Restore:input_type -> hydra.v1.RestoreAppRequest
-	1, // 3: hydra.v1.AppService.DeletePermanently:output_type -> hydra.v1.DeleteAppPermanentlyResponse
-	3, // 4: hydra.v1.AppService.MarkForDeletion:output_type -> hydra.v1.MarkAppForDeletionResponse
-	5, // 5: hydra.v1.AppService.Restore:output_type -> hydra.v1.RestoreAppResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6, // 0: hydra.v1.DeleteAppPermanentlyRequest.actor:type_name -> ctrl.v1.ActorInfo
+	6, // 1: hydra.v1.MarkAppForDeletionRequest.actor:type_name -> ctrl.v1.ActorInfo
+	0, // 2: hydra.v1.AppService.DeletePermanently:input_type -> hydra.v1.DeleteAppPermanentlyRequest
+	2, // 3: hydra.v1.AppService.MarkForDeletion:input_type -> hydra.v1.MarkAppForDeletionRequest
+	4, // 4: hydra.v1.AppService.Restore:input_type -> hydra.v1.RestoreAppRequest
+	1, // 5: hydra.v1.AppService.DeletePermanently:output_type -> hydra.v1.DeleteAppPermanentlyResponse
+	3, // 6: hydra.v1.AppService.MarkForDeletion:output_type -> hydra.v1.MarkAppForDeletionResponse
+	5, // 7: hydra.v1.AppService.Restore:output_type -> hydra.v1.RestoreAppResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_hydra_v1_app_proto_init() }
