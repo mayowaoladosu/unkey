@@ -182,6 +182,29 @@ type HeartbeatConfig struct {
 	// When set, a heartbeat is sent after successful drains of the MySQL outbox
 	// into ClickHouse. Optional - if empty, no heartbeat is sent.
 	AuditLogExportURL string `toml:"audit_log_export_url"`
+
+	// AuditLogOutboxCleanupURL is the Checkly heartbeat URL for the daily sweep
+	// that hard-deletes exported clickhouse_outbox rows past the retention
+	// window. When set, a heartbeat is sent after a successful sweep.
+	// Optional - if empty, no heartbeat is sent.
+	AuditLogOutboxCleanupURL string `toml:"audit_log_outbox_cleanup_url"`
+
+	// DeployBillingPushURL is the Checkly heartbeat URL for the hourly Deploy
+	// billing push. When set, a heartbeat is sent after a successful push.
+	// Optional - if empty, no heartbeat is sent.
+	DeployBillingPushURL string `toml:"deploy_billing_push_url"`
+}
+
+// BillingConfig holds Stripe configuration for the hourly Deploy billing push.
+//
+// The push reports month-to-date Deploy usage to Stripe Billing Meters by
+// event name (deploy.*), which map usage to a customer and price in Stripe, so
+// the worker needs no price or meter IDs. It is disabled unless StripeSecretKey
+// is set, so non-billing environments leave it empty and the cron runs as a
+// no-op.
+type BillingConfig struct {
+	// StripeSecretKey authenticates meter-event writes to Stripe.
+	StripeSecretKey string `toml:"stripe_secret_key"`
 }
 
 // SlackConfig holds Slack webhook URLs for notifications.
@@ -232,8 +255,8 @@ type Config struct {
 	// Each custom domain gets a unique subdomain like "{random}.{CnameDomain}".
 	CnameDomain string `toml:"cname_domain" config:"required,nonempty"`
 
-	// Database configures MySQL connections. See [config.DatabaseConfig].
-	Database config.DatabaseConfig `toml:"database"`
+	// Database is the MySQL DSN used for all control plane reads and writes.
+	Database string `toml:"database" config:"required,nonempty"`
 
 	// Vault configures the encryption/decryption service. See [config.VaultConfig].
 	Vault config.VaultConfig `toml:"vault"`
@@ -263,6 +286,9 @@ type Config struct {
 
 	// Slack configures Slack webhook URLs for notifications.
 	Slack SlackConfig `toml:"slack"`
+
+	// Billing configures the hourly Deploy billing push to Stripe.
+	Billing BillingConfig `toml:"billing"`
 
 	// Clock provides time operations for testing and scheduling.
 	// Use clock.New() for production deployments.

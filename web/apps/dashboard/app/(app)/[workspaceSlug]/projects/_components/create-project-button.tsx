@@ -1,36 +1,45 @@
 "use client";
 
-import { NavbarActionButton } from "@/components/navigation/action-button";
 import { Plus } from "@unkey/icons";
-import type React from "react";
+import { Button, InfoTooltip } from "@unkey/ui";
 import { useState } from "react";
 import { CreateProjectDialog } from "./create-project-dialog";
+import { useDeployGate } from "./hooks/use-deploy-gate";
 
 type Props = {
   defaultOpen?: boolean;
   workspaceSlug: string;
 };
 
-export const CreateProjectButton = ({
-  defaultOpen,
-  workspaceSlug,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & Props) => {
+export function CreateProjectButton({ defaultOpen, workspaceSlug }: Props) {
   const [isOpen, setIsOpen] = useState(defaultOpen ?? false);
+
+  // UX-only mirror of the authoritative ctrl-api gate, so a gated user gets a
+  // disabled button into the paywall instead of a request that fails.
+  const { gated, isLoading } = useDeployGate();
 
   return (
     <>
-      <NavbarActionButton
-        title="Create new project"
-        {...rest}
-        color="default"
-        onClick={() => setIsOpen(true)}
+      <InfoTooltip
+        content="A Compute plan is required to create projects."
+        disabled={!gated}
+        asChild
       >
-        <Plus />
-        Create new project
-      </NavbarActionButton>
+        <span>
+          <Button
+            size="md"
+            variant="primary"
+            loading={isLoading}
+            disabled={gated}
+            onClick={() => setIsOpen(true)}
+          >
+            <Plus iconSize="sm-regular" />
+            Create project
+          </Button>
+        </span>
+      </InfoTooltip>
 
       <CreateProjectDialog isOpen={isOpen} onOpenChange={setIsOpen} workspaceSlug={workspaceSlug} />
     </>
   );
-};
+}

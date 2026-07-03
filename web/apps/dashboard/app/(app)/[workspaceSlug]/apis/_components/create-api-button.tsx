@@ -1,7 +1,11 @@
 "use client";
 
 import { revalidate } from "@/app/actions";
-import { NavbarActionButton } from "@/components/navigation/action-button";
+import {
+  NavbarActionButton,
+  type NavbarActionButtonProps,
+} from "@/components/navigation/action-button";
+import { routes } from "@/lib/navigation/routes";
 import { trpc } from "@/lib/trpc/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "@unkey/icons";
@@ -28,13 +32,14 @@ const formSchema = z.object({
 type Props = {
   defaultOpen?: boolean;
   workspaceSlug: string;
+  size?: NavbarActionButtonProps["size"];
 };
 
 export const CreateApiButton = ({
   defaultOpen,
   workspaceSlug,
   ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & Props) => {
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "size"> & Props) => {
   const [isOpen, setIsOpen] = useState(defaultOpen ?? false);
   const router = useRouter();
   const { api } = trpc.useUtils();
@@ -50,9 +55,9 @@ export const CreateApiButton = ({
   const create = trpc.api.create.useMutation({
     async onSuccess(res) {
       toast.success("Your keyspace has been created");
-      await revalidate(`/${workspaceSlug}/apis`);
+      await revalidate(routes.apis.list({ workspaceSlug }));
       api.overview.query.invalidate();
-      router.push(`/${workspaceSlug}/apis/${res.id}`);
+      router.push(routes.apis.detail({ workspaceSlug, apiId: res.id }));
       setIsOpen(false);
     },
     onError(err) {

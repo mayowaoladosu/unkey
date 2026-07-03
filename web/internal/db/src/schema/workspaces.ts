@@ -11,7 +11,6 @@ import { projects } from "./projects";
 import { quotas } from "./quota";
 import { ratelimitNamespaces } from "./ratelimit";
 import { permissions, roles } from "./rbac";
-import { sentinels } from "./sentinels";
 import { deleteProtection } from "./util/delete_protection";
 import { lifecycleDatesMigration } from "./util/lifecycle_dates";
 
@@ -32,6 +31,23 @@ export const workspaces = mysqlTable("workspaces", {
   // stripe
   stripeCustomerId: varchar("stripe_customer_id", { length: 256 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 256 }),
+
+  /**
+   * Local mirror of the workspace's Unkey Deploy plan, synced from Stripe by the
+   * customer.subscription.* webhook. NULL means no Deploy plan (cannot use
+   * Deploy). Lets the deploy gate and dashboard read entitlement without calling
+   * Stripe in the hot path. Stripe stays source of truth; this is a cache.
+   */
+  deployPlan: varchar("deploy_plan", { length: 64 }),
+
+  /**
+   * Manual Deploy entitlement override for internal / comped workspaces, owned
+   * by us and never touched by the Stripe webhook. NULL = no override. When set
+   * (to a plan value), the deploy gate treats the workspace as entitled even
+   * without a paid deploy_plan. Kept separate from deployPlan so that stays a
+   * pure Stripe mirror.
+   */
+  deployPlanOverride: varchar("deploy_plan_override", { length: 64 }),
 
   /**
    * feature flags
@@ -81,6 +97,5 @@ export const workspacesRelations = relations(workspaces, ({ many, one }) => ({
   clickhouseSettings: one(clickhouseWorkspaceSettings),
 
   projects: many(projects),
-  sentinels: many(sentinels),
   certificates: many(certificates),
 }));

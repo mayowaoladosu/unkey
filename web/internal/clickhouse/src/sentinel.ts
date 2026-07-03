@@ -7,8 +7,8 @@ const TIMESERIES_INTERVAL_SECONDS = TIMESERIES_INTERVAL_MINUTES * 60;
 const CURRENT_RPS_WINDOW_MINUTES = 15;
 const CURRENT_RPS_WINDOW_MS = CURRENT_RPS_WINDOW_MINUTES * 60 * 1000;
 
-const TABLE = "default.sentinel_requests_raw_v1";
-const MV_TABLE = "default.sentinel_requests_per_15m_v1";
+const TABLE = "default.frontline_requests_raw_v1";
+const MV_TABLE = "default.frontline_requests_per_15m_v1";
 
 const SQL = {
   deploymentFilter: `
@@ -88,7 +88,8 @@ export const sentinelLogsRequestSchema = z.object({
     )
     .nullable()
     .default(null),
-  cursor: z.number().int().nullable().optional(),
+  // 1-based page for offset pagination. Defaults to 1 (offset 0).
+  page: z.number().int().min(1).default(1),
 });
 
 export type SentinelLogsRequest = z.infer<typeof sentinelLogsRequestSchema>;
@@ -177,26 +178,30 @@ export function getSentinelLogs(ch: Querier) {
       schema: z.object({ total_count: z.number().int() }),
     });
 
+    // Offset pagination. `page` is 1-based; page 1 maps to offset 0.
+    const offset = (args.page - 1) * args.limit;
+
     const logsQuery = ch.query({
       query: `
         SELECT request_id, time, deployment_id, region, method, path, host,
-               response_status, total_latency, instance_latency, sentinel_latency,
+               response_status, total_latency, instance_latency, frontline_latency AS sentinel_latency,
                query_string, query_params, request_headers, request_body,
                response_headers, response_body, user_agent, ip_address
         FROM ${TABLE}
         WHERE ${filterConditions}
-          AND ({cursor: Nullable(UInt64)} IS NULL OR time < {cursor: Nullable(UInt64)})
-        ORDER BY time DESC
-        LIMIT {limit: Int}`,
-      params: sentinelLogsRequestSchema.extend(
-        Object.fromEntries(Object.keys(pathParams).map((k) => [k, z.string()])),
-      ),
+        ORDER BY time DESC, request_id DESC
+        LIMIT {limit: Int}
+        OFFSET {offset: Int}`,
+      params: sentinelLogsRequestSchema.extend({
+        offset: z.number().int(),
+        ...Object.fromEntries(Object.keys(pathParams).map((k) => [k, z.string()])),
+      }),
       schema: sentinelLogsResponseSchema,
     });
 
     return {
       totalQuery: totalQuery({ ...args, ...pathValues } as never),
-      logsQuery: logsQuery({ ...args, ...pathValues } as never),
+      logsQuery: logsQuery({ ...args, ...pathValues, offset } as never),
     };
   };
 }

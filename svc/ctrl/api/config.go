@@ -110,8 +110,8 @@ type Config struct {
 	// Each custom domain gets a unique subdomain like "{random}.{CnameDomain}".
 	CnameDomain string `toml:"cname_domain"`
 
-	// Database configures MySQL connections. See [config.DatabaseConfig].
-	Database config.DatabaseConfig `toml:"database"`
+	// Database is the MySQL DSN used for all control plane reads and writes.
+	Database string `toml:"database" config:"required,nonempty"`
 
 	// Observability configures tracing, logging, and metrics. See [config.Observability].
 	Observability config.Observability `toml:"observability"`
@@ -129,6 +129,18 @@ type Config struct {
 	// ClickHouse configures the analytics database connection used for
 	// container lifecycle event ingestion.
 	ClickHouse ClickHouseConfig `toml:"clickhouse"`
+
+	// DeployGate configures the Unkey Deploy project-creation entitlement gate.
+	DeployGate DeployGateConfig `toml:"deploy_gate"`
+}
+
+// DeployGateConfig gates project creation on a Deploy entitlement: a synced
+// plan or a manual override.
+type DeployGateConfig struct {
+	// Enforce hard-blocks project creation for workspaces with no Deploy
+	// entitlement. Default false runs in observe mode: it logs what it would
+	// block but still allows creation, so the signal can be validated first.
+	Enforce bool `toml:"enforce"`
 }
 
 // Validate checks cross-field constraints that cannot be expressed through

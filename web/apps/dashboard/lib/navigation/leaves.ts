@@ -29,14 +29,14 @@ export function buildWorkspaceSections(slug: string, segments: string[]): Resolv
     {
       key: "apis",
       label: "Keyspaces (APIs)",
-      href: `/${slug}/apis`,
+      href: routes.apis.list({ workspaceSlug: slug }),
       icon: Nodes,
       isActive: top === "apis",
     },
     {
       key: "ratelimits",
       label: "Ratelimit",
-      href: `/${slug}/ratelimits`,
+      href: routes.ratelimits.list({ workspaceSlug: slug }),
       icon: Gauge,
       isActive: top === "ratelimits",
     },
@@ -71,27 +71,9 @@ export function buildWorkspaceSections(slug: string, segments: string[]): Resolv
     {
       key: "settings",
       label: "Settings",
-      href: `/${slug}/settings/general`,
+      href: routes.settings.general({ workspaceSlug: slug }),
       icon: Gear,
       isActive: top === "settings",
-    },
-  ];
-}
-
-export function buildAuthorizationLinks(slug: string, segments: string[]): ResolvedNavLink[] {
-  const page = segments[1];
-  return [
-    {
-      key: "roles",
-      label: "Roles",
-      href: `/${slug}/authorization/roles`,
-      isActive: page === "roles",
-    },
-    {
-      key: "permissions",
-      label: "Permissions",
-      href: `/${slug}/authorization/permissions`,
-      isActive: page === "permissions",
     },
   ];
 }
@@ -105,8 +87,8 @@ export function buildProjectLinks(
   const scope = { workspaceSlug: slug, projectId };
   return [
     {
-      key: "overview",
-      label: "Overview",
+      key: "apps",
+      label: "Apps",
       href: routes.projects.detail(scope),
       icon: Cube,
       isActive: !page,
@@ -127,7 +109,7 @@ export function buildProjectLinks(
     },
     {
       key: "settings",
-      label: "Settings",
+      label: "Project Settings",
       href: routes.projects.settings(scope),
       icon: Gear,
       isActive: page === "settings",
@@ -140,10 +122,36 @@ export function buildAppLinks(
   projectId: string,
   appId: string,
   segments: string[],
+  appOverviewEnabled: boolean,
 ): ResolvedNavLink[] {
   const page = segments[4];
   const scope = { workspaceSlug: slug, projectId, appId };
+  const overviewLink: ResolvedNavLink = {
+    key: "overview",
+    label: "Overview",
+    href: routes.projects.apps.overview(scope),
+    icon: Cube,
+    isActive: page === "overview",
+  };
+  const legacyLinks: ResolvedNavLink[] = [
+    {
+      key: "logs",
+      label: "Logs",
+      href: routes.projects.logs(scope),
+      icon: Layers3,
+      isActive: false,
+      separatorAbove: true,
+    },
+    {
+      key: "requests",
+      label: "Requests",
+      href: routes.projects.requests({ ...scope, since: "6h" }),
+      icon: ArrowOppositeDirectionY,
+      isActive: false,
+    },
+  ];
   return [
+    ...(appOverviewEnabled ? [overviewLink] : []),
     {
       key: "deployments",
       label: "Deployments",
@@ -167,28 +175,12 @@ export function buildAppLinks(
     },
     {
       key: "settings",
-      label: "Settings",
+      label: "App Settings",
       href: routes.projects.apps.settings(scope),
       icon: Gear,
       isActive: page === "settings",
     },
-    // Project-level views scoped to this app; separated since they navigate
-    // out of the app section.
-    {
-      key: "logs",
-      label: "Logs",
-      href: routes.projects.logs(scope),
-      icon: Layers3,
-      isActive: false,
-      separatorAbove: true,
-    },
-    {
-      key: "requests",
-      label: "Requests",
-      href: routes.projects.requests({ ...scope, since: "6h" }),
-      icon: ArrowOppositeDirectionY,
-      isActive: false,
-    },
+    ...(appOverviewEnabled ? [] : legacyLinks),
     // Will be polished and added back in the future iterations
     // {
     //   key: "openapi-diff",
@@ -211,14 +203,16 @@ export function buildApiLinks(
     {
       key: "requests",
       label: "Requests",
-      href: `/${slug}/apis/${apiId}`,
+      href: routes.apis.detail({ workspaceSlug: slug, apiId }),
       icon: ArrowOppositeDirectionY,
       isActive: !page,
     },
     {
       key: "keys",
       label: "Keys",
-      href: keyAuthId ? `/${slug}/apis/${apiId}/keys/${keyAuthId}` : `/${slug}/apis/${apiId}`,
+      href: keyAuthId
+        ? routes.apis.keys.list({ workspaceSlug: slug, apiId, keyAuthId })
+        : routes.apis.detail({ workspaceSlug: slug, apiId }),
       icon: Key,
       isActive: page === "keys",
       disabled: !keyAuthId,
@@ -226,7 +220,7 @@ export function buildApiLinks(
     {
       key: "settings",
       label: "Settings",
-      href: `/${slug}/apis/${apiId}/settings`,
+      href: routes.apis.settings({ workspaceSlug: slug, apiId }),
       icon: Gear,
       isActive: page === "settings",
     },
@@ -239,32 +233,33 @@ export function buildNamespaceLinks(
   segments: string[],
 ): ResolvedNavLink[] {
   const page = segments[2];
+  const scope = { workspaceSlug: slug, namespaceId };
   return [
     {
       key: "requests",
       label: "Requests",
-      href: `/${slug}/ratelimits/${namespaceId}`,
+      href: routes.ratelimits.detail(scope),
       icon: ArrowOppositeDirectionY,
       isActive: !page,
     },
     {
       key: "logs",
       label: "Logs",
-      href: `/${slug}/ratelimits/${namespaceId}/logs`,
+      href: routes.ratelimits.logs(scope),
       icon: Layers3,
       isActive: page === "logs",
     },
     {
       key: "settings",
       label: "Settings",
-      href: `/${slug}/ratelimits/${namespaceId}/settings`,
+      href: routes.ratelimits.settings(scope),
       icon: Gear,
       isActive: page === "settings",
     },
     {
       key: "overrides",
       label: "Overrides",
-      href: `/${slug}/ratelimits/${namespaceId}/overrides`,
+      href: routes.ratelimits.overrides(scope),
       icon: ArrowDottedRotateAnticlockwise,
       isActive: page === "overrides",
     },

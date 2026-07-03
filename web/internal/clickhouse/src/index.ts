@@ -1,6 +1,8 @@
 import { getAuditLogs } from "./audit-logs";
 import { getBillableRatelimits, getBillableVerifications } from "./billing";
 import { getBuildStepLogs, getBuildSteps } from "./build-steps";
+import { getDeployMeterUsage } from "./deploy_billing";
+export { type DeployMeterUsage, deployMeterUsage } from "./deploy_billing";
 import { Client, type Inserter, Noop, type Querier } from "./client";
 import { getInstanceEvents } from "./instance-events";
 export { instanceEventKind, type InstanceEventKind } from "./instance-events";
@@ -99,6 +101,7 @@ import {
   getResourceSummary,
 } from "./resources";
 export { TIME_WINDOWS, type TimeWindow } from "./resources";
+import { getEnvironmentRequests } from "./frontline/environment-requests";
 import { getRuntimeLogs } from "./runtime-logs";
 import {
   getDeploymentLatencyWithTimeseries,
@@ -290,6 +293,7 @@ export class ClickHouse {
     return {
       billableVerifications: getBillableVerifications(this.querier),
       billableRatelimits: getBillableRatelimits(this.querier),
+      deployMeterUsage: getDeployMeterUsage(this.querier),
     };
   }
   public get api() {
@@ -364,6 +368,11 @@ export class ClickHouse {
         egress: { timeseries: getResourceNetworkEgressTimeseries(this.querier) },
         ingress: { timeseries: getResourceNetworkIngressTimeseries(this.querier) },
       },
+    };
+  }
+  public get environment() {
+    return {
+      requests: getEnvironmentRequests(this.querier),
     };
   }
   public get sentinel() {
