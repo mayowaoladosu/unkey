@@ -1,5 +1,6 @@
 import { getAuth } from "@/lib/auth/get-auth";
 import { auth as authProvider } from "@/lib/auth/server";
+import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { SignJWT } from "jose";
 import type { NextRequest } from "next/server";
@@ -28,11 +29,21 @@ export async function POST(req: NextRequest, ctx: RouteContext): Promise<NextRes
 
   let bearerToken: string | null | undefined = auth.accessToken;
   if (!bearerToken) {
+    const workspace = await db.query.workspaces.findFirst({
+      where: (table, { and, eq, isNull }) => and(eq(table.orgId, orgId), isNull(table.deletedAtM)),
+      columns: {
+        id: true,
+      },
+    });
+    if (!workspace) {
+      return NextResponse.json({ error: "Workspace not found." }, { status: 403 });
+    }
+
     const user = await authProvider.getUser(userId);
     const actorName = user?.fullName ?? user?.email ?? userId;
     bearerToken = await mintProxyJWT({
       orgId,
-      permissions: auth.permissions ?? [],
+      permissions: proxyPermissions(workspace.id, auth.permissions ?? []),
       subject: userId,
       name: actorName,
     }).catch((error) => {
@@ -45,8 +56,28 @@ export async function POST(req: NextRequest, ctx: RouteContext): Promise<NextRes
   }
 
   const { path } = await ctx.params;
-  const upstreamURL = new URL(`/${path.join("/")}`, env().UNKEY_API_URL);
+
+  // A leading "//" or backslash in a segment is parsed as an authority
+  // delimiter and rewrites the upstream origin, so reject segments carrying a
+  // slash, backslash, or control character.
+  for (const segment of path) {
+    const hasControlChar = [...segment].some((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f;
+    });
+    if (/[\\/]/.test(segment) || hasControlChar) {
+      return NextResponse.json({ error: "Invalid proxy path." }, { status: 400 });
+    }
+  }
+
+  const baseURL = new URL(env().UNKEY_API_URL);
+  const upstreamURL = new URL(`/${path.join("/")}`, baseURL);
   upstreamURL.search = req.nextUrl.search;
+
+  // Defense in depth: never let the constructed URL leave the upstream origin.
+  if (upstreamURL.origin !== baseURL.origin) {
+    return NextResponse.json({ error: "Invalid proxy path." }, { status: 400 });
+  }
 
   const headers = upstreamRequestHeaders(req);
   headers.set("authorization", `Bearer ${bearerToken}`);
@@ -56,6 +87,9 @@ export async function POST(req: NextRequest, ctx: RouteContext): Promise<NextRes
     method: "POST",
     headers,
     body,
+    // Don't auto-follow redirects; the origin check only guards the initial
+    // target, so a 3xx could still reach another host with the bearer attached.
+    redirect: "manual",
     signal: AbortSignal.timeout(10_000),
   }).catch((error) => {
     console.error("Dashboard proxy request failed", { error, upstreamURL: upstreamURL.toString() });
@@ -117,25 +151,39 @@ async function mintProxyJWT(params: {
     throw new Error("UNKEY_JWT_SECRET must be configured for dashboard proxy signing");
   }
   if (params.permissions.length === 0) {
-    throw new Error("local auth permissions are required for dashboard proxy signing");
+    throw new Error("permissions are required for dashboard proxy signing");
   }
 
   const key = new TextEncoder().encode(signingSecret);
   const now = Math.floor(Date.now() / 1000);
 
-  return new SignJWT({
-    org: {
-      id: params.orgId,
-    },
-    name: params.name,
-    perms: params.permissions,
-  })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setIssuer("app.unkey.com")
-    .setAudience(["app.unkey.com", "api.unkey.com"])
-    .setSubject(params.subject)
-    .setIssuedAt(now)
-    .setNotBefore(now)
-    .setExpirationTime(now + 120)
-    .sign(key);
+  return (
+    new SignJWT({
+      org: {
+        id: params.orgId,
+      },
+      name: params.name,
+      perms: params.permissions,
+    })
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuer("app.unkey.com")
+      // Mirror the WorkOS JWT template's audience so svc/api's WorkOS auth entry
+      // (configured with audience = "api.unkey.com") verifies this fallback token
+      // the same way it verifies a forwarded WorkOS access token.
+      .setAudience(["api.unkey.com"])
+      .setSubject(params.subject)
+      .setIssuedAt(now)
+      .setNotBefore(now)
+      .setExpirationTime(now + 120)
+      .sign(key)
+  );
+}
+
+function proxyPermissions(workspaceID: string, permissions: readonly string[]): string[] {
+  return permissions.map((permission) => {
+    if (permission === "admin:*") {
+      return `unkey:v1:${workspaceID}:**#*`;
+    }
+    return permission;
+  });
 }

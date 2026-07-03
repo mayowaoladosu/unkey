@@ -26,7 +26,6 @@ import (
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/healthcheck"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/otel"
@@ -37,6 +36,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
 	"github.com/unkeyed/unkey/pkg/runner"
 	"github.com/unkeyed/unkey/pkg/uid"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	"github.com/unkeyed/unkey/svc/ctrl/services/acme/providers"
 	workerapp "github.com/unkeyed/unkey/svc/ctrl/worker/app"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/buildslot"
@@ -54,6 +54,7 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/worker/keylastusedsync"
 
 	ratelimitdb "github.com/unkeyed/unkey/internal/services/ratelimit/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/auditlogs"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/openapi"
 	workerproject "github.com/unkeyed/unkey/svc/ctrl/worker/project"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/routing"
@@ -145,10 +146,7 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	// Initialize database
-	database, err := db.New(db.Config{
-		PrimaryDSN:  cfg.Database.Primary,
-		ReadOnlyDSN: cfg.Database.ReadonlyReplica,
-	})
+	database, err := db.New(cfg.Database)
 	if err != nil {
 		return fmt.Errorf("unable to create db: %w", err)
 	}
@@ -311,15 +309,35 @@ func Run(ctx context.Context, cfg Config) error {
 		AllowUnauthenticatedDeployments: ptr.SafeDeref(cfg.GitHub).AllowUnauthenticatedDeployments,
 	})))
 
-	restateSrv.Bind(hydrav1.NewProjectServiceServer(workerproject.New(workerproject.Config{
-		DB: database,
-	})))
-	restateSrv.Bind(hydrav1.NewAppServiceServer(workerapp.New(workerapp.Config{
-		DB: database,
-	})))
+	// Deletion workflows write their audit logs as durable steps, so the audit
+	// record is tied to the retried deletion unit rather than the enqueueing RPC.
+	auditlogSvc, err := auditlogs.New(auditlogs.Config{DB: database})
+	if err != nil {
+		return fmt.Errorf("failed to create audit log service: %w", err)
+	}
+
+	projectSvc, err := workerproject.New(workerproject.Config{
+		DB:        database,
+		Auditlogs: auditlogSvc,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create project worker service: %w", err)
+	}
+	restateSrv.Bind(hydrav1.NewProjectServiceServer(projectSvc))
+
+	appSvc, err := workerapp.New(workerapp.Config{
+		DB:        database,
+		Auditlogs: auditlogSvc,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create app worker service: %w", err)
+	}
+	restateSrv.Bind(hydrav1.NewAppServiceServer(appSvc))
+
 	envSvc, err := workerenvironment.New(workerenvironment.Config{
-		DB:    database,
-		Admin: restateAdminClient,
+		DB:        database,
+		Admin:     restateAdminClient,
+		Auditlogs: auditlogSvc,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create environment worker service: %w", err)
@@ -461,6 +479,7 @@ func Run(ctx context.Context, cfg Config) error {
 			KeyRefill:         cronHeartbeat(cfg.Heartbeat.KeyRefillURL),
 			KeyLastUsedSync:   cronHeartbeat(cfg.Heartbeat.KeyLastUsedSyncURL),
 			AuditLogExport:    cronHeartbeat(cfg.Heartbeat.AuditLogExportURL),
+			AuditLogCleanup:   cronHeartbeat(cfg.Heartbeat.AuditLogOutboxCleanupURL),
 			DeployBillingPush: cronHeartbeat(cfg.Heartbeat.DeployBillingPushURL),
 		},
 	})
@@ -497,6 +516,18 @@ func Run(ctx context.Context, cfg Config) error {
 		restate.WithMaxAttempts(5),
 		restate.PauseOnMaxAttempts(),
 	)
+	// AuditLogOutboxCleanup mirrors the ratelimit cleanup policy: a
+	// stateless, cutoff-bounded DELETE the hot path doesn't depend on, so
+	// pausing for an operator to inspect a real failure beats killing
+	// silently. The daily cadence means a paused run is caught well before
+	// the next tick.
+	cronAuditLogCleanupRetry := restate.WithInvocationRetryPolicy(
+		restate.WithInitialInterval(100*time.Millisecond),
+		restate.WithExponentiationFactor(2.0),
+		restate.WithMaxInterval(5*time.Second),
+		restate.WithMaxAttempts(5),
+		restate.PauseOnMaxAttempts(),
+	)
 	// AuditLogExport runs every minute and is idempotent: any failure is
 	// recovered by the next tick, not by replaying journals from
 	// yesterday. 1h journal retention keeps enough debugging headroom for
@@ -506,6 +537,7 @@ func Run(ctx context.Context, cfg Config) error {
 	restateSrv.Bind(hydrav1.NewCronServiceServer(cronSvc).
 		ConfigureHandler("RunKeyLastUsedSync", cronKeyLastUsedRetry).
 		ConfigureHandler("RunRatelimitGlobalCountersCleanup", cronRatelimitGCCRetry).
+		ConfigureHandler("RunAuditLogOutboxCleanup", cronAuditLogCleanupRetry).
 		ConfigureHandler("RunAuditLogExport", restate.WithJournalRetention(1*time.Hour)))
 	logger.Info("CronService enabled")
 

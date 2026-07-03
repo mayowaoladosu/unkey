@@ -18,32 +18,39 @@ type Props = {
   steps: BuildStepRow[];
   isLoading: boolean;
   fixedHeight?: number;
-  focusStepId?: string | null;
+  focusStep?: { stepId: string; tick: number } | null;
 };
 
 export const DeploymentBuildStepsTable: React.FC<Props> = ({
   steps,
   isLoading,
   fixedHeight = 500,
-  focusStepId,
+  focusStep,
 }) => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const stepId = focusStep?.stepId;
+  const tick = focusStep?.tick;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tick is the intentional re-fire trigger.
   useEffect(() => {
-    if (!focusStepId) {
+    if (!stepId) {
       return;
     }
-    const stepId = focusStepId.split("#")[0];
     setExpandedIds((prev) => (prev.has(stepId) ? prev : new Set(prev).add(stepId)));
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        containerRef.current
-          ?.querySelector<HTMLElement>(`[data-row-id="${stepId}"]`)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const el = containerRef.current?.querySelector<HTMLElement>(`[data-row-id="${stepId}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (el) {
+          // Restart the animation so it re-fires even when the row is already in view.
+          el.classList.remove("animate-error-blink");
+          void el.offsetWidth;
+          el.classList.add("animate-error-blink");
+        }
       });
     });
-  }, [focusStepId]);
+  }, [stepId, tick]);
 
   const toggleExpand = (step: BuildStepRow) => {
     if (!step.has_logs) {

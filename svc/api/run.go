@@ -336,8 +336,11 @@ func Run(ctx context.Context, cfg Config) error {
 			}
 			return "", err
 		}
-		if hit == cache.Null || !workspace.Enabled {
+		if hit == cache.Null {
 			return "", authjwt.ErrWorkspaceNotFound
+		}
+		if !workspace.Enabled {
+			return "", authjwt.ErrWorkspaceDisabled
 		}
 		return workspace.ID, nil
 	})
@@ -408,6 +411,26 @@ func Run(ctx context.Context, cfg Config) error {
 		),
 	)
 
+	ctrlProjectClient := ctrl.NewConnectProjectServiceClient(
+		ctrlv1connect.NewProjectServiceClient(
+			&http.Client{},
+			cfg.Control.URL,
+			connect.WithInterceptors(interceptor.NewHeaderInjector(map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %s", cfg.Control.Token),
+			})),
+		),
+	)
+
+	ctrlAppClient := ctrl.NewConnectAppServiceClient(
+		ctrlv1connect.NewAppServiceClient(
+			&http.Client{},
+			cfg.Control.URL,
+			connect.WithInterceptors(interceptor.NewHeaderInjector(map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %s", cfg.Control.Token),
+			})),
+		),
+	)
+
 	logger.Info("Control plane clients initialized", "url", cfg.Control.URL)
 
 	pprofEnabled := cfg.Pprof != nil && cfg.Pprof.Username != "" && cfg.Pprof.Password != ""
@@ -431,6 +454,8 @@ func Run(ctx context.Context, cfg Config) error {
 		Caches:               caches,
 		Vault:                vaultClient,
 		CtrlDeploymentClient: ctrlDeploymentClient,
+		CtrlProjectClient:    ctrlProjectClient,
+		CtrlAppClient:        ctrlAppClient,
 		PprofEnabled:         pprofEnabled,
 		PprofUsername:        pprofUsername,
 		PprofPassword:        pprofPassword,

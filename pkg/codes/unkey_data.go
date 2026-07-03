@@ -36,6 +36,17 @@ type dataKeySpace struct {
 type dataProject struct {
 	// NotFound indicates the requested project was not found.
 	NotFound Code
+
+	// Duplicate indicates the requested project already exists.
+	Duplicate Code
+}
+
+// dataApp defines errors related to app operations.
+type dataApp struct {
+	// Duplicate indicates the requested app already exists.
+	Duplicate Code
+	// NotFound indicates the requested app does not exist.
+	NotFound Code
 }
 
 // dataPermission defines errors related to permission operations.
@@ -114,6 +125,7 @@ type UnkeyDataErrors struct {
 	Workspace          dataWorkspace
 	Api                dataApi
 	Project            dataProject
+	App                dataApp
 	Migration          dataMigration
 	KeySpace           dataKeySpace
 	Permission         dataPermission
@@ -152,7 +164,13 @@ var Data = UnkeyDataErrors{
 	},
 
 	Project: dataProject{
-		NotFound: Code{SystemUnkey, CategoryUnkeyData, "project_not_found"},
+		NotFound:  Code{SystemUnkey, CategoryUnkeyData, "project_not_found"},
+		Duplicate: Code{SystemUnkey, CategoryUnkeyData, "project_already_exists"},
+	},
+
+	App: dataApp{
+		Duplicate: Code{SystemUnkey, CategoryUnkeyData, "app_already_exists"},
+		NotFound:  Code{SystemUnkey, CategoryUnkeyData, "app_not_found"},
 	},
 
 	Permission: dataPermission{

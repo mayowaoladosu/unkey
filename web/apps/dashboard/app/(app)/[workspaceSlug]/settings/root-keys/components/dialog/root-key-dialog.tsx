@@ -79,6 +79,7 @@ export const RootKeyDialog = ({
     allProjects,
     permissionResources,
     projectsLoading,
+    allApps,
     hasNextPage,
     isFetchingNextPage,
     key,
@@ -117,6 +118,15 @@ export const RootKeyDialog = ({
         scope: { kind: "project" as const, id: project.id, name: project.name },
       })),
     [allProjects],
+  );
+  const appBadges = useMemo(
+    () =>
+      allApps.map((app) => ({
+        id: app.id,
+        name: app.name,
+        scope: { kind: "app" as const, id: app.id, name: app.name },
+      })),
+    [allApps],
   );
 
   const removePermission = (permission: UnkeyPermission) =>
@@ -190,6 +200,17 @@ export const RootKeyDialog = ({
                   scope={project.scope}
                   title="from project"
                   name={project.name}
+                  expandCount={ROOT_KEY_CONSTANTS.EXPAND_COUNT}
+                  removePermission={removePermission}
+                />
+              ))}
+              {appBadges.map((app) => (
+                <PermissionBadgeList
+                  key={app.id}
+                  selectedPermissions={selectedPermissions}
+                  scope={app.scope}
+                  title="from app"
+                  name={app.name}
                   expandCount={ROOT_KEY_CONSTANTS.EXPAND_COUNT}
                   removePermission={removePermission}
                 />
@@ -273,6 +294,7 @@ export const RootKeyDialog = ({
           selectedPermissions={selectedPermissions}
           apis={allApis}
           projects={allProjects}
+          apps={allApps}
           onChange={handlePermissionChange}
           loadMore={fetchMoreApis}
           hasNextPage={hasNextPage}

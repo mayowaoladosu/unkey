@@ -116,6 +116,15 @@ export function useRootKeyDialog({
     }));
   }, [projectsData]);
 
+  const allApps = useMemo(() => {
+    if (!projectsData) {
+      return [];
+    }
+    return projectsData.flatMap((project) =>
+      project.apps.map((app) => ({ id: app.id, name: app.name })),
+    );
+  }, [projectsData]);
+
   const { data: permissionResources } = trpc.settings.rootKeys.permissionResources.useQuery(
     undefined,
     { enabled: isOpen && useUrnPermissions },
@@ -247,6 +256,7 @@ export function useRootKeyDialog({
     allProjects,
     permissionResources,
     projectsLoading,
+    allApps,
     hasNextPage,
     isFetchingNextPage,
     key,

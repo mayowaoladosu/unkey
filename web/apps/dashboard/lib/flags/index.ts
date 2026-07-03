@@ -32,6 +32,19 @@ export const deployBilling = flag<boolean, Entities>({
   adapter: adapter(),
 });
 
+export const appOverview = flag<boolean, Entities>({
+  key: "app-overview",
+  description:
+    "Show the app overview page and use it as the default app landing. Off until rollout.",
+  defaultValue: false,
+  options: [
+    { value: false, label: "Off" },
+    { value: true, label: "On" },
+  ],
+  identify,
+  adapter: adapter(),
+});
+
 export const rootKeyUrnPermissions = flag<boolean, Entities>({
   key: "root-key-urn-permissions",
   description: "Enable the URN root key permission composer",

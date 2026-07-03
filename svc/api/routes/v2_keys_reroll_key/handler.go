@@ -15,13 +15,17 @@ import (
 
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/pkg/auditlog"
+	authprincipal "github.com/unkeyed/unkey/pkg/auth/principal"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/rbac"
+	"github.com/unkeyed/unkey/pkg/rbac/permissions"
 	"github.com/unkeyed/unkey/pkg/retry"
 	"github.com/unkeyed/unkey/pkg/uid"
+	"github.com/unkeyed/unkey/pkg/urn"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/auditactor"
 )
 
 type (
@@ -84,6 +88,37 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
+	// Portal sessions are scoped to a single external identity and may only
+	// reroll keys belonging to that identity. Mismatches return 404 so we never
+	// leak the existence of keys owned by another externalId.
+	//
+	// Identity scoping is intentionally separate from the RBAC permission system.
+	// Permissions gate what operations a principal can perform; identity scoping
+	// gates which keys are reachable. Portal sessions carry a fixed externalId.
+	switch src := principal.Source.(type) {
+	case authprincipal.PortalSessionSource:
+		// Fail closed: a portal session without an externalId can't be scoped.
+		if src.ExternalID == "" {
+			return fault.New("portal session missing identity",
+				fault.Code(codes.App.Internal.UnexpectedError.URN()),
+				fault.Internal("portal session externalId is empty"),
+				fault.Public("An internal error occurred."),
+			)
+		}
+
+		if !key.IdentityExternalID.Valid || key.IdentityExternalID.String != src.ExternalID {
+			return fault.New("key not found",
+				fault.Code(codes.Data.Key.NotFound.URN()),
+				fault.Internal("key identity externalId does not match portal session"),
+				fault.Public("The specified key was not found."),
+			)
+		}
+	}
+
+	// Portal-authenticated rerolls are attributed to a portalEndUser actor so
+	// customers can see end-user activity in their audit logs.
+	actor := auditactor.FromPrincipal(principal)
+
 	keyData := db.ToKeyData(key)
 
 	checks := rbac.Or(
@@ -97,6 +132,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			ResourceID:   "*",
 			Action:       rbac.CreateKey,
 		}),
+		rbac.U(
+			urn.New().Workspace(principal.WorkspaceID).Keyspace(key.KeyAuthID),
+			permissions.CreateKey{},
+		),
 	)
 
 	if keyData.EncryptionKeyID.Valid {
@@ -113,6 +152,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 					ResourceID:   "*",
 					Action:       rbac.EncryptKey,
 				}),
+				rbac.U(
+					urn.New().Workspace(principal.WorkspaceID).Keyspace(key.KeyAuthID).Key("*"),
+					permissions.EncryptKey{},
+				),
 			),
 		)
 	}
@@ -334,10 +377,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			auditLogs = append(auditLogs, auditlog.AuditLog{
 				WorkspaceID:   principal.WorkspaceID,
 				Event:         auditlog.KeyRerollEvent,
-				ActorType:     auditlog.AuditLogActor(principal.Subject.Type),
-				ActorID:       principal.Subject.ID,
-				ActorName:     principal.Subject.Name,
-				ActorMeta:     map[string]any{},
+				ActorType:     actor.Type,
+				ActorID:       actor.ID,
+				ActorName:     actor.Name,
+				ActorMeta:     actor.Meta,
 				Display:       fmt.Sprintf("Rerolled key (%s) to (%s)", req.KeyId, keyID),
 				RemoteIP:      s.Location(),
 				UserAgent:     s.UserAgent(),

@@ -1,11 +1,9 @@
 import { insertAuditLogs } from "@/lib/audit";
 import { db, eq, schema } from "@/lib/db";
 import { getStripeClient } from "@/lib/stripe";
-import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { workspaceProcedure } from "../../trpc";
-import { clearWorkspaceCache } from "../workspace/getCurrent";
 
 export const updateWorkspaceStripeCustomer = workspaceProcedure
   .input(
@@ -77,11 +75,7 @@ export const updateWorkspaceStripeCustomer = workspaceProcedure
             "We are unable to update the workspace Stripe customer. Please try again or contact support@unkey.com",
         });
       });
-    // Invalidate workspace cache after successful update
-    await invalidateWorkspaceCache(ctx.tenant.id);
 
-    // Also clear the tRPC workspace cache to ensure fresh data on next request
-    clearWorkspaceCache(ctx.tenant.id);
     return {
       success: true,
     };

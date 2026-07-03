@@ -61,6 +61,17 @@ import (
 	v2PortalCreateSession "github.com/unkeyed/unkey/svc/api/routes/v2_portal_create_session"
 	v2PortalExchangeSession "github.com/unkeyed/unkey/svc/api/routes/v2_portal_exchange_session"
 
+	v2AppsCreateApp "github.com/unkeyed/unkey/svc/api/routes/v2_apps_create_app"
+	v2AppsDeleteApp "github.com/unkeyed/unkey/svc/api/routes/v2_apps_delete_app"
+	v2AppsGetApp "github.com/unkeyed/unkey/svc/api/routes/v2_apps_get_app"
+	v2AppsListApps "github.com/unkeyed/unkey/svc/api/routes/v2_apps_list_apps"
+	v2AppsUpdateApp "github.com/unkeyed/unkey/svc/api/routes/v2_apps_update_app"
+	v2ProjectsCreateProject "github.com/unkeyed/unkey/svc/api/routes/v2_projects_create_project"
+	v2ProjectsDeleteProject "github.com/unkeyed/unkey/svc/api/routes/v2_projects_delete_project"
+	v2ProjectsGetProject "github.com/unkeyed/unkey/svc/api/routes/v2_projects_get_project"
+	v2ProjectsListProjects "github.com/unkeyed/unkey/svc/api/routes/v2_projects_list_projects"
+	v2ProjectsUpdateProject "github.com/unkeyed/unkey/svc/api/routes/v2_projects_update_project"
+
 	zen "github.com/unkeyed/unkey/pkg/zen"
 )
 
@@ -593,6 +604,91 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 		&v2PortalExchangeSession.Handler{
 			DB:        svc.Database,
 			Auditlogs: svc.Auditlogs,
+		},
+	)
+
+	// v2/projects.createProject
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2ProjectsCreateProject.Handler{
+			CtrlClient: svc.CtrlProjectClient,
+		},
+	)
+
+	// v2/projects.listProjects
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2ProjectsListProjects.Handler{
+			DB: svc.Database,
+		},
+	)
+
+	// v2/projects.getProject
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2ProjectsGetProject.Handler{
+			DB: svc.Database,
+		},
+	)
+
+	// v2/projects.updateProject
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2ProjectsUpdateProject.Handler{
+			DB:        svc.Database,
+			Auditlogs: svc.Auditlogs,
+		},
+	)
+
+	// v2/projects.deleteProject
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2ProjectsDeleteProject.Handler{
+			DB:         svc.Database,
+			CtrlClient: svc.CtrlProjectClient,
+		},
+	)
+
+	// v2/apps.createApp
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2AppsCreateApp.Handler{
+			DB:         svc.Database,
+			CtrlClient: svc.CtrlAppClient,
+		},
+	)
+
+	// v2/apps.getApp
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2AppsGetApp.Handler{
+			DB: svc.Database,
+		},
+	)
+
+	// v2/apps.listApps
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2AppsListApps.Handler{
+			DB: svc.Database,
+		},
+	)
+
+	// v2/apps.updateApp
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2AppsUpdateApp.Handler{
+			DB:        svc.Database,
+			Auditlogs: svc.Auditlogs,
+		},
+	)
+
+	// v2/apps.deleteApp
+	srv.RegisterRoute(
+		protectedMiddlewares,
+		&v2AppsDeleteApp.Handler{
+			DB:         svc.Database,
+			CtrlClient: svc.CtrlAppClient,
 		},
 	)
 

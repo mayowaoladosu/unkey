@@ -80,6 +80,7 @@ func WithErrorHandling() zen.Middleware {
 			case codes.UnkeyDataErrorsKeyNotFound,
 				codes.UnkeyDataErrorsWorkspaceNotFound,
 				codes.UnkeyDataErrorsApiNotFound,
+				codes.UnkeyDataErrorsAppNotFound,
 				codes.UnkeyDataErrorsMigrationNotFound,
 				codes.UnkeyDataErrorsKeySpaceNotFound,
 				codes.UnkeyDataErrorsPermissionNotFound,
@@ -278,7 +279,9 @@ func WithErrorHandling() zen.Middleware {
 			// Duplicate errors
 			case codes.UnkeyDataErrorsIdentityDuplicate,
 				codes.UnkeyDataErrorsRoleDuplicate,
-				codes.UnkeyDataErrorsPermissionDuplicate:
+				codes.UnkeyDataErrorsPermissionDuplicate,
+				codes.UnkeyDataErrorsProjectDuplicate,
+				codes.UnkeyDataErrorsAppDuplicate:
 				return s.ProblemJSON(http.StatusConflict, openapi.ConflictErrorResponse{
 					Meta: openapi.Meta{
 						RequestId: s.RequestID(),

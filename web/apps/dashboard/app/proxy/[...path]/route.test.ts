@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth/get-auth", () => ({
   getAuth: vi.fn(),
@@ -17,15 +17,27 @@ vi.mock("@/lib/env", () => ({
   env: vi.fn(),
 }));
 
+vi.mock("@/lib/db", () => ({
+  db: {
+    query: {
+      workspaces: {
+        findFirst: vi.fn(),
+      },
+    },
+  },
+}));
+
 import { getAuth } from "@/lib/auth/get-auth";
 import { auth as authProvider } from "@/lib/auth/server";
 import { LOCAL_AUTH_PERMISSIONS } from "@/lib/auth/types";
+import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { jwtVerify } from "jose";
 import { POST } from "./route";
 
 const mockedGetAuth = vi.mocked(getAuth);
 const mockedAuthProvider = vi.mocked(authProvider);
+const mockedFindWorkspace = vi.mocked(db.query.workspaces.findFirst);
 const mockedEnv = vi.mocked(env);
 
 function makeRequest(headers: Record<string, string> = {}): NextRequest {
@@ -50,6 +62,13 @@ describe("dashboard proxy POST", () => {
       UNKEY_API_URL: "https://api.example.test",
       UNKEY_JWT_SECRET: "test-secret-with-at-least-32-bytes-of-entropy",
     } as ReturnType<typeof env>);
+    mockedFindWorkspace.mockResolvedValue({ id: "ws_123" } as Awaited<
+      ReturnType<typeof mockedFindWorkspace>
+    >);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("rejects requests that smuggle an Authorization header", async () => {
@@ -86,6 +105,7 @@ describe("dashboard proxy POST", () => {
 
     expect(res.status).toBe(200);
     expect(mockedAuthProvider.getUser).not.toHaveBeenCalled();
+    expect(mockedFindWorkspace).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledOnce();
     const [, init] = vi.mocked(fetch).mock.calls[0];
     expect(init).toBeDefined();
@@ -130,6 +150,65 @@ describe("dashboard proxy POST", () => {
     expect(payload["org.id"]).toBeUndefined();
     expect(payload.wid).toBeUndefined();
     expect(payload.name).toBe("Test User");
-    expect(payload.perms).toEqual(LOCAL_AUTH_PERMISSIONS);
+    expect(payload.perms).toEqual(["unkey:v1:ws_123:**#*"]);
+  });
+
+  it.each([
+    ["leading backslash host", ["\\evil.com", "v1", "keys"]],
+    ["leading double-slash host", ["", "", "evil.com", "v1", "keys"]],
+    ["backslash mid-segment", ["v1", "x\\evil.com"]],
+    ["embedded slash segment", ["v1/keys", "x"]],
+    ["control character", ["v1", "keys\u0001"]],
+  ])("rejects SSRF path injection via %s", async (_label, injectedPath) => {
+    // The proxy pins the upstream origin from UNKEY_API_URL. A path segment
+    // carrying a slash, backslash, or control character must never be allowed
+    // to rewrite the origin and turn the proxy into an SSRF primitive.
+    mockedGetAuth.mockResolvedValue({
+      userId: "user_1",
+      orgId: "org_1",
+      accessToken: "workos_access_token",
+      role: "owner",
+    });
+
+    const res = await POST(makeRequest({ accept: "application/json" }), {
+      params: Promise.resolve({ path: injectedPath }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the upstream request pinned to the configured origin", async () => {
+    mockedGetAuth.mockResolvedValue({
+      userId: "user_1",
+      orgId: "org_1",
+      accessToken: "workos_access_token",
+      role: "owner",
+    });
+
+    const res = await POST(makeRequest({ accept: "application/json" }), { params });
+
+    expect(res.status).toBe(200);
+    expect(fetch).toHaveBeenCalledOnce();
+    const [target] = vi.mocked(fetch).mock.calls[0];
+    const url = new URL(target instanceof Request ? target.url : String(target));
+    expect(url.origin).toBe("https://api.example.test");
+    expect(url.pathname).toBe("/v2/apis.listKeys");
+  });
+
+  it("rejects fallback proxy JWT minting when the org has no workspace", async () => {
+    mockedGetAuth.mockResolvedValue({
+      userId: "user_1",
+      orgId: "org_1",
+      permissions: LOCAL_AUTH_PERMISSIONS,
+      role: "owner",
+    });
+    mockedFindWorkspace.mockResolvedValue(undefined);
+
+    const res = await POST(makeRequest({ accept: "application/json" }), { params });
+
+    expect(res.status).toBe(403);
+    expect(mockedAuthProvider.getUser).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
