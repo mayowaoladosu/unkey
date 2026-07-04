@@ -460,6 +460,97 @@ func (*SlackPostApprovalResponse) Descriptor() ([]byte, []int) {
 	return file_hydra_v1_slack_status_proto_rawDescGZIP(), []int{5}
 }
 
+// SlackResolveApprovalRequest carries the decision outcome for retiring the
+// approval prompt. resolved_by is a display name when known (may be empty for
+// API-driven decisions).
+type SlackResolveApprovalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Approved      bool                   `protobuf:"varint,1,opt,name=approved,proto3" json:"approved,omitempty"`
+	ResolvedBy    string                 `protobuf:"bytes,2,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SlackResolveApprovalRequest) Reset() {
+	*x = SlackResolveApprovalRequest{}
+	mi := &file_hydra_v1_slack_status_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SlackResolveApprovalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SlackResolveApprovalRequest) ProtoMessage() {}
+
+func (x *SlackResolveApprovalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hydra_v1_slack_status_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SlackResolveApprovalRequest.ProtoReflect.Descriptor instead.
+func (*SlackResolveApprovalRequest) Descriptor() ([]byte, []int) {
+	return file_hydra_v1_slack_status_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SlackResolveApprovalRequest) GetApproved() bool {
+	if x != nil {
+		return x.Approved
+	}
+	return false
+}
+
+func (x *SlackResolveApprovalRequest) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
+	}
+	return ""
+}
+
+type SlackResolveApprovalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SlackResolveApprovalResponse) Reset() {
+	*x = SlackResolveApprovalResponse{}
+	mi := &file_hydra_v1_slack_status_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SlackResolveApprovalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SlackResolveApprovalResponse) ProtoMessage() {}
+
+func (x *SlackResolveApprovalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hydra_v1_slack_status_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SlackResolveApprovalResponse.ProtoReflect.Descriptor instead.
+func (*SlackResolveApprovalResponse) Descriptor() ([]byte, []int) {
+	return file_hydra_v1_slack_status_proto_rawDescGZIP(), []int{7}
+}
+
 var File_hydra_v1_slack_status_proto protoreflect.FileDescriptor
 
 const file_hydra_v1_slack_status_proto_rawDesc = "" +
@@ -496,16 +587,22 @@ const file_hydra_v1_slack_status_proto_rawDesc = "" +
 	"\x0ecommit_message\x18\a \x01(\tR\rcommitMessage\x12\x18\n" +
 	"\atrigger\x18\b \x01(\tR\atrigger\x12!\n" +
 	"\ftriggered_by\x18\t \x01(\tR\vtriggeredBy\"\x1b\n" +
-	"\x19SlackPostApprovalResponse*\xab\x01\n" +
+	"\x19SlackPostApprovalResponse\"Z\n" +
+	"\x1bSlackResolveApprovalRequest\x12\x1a\n" +
+	"\bapproved\x18\x01 \x01(\bR\bapproved\x12\x1f\n" +
+	"\vresolved_by\x18\x02 \x01(\tR\n" +
+	"resolvedBy\"\x1e\n" +
+	"\x1cSlackResolveApprovalResponse*\xab\x01\n" +
 	"\x14SlackDeploymentState\x12&\n" +
 	"\"SLACK_DEPLOYMENT_STATE_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"SLACK_DEPLOYMENT_STATE_IN_PROGRESS\x10\x01\x12 \n" +
 	"\x1cSLACK_DEPLOYMENT_STATE_READY\x10\x02\x12!\n" +
-	"\x1dSLACK_DEPLOYMENT_STATE_FAILED\x10\x032\x9f\x02\n" +
+	"\x1dSLACK_DEPLOYMENT_STATE_FAILED\x10\x032\x83\x03\n" +
 	"\x12SlackStatusService\x12M\n" +
 	"\x04Init\x12 .hydra.v1.SlackStatusInitRequest\x1a!.hydra.v1.SlackStatusInitResponse\"\x00\x12Y\n" +
 	"\fReportStatus\x12\".hydra.v1.SlackStatusReportRequest\x1a#.hydra.v1.SlackStatusReportResponse\"\x00\x12Y\n" +
-	"\fPostApproval\x12\".hydra.v1.SlackPostApprovalRequest\x1a#.hydra.v1.SlackPostApprovalResponse\"\x00\x1a\x04\x98\x80\x01\x01B\x96\x01\n" +
+	"\fPostApproval\x12\".hydra.v1.SlackPostApprovalRequest\x1a#.hydra.v1.SlackPostApprovalResponse\"\x00\x12b\n" +
+	"\x0fResolveApproval\x12%.hydra.v1.SlackResolveApprovalRequest\x1a&.hydra.v1.SlackResolveApprovalResponse\"\x00\x1a\x04\x98\x80\x01\x01B\x96\x01\n" +
 	"\fcom.hydra.v1B\x10SlackStatusProtoP\x01Z3github.com/unkeyed/unkey/gen/proto/hydra/v1;hydrav1\xa2\x02\x03HXX\xaa\x02\bHydra.V1\xca\x02\bHydra\\V1\xe2\x02\x14Hydra\\V1\\GPBMetadata\xea\x02\tHydra::V1b\x06proto3"
 
 var (
@@ -521,26 +618,30 @@ func file_hydra_v1_slack_status_proto_rawDescGZIP() []byte {
 }
 
 var file_hydra_v1_slack_status_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_hydra_v1_slack_status_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_hydra_v1_slack_status_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_hydra_v1_slack_status_proto_goTypes = []any{
-	(SlackDeploymentState)(0),         // 0: hydra.v1.SlackDeploymentState
-	(*SlackStatusInitRequest)(nil),    // 1: hydra.v1.SlackStatusInitRequest
-	(*SlackStatusInitResponse)(nil),   // 2: hydra.v1.SlackStatusInitResponse
-	(*SlackStatusReportRequest)(nil),  // 3: hydra.v1.SlackStatusReportRequest
-	(*SlackStatusReportResponse)(nil), // 4: hydra.v1.SlackStatusReportResponse
-	(*SlackPostApprovalRequest)(nil),  // 5: hydra.v1.SlackPostApprovalRequest
-	(*SlackPostApprovalResponse)(nil), // 6: hydra.v1.SlackPostApprovalResponse
+	(SlackDeploymentState)(0),            // 0: hydra.v1.SlackDeploymentState
+	(*SlackStatusInitRequest)(nil),       // 1: hydra.v1.SlackStatusInitRequest
+	(*SlackStatusInitResponse)(nil),      // 2: hydra.v1.SlackStatusInitResponse
+	(*SlackStatusReportRequest)(nil),     // 3: hydra.v1.SlackStatusReportRequest
+	(*SlackStatusReportResponse)(nil),    // 4: hydra.v1.SlackStatusReportResponse
+	(*SlackPostApprovalRequest)(nil),     // 5: hydra.v1.SlackPostApprovalRequest
+	(*SlackPostApprovalResponse)(nil),    // 6: hydra.v1.SlackPostApprovalResponse
+	(*SlackResolveApprovalRequest)(nil),  // 7: hydra.v1.SlackResolveApprovalRequest
+	(*SlackResolveApprovalResponse)(nil), // 8: hydra.v1.SlackResolveApprovalResponse
 }
 var file_hydra_v1_slack_status_proto_depIdxs = []int32{
 	0, // 0: hydra.v1.SlackStatusReportRequest.state:type_name -> hydra.v1.SlackDeploymentState
 	1, // 1: hydra.v1.SlackStatusService.Init:input_type -> hydra.v1.SlackStatusInitRequest
 	3, // 2: hydra.v1.SlackStatusService.ReportStatus:input_type -> hydra.v1.SlackStatusReportRequest
 	5, // 3: hydra.v1.SlackStatusService.PostApproval:input_type -> hydra.v1.SlackPostApprovalRequest
-	2, // 4: hydra.v1.SlackStatusService.Init:output_type -> hydra.v1.SlackStatusInitResponse
-	4, // 5: hydra.v1.SlackStatusService.ReportStatus:output_type -> hydra.v1.SlackStatusReportResponse
-	6, // 6: hydra.v1.SlackStatusService.PostApproval:output_type -> hydra.v1.SlackPostApprovalResponse
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
+	7, // 4: hydra.v1.SlackStatusService.ResolveApproval:input_type -> hydra.v1.SlackResolveApprovalRequest
+	2, // 5: hydra.v1.SlackStatusService.Init:output_type -> hydra.v1.SlackStatusInitResponse
+	4, // 6: hydra.v1.SlackStatusService.ReportStatus:output_type -> hydra.v1.SlackStatusReportResponse
+	6, // 7: hydra.v1.SlackStatusService.PostApproval:output_type -> hydra.v1.SlackPostApprovalResponse
+	8, // 8: hydra.v1.SlackStatusService.ResolveApproval:output_type -> hydra.v1.SlackResolveApprovalResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -557,7 +658,7 @@ func file_hydra_v1_slack_status_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hydra_v1_slack_status_proto_rawDesc), len(file_hydra_v1_slack_status_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

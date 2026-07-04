@@ -25,8 +25,15 @@ service SlackStatusService {
 
   // PostApproval posts an interactive approval prompt (Approve/Reject buttons)
   // for a deployment awaiting approval. Called fire-and-forget by the
-  // github-webhook worker, which holds no Slack or vault credentials.
+  // github-webhook worker, which holds no Slack or vault credentials. Skips
+  // posting when the deployment is no longer awaiting approval (late delivery).
   rpc PostApproval(SlackPostApprovalRequest) returns (SlackPostApprovalResponse) {}
+
+  // ResolveApproval edits the approval prompt posted by PostApproval to its
+  // resolved state, removing the Approve/Reject buttons. Fired fire-and-forget
+  // by AuthorizeDeployment/RejectDeployment so decisions made outside Slack
+  // (dashboard, API) retire the prompt. No-ops when no prompt was posted.
+  rpc ResolveApproval(SlackResolveApprovalRequest) returns (SlackResolveApprovalResponse) {}
 }
 
 // SlackDeploymentState is the notified deployment outcome.
@@ -84,3 +91,13 @@ message SlackPostApprovalRequest {
 }
 
 message SlackPostApprovalResponse {}
+
+// SlackResolveApprovalRequest carries the decision outcome for retiring the
+// approval prompt. resolved_by is a display name when known (may be empty for
+// API-driven decisions).
+message SlackResolveApprovalRequest {
+  bool approved = 1;
+  string resolved_by = 2;
+}
+
+message SlackResolveApprovalResponse {}

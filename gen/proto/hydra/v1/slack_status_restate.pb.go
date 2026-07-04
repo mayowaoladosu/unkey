@@ -31,8 +31,14 @@ type SlackStatusServiceClient interface {
 	ReportStatus(opts ...sdk_go.ClientOption) sdk_go.Client[*SlackStatusReportRequest, *SlackStatusReportResponse]
 	// PostApproval posts an interactive approval prompt (Approve/Reject buttons)
 	// for a deployment awaiting approval. Called fire-and-forget by the
-	// github-webhook worker, which holds no Slack or vault credentials.
+	// github-webhook worker, which holds no Slack or vault credentials. Skips
+	// posting when the deployment is no longer awaiting approval (late delivery).
 	PostApproval(opts ...sdk_go.ClientOption) sdk_go.Client[*SlackPostApprovalRequest, *SlackPostApprovalResponse]
+	// ResolveApproval edits the approval prompt posted by PostApproval to its
+	// resolved state, removing the Approve/Reject buttons. Fired fire-and-forget
+	// by AuthorizeDeployment/RejectDeployment so decisions made outside Slack
+	// (dashboard, API) retire the prompt. No-ops when no prompt was posted.
+	ResolveApproval(opts ...sdk_go.ClientOption) sdk_go.Client[*SlackResolveApprovalRequest, *SlackResolveApprovalResponse]
 }
 
 type slackStatusServiceClient struct {
@@ -73,6 +79,14 @@ func (c *slackStatusServiceClient) PostApproval(opts ...sdk_go.ClientOption) sdk
 	return sdk_go.WithRequestType[*SlackPostApprovalRequest](sdk_go.Object[*SlackPostApprovalResponse](c.ctx, "hydra.v1.SlackStatusService", c.key, "PostApproval", cOpts...))
 }
 
+func (c *slackStatusServiceClient) ResolveApproval(opts ...sdk_go.ClientOption) sdk_go.Client[*SlackResolveApprovalRequest, *SlackResolveApprovalResponse] {
+	cOpts := c.options
+	if len(opts) > 0 {
+		cOpts = append(append([]sdk_go.ClientOption{}, cOpts...), opts...)
+	}
+	return sdk_go.WithRequestType[*SlackResolveApprovalRequest](sdk_go.Object[*SlackResolveApprovalResponse](c.ctx, "hydra.v1.SlackStatusService", c.key, "ResolveApproval", cOpts...))
+}
+
 // SlackStatusServiceIngressClient is the ingress client API for hydra.v1.SlackStatusService service.
 //
 // This client is used to call the service from outside of a Restate context.
@@ -85,8 +99,14 @@ type SlackStatusServiceIngressClient interface {
 	ReportStatus() ingress.Requester[*SlackStatusReportRequest, *SlackStatusReportResponse]
 	// PostApproval posts an interactive approval prompt (Approve/Reject buttons)
 	// for a deployment awaiting approval. Called fire-and-forget by the
-	// github-webhook worker, which holds no Slack or vault credentials.
+	// github-webhook worker, which holds no Slack or vault credentials. Skips
+	// posting when the deployment is no longer awaiting approval (late delivery).
 	PostApproval() ingress.Requester[*SlackPostApprovalRequest, *SlackPostApprovalResponse]
+	// ResolveApproval edits the approval prompt posted by PostApproval to its
+	// resolved state, removing the Approve/Reject buttons. Fired fire-and-forget
+	// by AuthorizeDeployment/RejectDeployment so decisions made outside Slack
+	// (dashboard, API) retire the prompt. No-ops when no prompt was posted.
+	ResolveApproval() ingress.Requester[*SlackResolveApprovalRequest, *SlackResolveApprovalResponse]
 }
 
 type slackStatusServiceIngressClient struct {
@@ -118,6 +138,11 @@ func (c *slackStatusServiceIngressClient) PostApproval() ingress.Requester[*Slac
 	return ingress.NewRequester[*SlackPostApprovalRequest, *SlackPostApprovalResponse](c.client, c.serviceName, "PostApproval", &c.key, &codec)
 }
 
+func (c *slackStatusServiceIngressClient) ResolveApproval() ingress.Requester[*SlackResolveApprovalRequest, *SlackResolveApprovalResponse] {
+	codec := encoding.ProtoJSONCodec
+	return ingress.NewRequester[*SlackResolveApprovalRequest, *SlackResolveApprovalResponse](c.client, c.serviceName, "ResolveApproval", &c.key, &codec)
+}
+
 // SlackStatusServiceServer is the server API for hydra.v1.SlackStatusService service.
 // All implementations should embed UnimplementedSlackStatusServiceServer
 // for forward compatibility.
@@ -138,8 +163,14 @@ type SlackStatusServiceServer interface {
 	ReportStatus(ctx sdk_go.ObjectContext, req *SlackStatusReportRequest) (*SlackStatusReportResponse, error)
 	// PostApproval posts an interactive approval prompt (Approve/Reject buttons)
 	// for a deployment awaiting approval. Called fire-and-forget by the
-	// github-webhook worker, which holds no Slack or vault credentials.
+	// github-webhook worker, which holds no Slack or vault credentials. Skips
+	// posting when the deployment is no longer awaiting approval (late delivery).
 	PostApproval(ctx sdk_go.ObjectContext, req *SlackPostApprovalRequest) (*SlackPostApprovalResponse, error)
+	// ResolveApproval edits the approval prompt posted by PostApproval to its
+	// resolved state, removing the Approve/Reject buttons. Fired fire-and-forget
+	// by AuthorizeDeployment/RejectDeployment so decisions made outside Slack
+	// (dashboard, API) retire the prompt. No-ops when no prompt was posted.
+	ResolveApproval(ctx sdk_go.ObjectContext, req *SlackResolveApprovalRequest) (*SlackResolveApprovalResponse, error)
 }
 
 // UnimplementedSlackStatusServiceServer should be embedded to have
@@ -157,6 +188,9 @@ func (UnimplementedSlackStatusServiceServer) ReportStatus(ctx sdk_go.ObjectConte
 }
 func (UnimplementedSlackStatusServiceServer) PostApproval(ctx sdk_go.ObjectContext, req *SlackPostApprovalRequest) (*SlackPostApprovalResponse, error) {
 	return nil, sdk_go.TerminalError(fmt.Errorf("method PostApproval not implemented"), 501)
+}
+func (UnimplementedSlackStatusServiceServer) ResolveApproval(ctx sdk_go.ObjectContext, req *SlackResolveApprovalRequest) (*SlackResolveApprovalResponse, error) {
+	return nil, sdk_go.TerminalError(fmt.Errorf("method ResolveApproval not implemented"), 501)
 }
 func (UnimplementedSlackStatusServiceServer) testEmbeddedByValue() {}
 
@@ -180,5 +214,6 @@ func NewSlackStatusServiceServer(srv SlackStatusServiceServer, opts ...sdk_go.Se
 	router = router.Handler("Init", sdk_go.NewObjectHandler(srv.Init))
 	router = router.Handler("ReportStatus", sdk_go.NewObjectHandler(srv.ReportStatus))
 	router = router.Handler("PostApproval", sdk_go.NewObjectHandler(srv.PostApproval))
+	router = router.Handler("ResolveApproval", sdk_go.NewObjectHandler(srv.ResolveApproval))
 	return router
 }

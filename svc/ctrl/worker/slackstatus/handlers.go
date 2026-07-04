@@ -168,6 +168,28 @@ func (s *Service) ReportStatus(ctx restate.ObjectContext, req *hydrav1.SlackStat
 func (s *Service) PostApproval(ctx restate.ObjectContext, req *hydrav1.SlackPostApprovalRequest) (*hydrav1.SlackPostApprovalResponse, error) {
 	deploymentID := restate.Key(ctx)
 
+	// The send is fire-and-forget behind retried steps, so it can arrive after
+	// the deployment was already authorized or rejected (e.g. via the
+	// dashboard). Re-check status so a late prompt with live buttons is never
+	// posted for an already-resolved deployment.
+	stillPending, err := restate.Run(ctx, func(rc restate.RunContext) (bool, error) {
+		deployment, findErr := s.db.FindDeploymentById(rc, deploymentID)
+		if findErr != nil {
+			if db.IsNotFound(findErr) {
+				return false, nil
+			}
+			return false, findErr
+		}
+		return deployment.Status == db.DeploymentsStatusAwaitingApproval, nil
+	}, restate.WithName("check deployment still awaiting approval"), restate.WithMaxRetryDuration(30*time.Second))
+	if err != nil {
+		logger.Warn("failed to check deployment status, skipping approval prompt", "deployment_id", deploymentID, "error", err)
+		return &hydrav1.SlackPostApprovalResponse{}, nil
+	}
+	if !stillPending {
+		return &hydrav1.SlackPostApprovalResponse{}, nil
+	}
+
 	resolved, err := restate.Run(ctx, func(rc restate.RunContext) (resolveResult, error) {
 		return s.resolve(rc, req.GetProjectId())
 	}, restate.WithName("resolve slack connection"), restate.WithMaxRetryDuration(30*time.Second))
@@ -198,8 +220,55 @@ func (s *Service) PostApproval(ctx restate.ObjectContext, req *hydrav1.SlackPost
 		return &hydrav1.SlackPostApprovalResponse{}, nil
 	}
 
-	restate.Set(ctx, stateChannel, post.Channel)
-	restate.Set(ctx, stateTS, post.TS)
+	// Dedicated keys: the outcome message (Init/ReportStatus) shares this
+	// virtual object and must not have its channel/ts clobbered, and vice versa.
+	restate.Set(ctx, stateApprovalChannel, post.Channel)
+	restate.Set(ctx, stateApprovalTS, post.TS)
+	restate.Set(ctx, stateApprovalConfig, req)
 
 	return &hydrav1.SlackPostApprovalResponse{}, nil
+}
+
+// ResolveApproval edits the approval prompt to its resolved state, removing the
+// Approve/Reject buttons. Fired fire-and-forget by AuthorizeDeployment and
+// RejectDeployment so decisions made outside Slack retire the prompt. No-ops
+// when no prompt was posted (unconnected project, or the prompt send failed).
+func (s *Service) ResolveApproval(ctx restate.ObjectContext, req *hydrav1.SlackResolveApprovalRequest) (*hydrav1.SlackResolveApprovalResponse, error) {
+	deploymentID := restate.Key(ctx)
+
+	config, err := restate.Get[*hydrav1.SlackPostApprovalRequest](ctx, stateApprovalConfig)
+	if err != nil || config == nil {
+		return &hydrav1.SlackResolveApprovalResponse{}, nil
+	}
+	channel, _ := restate.Get[string](ctx, stateApprovalChannel)
+	ts, _ := restate.Get[string](ctx, stateApprovalTS)
+	if channel == "" || ts == "" {
+		return &hydrav1.SlackResolveApprovalResponse{}, nil
+	}
+
+	resolved, err := restate.Run(ctx, func(rc restate.RunContext) (resolveResult, error) {
+		return s.resolve(rc, config.GetProjectId())
+	}, restate.WithName("resolve slack connection"), restate.WithMaxRetryDuration(30*time.Second))
+	if err != nil || !resolved.Connected {
+		return &hydrav1.SlackResolveApprovalResponse{}, nil
+	}
+
+	msg := slack.Message{
+		Channel: channel,
+		Text:    resolvedApprovalText(req.GetApproved()),
+		Blocks:  resolvedApprovalBlocks(deploymentID, config, req.GetApproved(), req.GetResolvedBy()),
+		TS:      ts,
+	}
+
+	if updateErr := restate.RunVoid(ctx, func(rc restate.RunContext) error {
+		token, decErr := s.decrypt(rc, config.GetWorkspaceId(), resolved.EncryptedBotToken)
+		if decErr != nil {
+			return decErr
+		}
+		return s.slack.UpdateMessage(rc, token, msg)
+	}, restate.WithName("retire slack approval prompt"), restate.WithMaxRetryDuration(30*time.Second)); updateErr != nil {
+		logger.Error("failed to retire slack approval prompt", "deployment_id", deploymentID, "error", updateErr)
+	}
+
+	return &hydrav1.SlackResolveApprovalResponse{}, nil
 }

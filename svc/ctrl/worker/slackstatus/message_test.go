@@ -94,6 +94,35 @@ func TestApprovalBlocks_EscapesUntrustedMrkdwn(t *testing.T) {
 	require.Contains(t, rendered, "<https://app.unkey.com/review|")
 }
 
+// TestResolvedApprovalBlocks_RemovesButtonsAndShowsOutcome verifies retiring an
+// approval prompt strips the interactive controls and renders the decision.
+func TestResolvedApprovalBlocks_RemovesButtonsAndShowsOutcome(t *testing.T) {
+	req := &hydrav1.SlackPostApprovalRequest{
+		WorkspaceId:      "ws_123",
+		ProjectId:        "proj_456",
+		EnvironmentLabel: "preview",
+		ReviewUrl:        "https://app.unkey.com/review",
+		IsProduction:     false,
+		CommitSha:        "a1b2c3d4",
+		CommitMessage:    "fix auth",
+		Trigger:          "github",
+		TriggeredBy:      "octocat",
+	}
+
+	approvedBlocks := resolvedApprovalBlocks("dep_789", req, true, "James <admin>")
+	for _, blk := range approvedBlocks {
+		require.NotEqual(t, "actions", blk.Type, "resolved prompt must not carry buttons")
+	}
+	rendered := allText(approvedBlocks)
+	require.Contains(t, rendered, "approved")
+	// resolvedBy is untrusted display text and must be escaped.
+	require.Contains(t, rendered, "James &lt;admin&gt;")
+
+	rejected := allText(resolvedApprovalBlocks("dep_789", req, false, ""))
+	require.Contains(t, rejected, "rejected")
+	require.NotContains(t, rejected, "Resolved by")
+}
+
 // TestOutcomeBlocks_LinkPerState verifies the ready message links to the live
 // URL and the failed message links to the logs URL (AE2).
 func TestOutcomeBlocks_LinkPerState(t *testing.T) {

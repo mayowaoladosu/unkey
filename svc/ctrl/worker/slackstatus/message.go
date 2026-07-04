@@ -132,6 +132,50 @@ func outcomeStatusText(state hydrav1.SlackDeploymentState) string {
 	}
 }
 
+// resolvedApprovalText is the fallback text line for a retired approval prompt.
+func resolvedApprovalText(approved bool) string {
+	if approved {
+		return "Deployment approved"
+	}
+	return "Deployment rejected"
+}
+
+// resolvedApprovalBlocks re-renders the approval prompt in its resolved state:
+// same structured fields, no Approve/Reject buttons, plus who resolved it when
+// known. Used by ResolveApproval to retire prompts decided outside Slack.
+func resolvedApprovalBlocks(deploymentID string, req *hydrav1.SlackPostApprovalRequest, approved bool, resolvedBy string) []slack.Block {
+	header := "✅ Deployment approved"
+	status := "approved"
+	if !approved {
+		header = "🚫 Deployment rejected"
+		status = "rejected"
+	}
+
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(header),
+		structuredFields(
+			deploymentID,
+			req.GetProjectId(),
+			req.GetEnvironmentLabel(),
+			status,
+			req.GetCommitSha(),
+			req.GetCommitMessage(),
+			req.GetTrigger(),
+			req.GetTriggeredBy(),
+		),
+	}
+	if resolvedBy != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewMarkdownField(fmt.Sprintf("Resolved by %s", escapeMrkdwn(resolvedBy))),
+		))
+	}
+	if req.GetReviewUrl() != "" {
+		blocks = append(blocks, linkBlock(req.GetReviewUrl(), "View in dashboard"))
+	}
+
+	return blocks
+}
+
 // approvalBlocks builds the interactive approval prompt for a gated deployment.
 // The actions block_id carries the deployment and workspace as lookup keys for
 // the interactivity handler.

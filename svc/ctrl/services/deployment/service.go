@@ -1,9 +1,12 @@
 package deployment
 
 import (
+	"context"
+
 	restateingress "github.com/restatedev/sdk-go/ingress"
 	"github.com/unkeyed/unkey/gen/proto/ctrl/v1/ctrlv1connect"
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
+	"github.com/unkeyed/unkey/pkg/logger"
 	restateadmin "github.com/unkeyed/unkey/pkg/restate/admin"
 	"github.com/unkeyed/unkey/svc/ctrl/dedup"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/auditlogs"
@@ -33,6 +36,26 @@ type Service struct {
 // via SwapLiveDeployment.
 func (s *Service) deploymentClient(deploymentID string) hydrav1.DeployServiceIngressClient {
 	return hydrav1.NewDeployServiceIngressClient(s.restate, deploymentID)
+}
+
+// resolveSlackApproval fire-and-forgets a SlackStatusService.ResolveApproval so
+// a decision made outside Slack (dashboard, API) retires the approval prompt's
+// Approve/Reject buttons. Best-effort: errors are logged, never propagated, and
+// the service no-ops when the deployment never had a prompt posted.
+func (s *Service) resolveSlackApproval(ctx context.Context, deploymentID string, approved bool) {
+	if s.restate == nil {
+		return
+	}
+	if _, err := hydrav1.NewSlackStatusServiceIngressClient(s.restate, deploymentID).
+		ResolveApproval().Send(ctx, &hydrav1.SlackResolveApprovalRequest{
+		Approved:   approved,
+		ResolvedBy: "",
+	}); err != nil {
+		logger.Warn("failed to retire slack approval prompt",
+			"deployment_id", deploymentID,
+			"error", err,
+		)
+	}
 }
 
 // Config holds the configuration for creating a new [Service].

@@ -15,12 +15,21 @@ import (
 
 // Restate K/V state keys.
 const (
-	// stateChannel and stateTS identify the posted message so a later state
-	// change can edit it in place.
+	// stateChannel and stateTS identify the outcome message posted by Init so
+	// ReportStatus can edit it in place.
 	stateChannel = "channel"
 	stateTS      = "ts"
 	// stateConfig holds the Init request so ReportStatus can re-render.
 	stateConfig = "config"
+
+	// The approval prompt keeps its own message identity and config, separate
+	// from the outcome message: Init and PostApproval share the same virtual
+	// object key (the deployment ID), and after an approval the deploy workflow's
+	// Init would otherwise overwrite the prompt's channel/ts before
+	// ResolveApproval edits it.
+	stateApprovalChannel = "approval_channel"
+	stateApprovalTS      = "approval_ts"
+	stateApprovalConfig  = "approval_config"
 )
 
 // Service is the SlackStatusService virtual object.
