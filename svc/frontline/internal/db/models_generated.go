@@ -844,6 +844,48 @@ func (ns NullKeyMigrationsAlgorithm) Value() (driver.Value, error) {
 	return string(ns.KeyMigrationsAlgorithm), nil
 }
 
+type SlackProjectConnectionsApprovalPolicy string
+
+const (
+	SlackProjectConnectionsApprovalPolicyAnyone     SlackProjectConnectionsApprovalPolicy = "anyone"
+	SlackProjectConnectionsApprovalPolicyAdminsOnly SlackProjectConnectionsApprovalPolicy = "admins_only"
+)
+
+func (e *SlackProjectConnectionsApprovalPolicy) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SlackProjectConnectionsApprovalPolicy(s)
+	case string:
+		*e = SlackProjectConnectionsApprovalPolicy(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SlackProjectConnectionsApprovalPolicy: %T", src)
+	}
+	return nil
+}
+
+type NullSlackProjectConnectionsApprovalPolicy struct {
+	SlackProjectConnectionsApprovalPolicy SlackProjectConnectionsApprovalPolicy
+	Valid                                 bool // Valid is true if SlackProjectConnectionsApprovalPolicy is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSlackProjectConnectionsApprovalPolicy) Scan(value interface{}) error {
+	if value == nil {
+		ns.SlackProjectConnectionsApprovalPolicy, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SlackProjectConnectionsApprovalPolicy.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSlackProjectConnectionsApprovalPolicy) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SlackProjectConnectionsApprovalPolicy), nil
+}
+
 type AcmeChallenge struct {
 	Pk            uint64                      `db:"pk"`
 	DomainID      string                      `db:"domain_id"`
@@ -1450,6 +1492,32 @@ type RolesPermission struct {
 	WorkspaceID  string        `db:"workspace_id"`
 	CreatedAtM   int64         `db:"created_at_m"`
 	UpdatedAtM   sql.NullInt64 `db:"updated_at_m"`
+}
+
+type SlackInstallation struct {
+	Pk                uint64        `db:"pk"`
+	ID                string        `db:"id"`
+	WorkspaceID       string        `db:"workspace_id"`
+	TeamID            string        `db:"team_id"`
+	BotToken          string        `db:"bot_token"`
+	BotUserID         string        `db:"bot_user_id"`
+	InstalledByUserID string        `db:"installed_by_user_id"`
+	CreatedAt         int64         `db:"created_at"`
+	UpdatedAt         sql.NullInt64 `db:"updated_at"`
+}
+
+type SlackProjectConnection struct {
+	Pk              uint64                                `db:"pk"`
+	ID              string                                `db:"id"`
+	WorkspaceID     string                                `db:"workspace_id"`
+	ProjectID       string                                `db:"project_id"`
+	InstallationID  string                                `db:"installation_id"`
+	ChannelID       string                                `db:"channel_id"`
+	ChannelName     string                                `db:"channel_name"`
+	IncludePreviews bool                                  `db:"include_previews"`
+	ApprovalPolicy  SlackProjectConnectionsApprovalPolicy `db:"approval_policy"`
+	CreatedAt       int64                                 `db:"created_at"`
+	UpdatedAt       sql.NullInt64                         `db:"updated_at"`
 }
 
 type Workspace struct {

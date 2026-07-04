@@ -200,6 +200,12 @@ message CancelDeploymentRequest {
 
 message CancelDeploymentResponse {}
 
+message RejectDeploymentRequest {
+  string deployment_id = 1;
+}
+
+message RejectDeploymentResponse {}
+
 message StopDeploymentRequest {
   string deployment_id = 1;
 }
@@ -228,6 +234,12 @@ service DeployService {
 
   // Authorize deployment for an external contributor's push on a branch
   rpc AuthorizeDeployment(AuthorizeDeploymentRequest) returns (AuthorizeDeploymentResponse) {}
+
+  // Reject a deployment that is awaiting approval, transitioning it to
+  // cancelled. Unlike CancelDeployment, this targets the pre-workflow
+  // awaiting_approval state (no Restate invocation exists yet) and records a
+  // distinct reject decision.
+  rpc RejectDeployment(RejectDeploymentRequest) returns (RejectDeploymentResponse) {}
 
   // Cancel a running or queued deployment. Cancels the underlying Restate
   // Deploy invocation, which triggers the workflow's compensation stack to

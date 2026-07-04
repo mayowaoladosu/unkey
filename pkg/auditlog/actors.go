@@ -25,4 +25,10 @@ const (
 	// workspace owner. The actor's externalId is carried by the audit log's
 	// ActorID so customers can see what their end users did.
 	PortalEndUserActor AuditLogActor = "portalEndUser"
+
+	// SlackActor indicates the action was performed by a Slack user acting
+	// through the Slack integration (e.g. approving or rejecting a gated
+	// deployment). When the Slack user maps to an Unkey identity that id is
+	// recorded; otherwise the Slack user id/name is carried in ActorID/meta.
+	SlackActor AuditLogActor = "slack"
 )

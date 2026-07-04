@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "slack",
+    srcs = ["tunnel.go"],
+    importpath = "github.com/unkeyed/unkey/cmd/dev/slack",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/cli"],
+)
+
+go_test(
+    name = "slack_test",
+    srcs = ["tunnel_test.go"],
+    embed = [":slack"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

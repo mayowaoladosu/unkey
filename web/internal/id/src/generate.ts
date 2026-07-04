@@ -35,6 +35,7 @@ const prefixes = {
   environmentVariable: "evr",
   project: "proj",
   autoscalingPolicy: "asp",
+  slack: "slack",
 } as const;
 
 export function newId<TPrefix extends keyof typeof prefixes>(prefix: TPrefix) {

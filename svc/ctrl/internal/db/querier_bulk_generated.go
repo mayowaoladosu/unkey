@@ -44,6 +44,8 @@ type BulkQuerier interface {
 	UpsertQuota(ctx context.Context, args []UpsertQuotaParams) error
 	InsertRoles(ctx context.Context, args []InsertRoleParams) error
 	InsertRolePermissions(ctx context.Context, args []InsertRolePermissionParams) error
+	InsertSlackInstallations(ctx context.Context, args []InsertSlackInstallationParams) error
+	InsertSlackProjectConnections(ctx context.Context, args []InsertSlackProjectConnectionParams) error
 	InsertWorkspaces(ctx context.Context, args []InsertWorkspaceParams) error
 }
 

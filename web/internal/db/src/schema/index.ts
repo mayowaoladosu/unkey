@@ -31,6 +31,7 @@ export * from "./instances";
 export * from "./certificates";
 export * from "./frontline_routes";
 export * from "./github_app";
+export * from "./slack";
 export * from "./cilium";
 
 export * from "./clusters";

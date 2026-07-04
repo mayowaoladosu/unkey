@@ -58,13 +58,12 @@ func startTunnel(_ context.Context, cmd *cli.Command) error {
 		panic("ngrok is not installed or not in PATH\n\nInstall it from: https://ngrok.com/download")
 	}
 
-	appID, err := readAppID(envFile)
-	if err != nil {
+	// Fail fast before starting ngrok: validate the GitHub App config is
+	// readable. UpdateWebhookURL re-reads it once the tunnel URL is known.
+	if _, err := readAppID(envFile); err != nil {
 		return err
 	}
-
-	pem, err := os.ReadFile(filepath.Clean(pemFile))
-	if err != nil {
+	if _, err := os.ReadFile(filepath.Clean(pemFile)); err != nil {
 		return fmt.Errorf("failed to read %s: %w", pemFile, err)
 	}
 
@@ -86,13 +85,7 @@ func startTunnel(_ context.Context, cmd *cli.Command) error {
 	fmt.Printf("Tunnel URL: %s\n", publicURL)
 	fmt.Printf("Updating GitHub App webhook to %s...\n", webhookURL)
 
-	token, err := generateAppJWT(appID, string(pem))
-	if err != nil {
-		_ = ngrok.Process.Kill()
-		return fmt.Errorf("failed to generate JWT: %w", err)
-	}
-
-	if err := patchWebhookURL(token, webhookURL); err != nil {
+	if err := UpdateWebhookURL(envFile, pemFile, webhookURL); err != nil {
 		_ = ngrok.Process.Kill()
 		return err
 	}
@@ -104,6 +97,26 @@ func startTunnel(_ context.Context, cmd *cli.Command) error {
 	// Keep running until killed
 	_ = ngrok.Wait()
 	return nil
+}
+
+// UpdateWebhookURL points the GitHub App's webhook config at webhookURL, using
+// the app id from envFile and the private key from pemFile. Exported so the
+// combined `dev tunnel` command (which runs one ngrok agent for both the GitHub
+// and Slack tunnels) can reuse the GitHub-specific registration step.
+func UpdateWebhookURL(envFile, pemFile, webhookURL string) error {
+	appID, err := readAppID(envFile)
+	if err != nil {
+		return err
+	}
+	pem, err := os.ReadFile(filepath.Clean(pemFile))
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", pemFile, err)
+	}
+	token, err := generateAppJWT(appID, string(pem))
+	if err != nil {
+		return fmt.Errorf("failed to generate JWT: %w", err)
+	}
+	return patchWebhookURL(token, webhookURL)
 }
 
 // waitForNgrokURL polls ngrok's local API until an HTTPS tunnel URL appears.

@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tunnel",
+    srcs = ["tunnel.go"],
+    importpath = "github.com/unkeyed/unkey/cmd/dev/tunnel",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cmd/dev/github",
+        "//pkg/cli",
+    ],
+)
+
+go_test(
+    name = "tunnel_test",
+    srcs = ["tunnel_test.go"],
+    embed = [":tunnel"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

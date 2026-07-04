@@ -1,0 +1,86 @@
+syntax = "proto3";
+package hydra.v1;
+
+import "dev/restate/sdk/go.proto";
+
+option go_package = "github.com/unkeyed/unkey/gen/proto/hydra/v1;hydrav1";
+
+// SlackStatusService is a Restate virtual object keyed by deployment ID that
+// owns all outbound Slack messaging for a deployment (outcome notifications and
+// the approval prompt). Any service can fire-and-forget to it without holding
+// Slack credentials or deployment context; the object owns the connection
+// lookup, the vault bot-token decrypt, and the posted message's channel+ts so a
+// later state change can edit the same message. It no-ops when the project has
+// no Slack connection.
+service SlackStatusService {
+  option (dev.restate.sdk.go.service_type) = VIRTUAL_OBJECT;
+
+  // Init posts the initial outcome message and stores the deployment context +
+  // channel/ts. Called by the deploy workflow once the commit SHA is resolved.
+  rpc Init(SlackStatusInitRequest) returns (SlackStatusInitResponse) {}
+
+  // ReportStatus edits the message posted by Init to reflect a new state.
+  // Fire-and-forget — errors are logged, never propagated.
+  rpc ReportStatus(SlackStatusReportRequest) returns (SlackStatusReportResponse) {}
+
+  // PostApproval posts an interactive approval prompt (Approve/Reject buttons)
+  // for a deployment awaiting approval. Called fire-and-forget by the
+  // github-webhook worker, which holds no Slack or vault credentials.
+  rpc PostApproval(SlackPostApprovalRequest) returns (SlackPostApprovalResponse) {}
+}
+
+// SlackDeploymentState is the notified deployment outcome.
+enum SlackDeploymentState {
+  SLACK_DEPLOYMENT_STATE_UNSPECIFIED = 0;
+  SLACK_DEPLOYMENT_STATE_IN_PROGRESS = 1;
+  SLACK_DEPLOYMENT_STATE_READY = 2;
+  SLACK_DEPLOYMENT_STATE_FAILED = 3;
+}
+
+// SlackStatusInitRequest carries the context the object needs to look up the
+// connection, apply environment scoping, and render structured fields.
+message SlackStatusInitRequest {
+  string workspace_id = 1;
+  string project_id = 2;
+
+  string environment_label = 3;
+  // Live deployment URL, shown on the ready state.
+  string environment_url = 4;
+  // Dashboard deployment/logs URL, shown on the failed state.
+  string log_url = 5;
+  bool is_production = 6;
+
+  string commit_sha = 7;
+  string commit_message = 8;
+  // Deployment trigger and actor, for the structured fields (R8).
+  string trigger = 9;
+  string triggered_by = 10;
+}
+
+message SlackStatusInitResponse {}
+
+message SlackStatusReportRequest {
+  SlackDeploymentState state = 1;
+}
+
+message SlackStatusReportResponse {}
+
+// SlackPostApprovalRequest carries the context for an approval prompt. The
+// deployment ID is the virtual-object key; workspace_id is echoed into the
+// button action ids so the interactivity handler can bind and route the click.
+message SlackPostApprovalRequest {
+  string workspace_id = 1;
+  string project_id = 2;
+
+  string environment_label = 3;
+  // Dashboard review link.
+  string review_url = 4;
+  bool is_production = 5;
+
+  string commit_sha = 6;
+  string commit_message = 7;
+  string trigger = 8;
+  string triggered_by = 9;
+}
+
+message SlackPostApprovalResponse {}

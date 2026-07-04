@@ -17,9 +17,22 @@ type Payload struct {
 
 // Block represents a Slack block element.
 type Block struct {
-	Type   string  `json:"type"`
-	Text   *Text   `json:"text,omitempty"`
-	Fields []Field `json:"fields,omitempty"`
+	Type     string    `json:"type"`
+	Text     *Text     `json:"text,omitempty"`
+	Fields   []Field   `json:"fields,omitempty"`
+	BlockID  string    `json:"block_id,omitempty"`
+	Elements []Element `json:"elements,omitempty"`
+}
+
+// Element represents an interactive block element, such as a button inside an
+// actions block.
+type Element struct {
+	Type     string `json:"type"`
+	Text     *Text  `json:"text,omitempty"`
+	ActionID string `json:"action_id,omitempty"`
+	Value    string `json:"value,omitempty"`
+	// Style is one of "primary", "danger", or "" (default).
+	Style string `json:"style,omitempty"`
 }
 
 // Text represents a Slack text element.
@@ -44,16 +57,20 @@ func NewHeaderBlock(text string) Block {
 			Text:  text,
 			Emoji: true,
 		},
-		Fields: nil,
+		Fields:   nil,
+		BlockID:  "",
+		Elements: nil,
 	}
 }
 
 // NewSectionBlock creates a section block with markdown fields.
 func NewSectionBlock(fields ...Field) Block {
 	return Block{
-		Type:   "section",
-		Text:   nil,
-		Fields: fields,
+		Type:     "section",
+		Text:     nil,
+		Fields:   fields,
+		BlockID:  "",
+		Elements: nil,
 	}
 }
 
@@ -62,6 +79,35 @@ func NewMarkdownField(text string) Field {
 	return Field{
 		Type: "mrkdwn",
 		Text: text,
+	}
+}
+
+// NewActionsBlock creates an actions block holding interactive elements (e.g.
+// buttons). blockID is echoed back in the interaction payload, so callers use
+// it to route a click (e.g. to a specific deployment).
+func NewActionsBlock(blockID string, elements ...Element) Block {
+	return Block{
+		Type:     "actions",
+		Text:     nil,
+		Fields:   nil,
+		BlockID:  blockID,
+		Elements: elements,
+	}
+}
+
+// NewButton creates a button element. style is one of "primary", "danger", or
+// "" for the default. actionID identifies which control was clicked.
+func NewButton(text, actionID, value, style string) Element {
+	return Element{
+		Type: "button",
+		Text: &Text{
+			Type:  "plain_text",
+			Text:  text,
+			Emoji: true,
+		},
+		ActionID: actionID,
+		Value:    value,
+		Style:    style,
 	}
 }
 

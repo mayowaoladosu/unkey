@@ -34,6 +34,8 @@ go_library(
         "project_restate.pb.go",
         "routing.pb.go",
         "routing_restate.pb.go",
+        "slack_status.pb.go",
+        "slack_status_restate.pb.go",
     ],
     importpath = "github.com/unkeyed/unkey/gen/proto/hydra/v1",
     visibility = ["//visibility:public"],

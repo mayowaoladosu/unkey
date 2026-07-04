@@ -1346,6 +1346,86 @@ func (*CancelDeploymentResponse) Descriptor() ([]byte, []int) {
 	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{17}
 }
 
+type RejectDeploymentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeploymentId  string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectDeploymentRequest) Reset() {
+	*x = RejectDeploymentRequest{}
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectDeploymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectDeploymentRequest) ProtoMessage() {}
+
+func (x *RejectDeploymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectDeploymentRequest.ProtoReflect.Descriptor instead.
+func (*RejectDeploymentRequest) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *RejectDeploymentRequest) GetDeploymentId() string {
+	if x != nil {
+		return x.DeploymentId
+	}
+	return ""
+}
+
+type RejectDeploymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectDeploymentResponse) Reset() {
+	*x = RejectDeploymentResponse{}
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectDeploymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectDeploymentResponse) ProtoMessage() {}
+
+func (x *RejectDeploymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectDeploymentResponse.ProtoReflect.Descriptor instead.
+func (*RejectDeploymentResponse) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{19}
+}
+
 type StopDeploymentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeploymentId  string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
@@ -1355,7 +1435,7 @@ type StopDeploymentRequest struct {
 
 func (x *StopDeploymentRequest) Reset() {
 	*x = StopDeploymentRequest{}
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[18]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1367,7 +1447,7 @@ func (x *StopDeploymentRequest) String() string {
 func (*StopDeploymentRequest) ProtoMessage() {}
 
 func (x *StopDeploymentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[18]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1380,7 +1460,7 @@ func (x *StopDeploymentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopDeploymentRequest.ProtoReflect.Descriptor instead.
 func (*StopDeploymentRequest) Descriptor() ([]byte, []int) {
-	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{18}
+	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StopDeploymentRequest) GetDeploymentId() string {
@@ -1398,7 +1478,7 @@ type StopDeploymentResponse struct {
 
 func (x *StopDeploymentResponse) Reset() {
 	*x = StopDeploymentResponse{}
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[19]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1410,7 +1490,7 @@ func (x *StopDeploymentResponse) String() string {
 func (*StopDeploymentResponse) ProtoMessage() {}
 
 func (x *StopDeploymentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[19]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1423,7 +1503,7 @@ func (x *StopDeploymentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopDeploymentResponse.ProtoReflect.Descriptor instead.
 func (*StopDeploymentResponse) Descriptor() ([]byte, []int) {
-	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{19}
+	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{21}
 }
 
 type WakeDeploymentRequest struct {
@@ -1435,7 +1515,7 @@ type WakeDeploymentRequest struct {
 
 func (x *WakeDeploymentRequest) Reset() {
 	*x = WakeDeploymentRequest{}
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[20]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1447,7 +1527,7 @@ func (x *WakeDeploymentRequest) String() string {
 func (*WakeDeploymentRequest) ProtoMessage() {}
 
 func (x *WakeDeploymentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[20]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1460,7 +1540,7 @@ func (x *WakeDeploymentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakeDeploymentRequest.ProtoReflect.Descriptor instead.
 func (*WakeDeploymentRequest) Descriptor() ([]byte, []int) {
-	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{20}
+	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *WakeDeploymentRequest) GetDeploymentId() string {
@@ -1478,7 +1558,7 @@ type WakeDeploymentResponse struct {
 
 func (x *WakeDeploymentResponse) Reset() {
 	*x = WakeDeploymentResponse{}
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[21]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1490,7 +1570,7 @@ func (x *WakeDeploymentResponse) String() string {
 func (*WakeDeploymentResponse) ProtoMessage() {}
 
 func (x *WakeDeploymentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ctrl_v1_deployment_proto_msgTypes[21]
+	mi := &file_ctrl_v1_deployment_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1503,7 +1583,7 @@ func (x *WakeDeploymentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakeDeploymentResponse.ProtoReflect.Descriptor instead.
 func (*WakeDeploymentResponse) Descriptor() ([]byte, []int) {
-	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{21}
+	return file_ctrl_v1_deployment_proto_rawDescGZIP(), []int{23}
 }
 
 var File_ctrl_v1_deployment_proto protoreflect.FileDescriptor
@@ -1611,7 +1691,10 @@ const file_ctrl_v1_deployment_proto_rawDesc = "" +
 	"\x1bAuthorizeDeploymentResponse\">\n" +
 	"\x17CancelDeploymentRequest\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x1a\n" +
-	"\x18CancelDeploymentResponse\"<\n" +
+	"\x18CancelDeploymentResponse\">\n" +
+	"\x17RejectDeploymentRequest\x12#\n" +
+	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x1a\n" +
+	"\x18RejectDeploymentResponse\"<\n" +
 	"\x15StopDeploymentRequest\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x18\n" +
 	"\x16StopDeploymentResponse\"<\n" +
@@ -1640,13 +1723,14 @@ const file_ctrl_v1_deployment_proto_rawDesc = "" +
 	"\x16DEPLOYMENT_TRIGGER_API\x10\x02\x12\x1a\n" +
 	"\x16DEPLOYMENT_TRIGGER_CLI\x10\x03\x12 \n" +
 	"\x1cDEPLOYMENT_TRIGGER_DASHBOARD\x10\x04\x12\x1c\n" +
-	"\x18DEPLOYMENT_TRIGGER_UNKEY\x10\x052\xa8\x05\n" +
+	"\x18DEPLOYMENT_TRIGGER_UNKEY\x10\x052\x83\x06\n" +
 	"\rDeployService\x12Y\n" +
 	"\x10CreateDeployment\x12 .ctrl.v1.CreateDeploymentRequest\x1a!.ctrl.v1.CreateDeploymentResponse\"\x00\x12P\n" +
 	"\rGetDeployment\x12\x1d.ctrl.v1.GetDeploymentRequest\x1a\x1e.ctrl.v1.GetDeploymentResponse\"\x00\x12A\n" +
 	"\bRollback\x12\x18.ctrl.v1.RollbackRequest\x1a\x19.ctrl.v1.RollbackResponse\"\x00\x12>\n" +
 	"\aPromote\x12\x17.ctrl.v1.PromoteRequest\x1a\x18.ctrl.v1.PromoteResponse\"\x00\x12b\n" +
 	"\x13AuthorizeDeployment\x12#.ctrl.v1.AuthorizeDeploymentRequest\x1a$.ctrl.v1.AuthorizeDeploymentResponse\"\x00\x12Y\n" +
+	"\x10RejectDeployment\x12 .ctrl.v1.RejectDeploymentRequest\x1a!.ctrl.v1.RejectDeploymentResponse\"\x00\x12Y\n" +
 	"\x10CancelDeployment\x12 .ctrl.v1.CancelDeploymentRequest\x1a!.ctrl.v1.CancelDeploymentResponse\"\x00\x12S\n" +
 	"\x0eStopDeployment\x12\x1e.ctrl.v1.StopDeploymentRequest\x1a\x1f.ctrl.v1.StopDeploymentResponse\"\x00\x12S\n" +
 	"\x0eWakeDeployment\x12\x1e.ctrl.v1.WakeDeploymentRequest\x1a\x1f.ctrl.v1.WakeDeploymentResponse\"\x00B\x8e\x01\n" +
@@ -1665,7 +1749,7 @@ func file_ctrl_v1_deployment_proto_rawDescGZIP() []byte {
 }
 
 var file_ctrl_v1_deployment_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_ctrl_v1_deployment_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_ctrl_v1_deployment_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_ctrl_v1_deployment_proto_goTypes = []any{
 	(DeploymentStatus)(0),               // 0: ctrl.v1.DeploymentStatus
 	(DeploymentTrigger)(0),              // 1: ctrl.v1.DeploymentTrigger
@@ -1687,11 +1771,13 @@ var file_ctrl_v1_deployment_proto_goTypes = []any{
 	(*AuthorizeDeploymentResponse)(nil), // 17: ctrl.v1.AuthorizeDeploymentResponse
 	(*CancelDeploymentRequest)(nil),     // 18: ctrl.v1.CancelDeploymentRequest
 	(*CancelDeploymentResponse)(nil),    // 19: ctrl.v1.CancelDeploymentResponse
-	(*StopDeploymentRequest)(nil),       // 20: ctrl.v1.StopDeploymentRequest
-	(*StopDeploymentResponse)(nil),      // 21: ctrl.v1.StopDeploymentResponse
-	(*WakeDeploymentRequest)(nil),       // 22: ctrl.v1.WakeDeploymentRequest
-	(*WakeDeploymentResponse)(nil),      // 23: ctrl.v1.WakeDeploymentResponse
-	nil,                                 // 24: ctrl.v1.Deployment.EnvironmentVariablesEntry
+	(*RejectDeploymentRequest)(nil),     // 20: ctrl.v1.RejectDeploymentRequest
+	(*RejectDeploymentResponse)(nil),    // 21: ctrl.v1.RejectDeploymentResponse
+	(*StopDeploymentRequest)(nil),       // 22: ctrl.v1.StopDeploymentRequest
+	(*StopDeploymentResponse)(nil),      // 23: ctrl.v1.StopDeploymentResponse
+	(*WakeDeploymentRequest)(nil),       // 24: ctrl.v1.WakeDeploymentRequest
+	(*WakeDeploymentResponse)(nil),      // 25: ctrl.v1.WakeDeploymentResponse
+	nil,                                 // 26: ctrl.v1.Deployment.EnvironmentVariablesEntry
 }
 var file_ctrl_v1_deployment_proto_depIdxs = []int32{
 	3,  // 0: ctrl.v1.CreateDeploymentRequest.git_commit:type_name -> ctrl.v1.GitCommitInfo
@@ -1699,7 +1785,7 @@ var file_ctrl_v1_deployment_proto_depIdxs = []int32{
 	0,  // 2: ctrl.v1.CreateDeploymentResponse.status:type_name -> ctrl.v1.DeploymentStatus
 	7,  // 3: ctrl.v1.GetDeploymentResponse.deployment:type_name -> ctrl.v1.Deployment
 	0,  // 4: ctrl.v1.Deployment.status:type_name -> ctrl.v1.DeploymentStatus
-	24, // 5: ctrl.v1.Deployment.environment_variables:type_name -> ctrl.v1.Deployment.EnvironmentVariablesEntry
+	26, // 5: ctrl.v1.Deployment.environment_variables:type_name -> ctrl.v1.Deployment.EnvironmentVariablesEntry
 	9,  // 6: ctrl.v1.Deployment.topology:type_name -> ctrl.v1.Topology
 	8,  // 7: ctrl.v1.Deployment.steps:type_name -> ctrl.v1.DeploymentStep
 	11, // 8: ctrl.v1.Topology.regions:type_name -> ctrl.v1.RegionalConfig
@@ -1709,19 +1795,21 @@ var file_ctrl_v1_deployment_proto_depIdxs = []int32{
 	12, // 12: ctrl.v1.DeployService.Rollback:input_type -> ctrl.v1.RollbackRequest
 	14, // 13: ctrl.v1.DeployService.Promote:input_type -> ctrl.v1.PromoteRequest
 	16, // 14: ctrl.v1.DeployService.AuthorizeDeployment:input_type -> ctrl.v1.AuthorizeDeploymentRequest
-	18, // 15: ctrl.v1.DeployService.CancelDeployment:input_type -> ctrl.v1.CancelDeploymentRequest
-	20, // 16: ctrl.v1.DeployService.StopDeployment:input_type -> ctrl.v1.StopDeploymentRequest
-	22, // 17: ctrl.v1.DeployService.WakeDeployment:input_type -> ctrl.v1.WakeDeploymentRequest
-	4,  // 18: ctrl.v1.DeployService.CreateDeployment:output_type -> ctrl.v1.CreateDeploymentResponse
-	6,  // 19: ctrl.v1.DeployService.GetDeployment:output_type -> ctrl.v1.GetDeploymentResponse
-	13, // 20: ctrl.v1.DeployService.Rollback:output_type -> ctrl.v1.RollbackResponse
-	15, // 21: ctrl.v1.DeployService.Promote:output_type -> ctrl.v1.PromoteResponse
-	17, // 22: ctrl.v1.DeployService.AuthorizeDeployment:output_type -> ctrl.v1.AuthorizeDeploymentResponse
-	19, // 23: ctrl.v1.DeployService.CancelDeployment:output_type -> ctrl.v1.CancelDeploymentResponse
-	21, // 24: ctrl.v1.DeployService.StopDeployment:output_type -> ctrl.v1.StopDeploymentResponse
-	23, // 25: ctrl.v1.DeployService.WakeDeployment:output_type -> ctrl.v1.WakeDeploymentResponse
-	18, // [18:26] is the sub-list for method output_type
-	10, // [10:18] is the sub-list for method input_type
+	20, // 15: ctrl.v1.DeployService.RejectDeployment:input_type -> ctrl.v1.RejectDeploymentRequest
+	18, // 16: ctrl.v1.DeployService.CancelDeployment:input_type -> ctrl.v1.CancelDeploymentRequest
+	22, // 17: ctrl.v1.DeployService.StopDeployment:input_type -> ctrl.v1.StopDeploymentRequest
+	24, // 18: ctrl.v1.DeployService.WakeDeployment:input_type -> ctrl.v1.WakeDeploymentRequest
+	4,  // 19: ctrl.v1.DeployService.CreateDeployment:output_type -> ctrl.v1.CreateDeploymentResponse
+	6,  // 20: ctrl.v1.DeployService.GetDeployment:output_type -> ctrl.v1.GetDeploymentResponse
+	13, // 21: ctrl.v1.DeployService.Rollback:output_type -> ctrl.v1.RollbackResponse
+	15, // 22: ctrl.v1.DeployService.Promote:output_type -> ctrl.v1.PromoteResponse
+	17, // 23: ctrl.v1.DeployService.AuthorizeDeployment:output_type -> ctrl.v1.AuthorizeDeploymentResponse
+	21, // 24: ctrl.v1.DeployService.RejectDeployment:output_type -> ctrl.v1.RejectDeploymentResponse
+	19, // 25: ctrl.v1.DeployService.CancelDeployment:output_type -> ctrl.v1.CancelDeploymentResponse
+	23, // 26: ctrl.v1.DeployService.StopDeployment:output_type -> ctrl.v1.StopDeploymentResponse
+	25, // 27: ctrl.v1.DeployService.WakeDeployment:output_type -> ctrl.v1.WakeDeploymentResponse
+	19, // [19:28] is the sub-list for method output_type
+	10, // [10:19] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -1740,7 +1828,7 @@ func file_ctrl_v1_deployment_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ctrl_v1_deployment_proto_rawDesc), len(file_ctrl_v1_deployment_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   23,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

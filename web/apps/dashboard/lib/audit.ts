@@ -25,7 +25,10 @@ export type UnkeyAuditLog = {
   event: z.infer<typeof unkeyAuditLogEvents>;
   description: string;
   actor: {
-    type: "user" | "key" | "system";
+    // "slack" identifies a Slack channel member acting through the Slack
+    // integration (e.g. approving a gated deployment) who could not be
+    // resolved to an Unkey user. Mirrors SlackActor in pkg/auditlog/actors.go.
+    type: "user" | "key" | "system" | "slack";
     name?: string;
     id: string;
     meta?: Record<string, string | number | boolean | null>;

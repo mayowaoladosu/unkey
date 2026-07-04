@@ -1,8 +1,18 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "slack",
-    srcs = ["webhook.go"],
+    srcs = [
+        "webapi.go",
+        "webhook.go",
+    ],
     importpath = "github.com/unkeyed/unkey/svc/ctrl/internal/slack",
     visibility = ["//svc/ctrl:__subpackages__"],
+)
+
+go_test(
+    name = "slack_test",
+    srcs = ["webapi_test.go"],
+    embed = [":slack"],
+    deps = ["@com_github_stretchr_testify//require"],
 )

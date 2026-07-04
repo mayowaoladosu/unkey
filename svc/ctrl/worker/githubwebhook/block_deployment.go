@@ -18,6 +18,7 @@ func (s *Service) blockDeploymentForApproval(
 	req *hydrav1.HandlePushRequest,
 	project db.Project,
 	repo db.GithubRepoConnection,
+	env db.Environment,
 	deploymentID string,
 ) error {
 	workspace, err := restate.Run(ctx, func(runCtx restate.RunContext) (db.Workspace, error) {
@@ -44,6 +45,22 @@ func (s *Service) blockDeploymentForApproval(
 			)
 		}, restate.WithName("create commit status for authorization"), restate.WithMaxRetryDuration(30*time.Second))
 	}
+
+	// Post an interactive Slack approval prompt, fire-and-forget through the
+	// deployment-keyed SlackStatusService. That service owns the connection
+	// lookup, vault token decrypt, no-op-when-unconnected behaviour, and durable
+	// retry, so the webhook worker needs no Slack or vault credentials.
+	hydrav1.NewSlackStatusServiceClient(ctx, deploymentID).PostApproval().Send(&hydrav1.SlackPostApprovalRequest{
+		WorkspaceId:      project.WorkspaceID,
+		ProjectId:        project.ID,
+		EnvironmentLabel: env.Slug,
+		ReviewUrl:        logURL,
+		IsProduction:     env.Slug == "production",
+		CommitSha:        req.GetAfter(),
+		CommitMessage:    req.GetCommitMessage(),
+		Trigger:          "github",
+		TriggeredBy:      req.GetSenderLogin(),
+	})
 
 	logger.Info("deployment blocked for authorization",
 		"deployment_id", deploymentID,

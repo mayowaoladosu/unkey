@@ -100,6 +100,25 @@ export const githubOAuthSchema = z.object({
 const githubOAuthParsed = githubOAuthSchema.safeParse(process.env);
 export const githubOAuthEnv = () => (githubOAuthParsed.success ? githubOAuthParsed.data : null);
 
+// Slack app credentials, shared by the OAuth install handshake (client id /
+// secret), the interactivity endpoint (signing secret, used to verify inbound
+// request signatures), and the "Add to Slack" button. Kept optional as a group
+// via safeParse so environments without the Slack integration configured still
+// parse; the Slack install/interactivity paths fail closed when unset.
+// NEXT_PUBLIC_SLACK_APP_NAME is read directly in the button component (client
+// side) and is not part of this server-only schema.
+export const slackAppSchema = z.object({
+  SLACK_CLIENT_ID: z.string().min(1),
+  SLACK_CLIENT_SECRET: z.string().min(1),
+  SLACK_SIGNING_SECRET: z.string().min(1),
+  // Must exactly match the redirect configured on the Slack app and the value
+  // used in both the authorize URL and the oauth.v2.access exchange.
+  SLACK_REDIRECT_URI: z.string().min(1),
+});
+
+const slackAppParsed = slackAppSchema.safeParse(process.env);
+export const slackAppEnv = () => (slackAppParsed.success ? slackAppParsed.data : null);
+
 const stripeSchema = z.object({
   STRIPE_SECRET_KEY: z.string(),
   // The product ids, comma separated, from lowest to highest, pro first, and then enterprise plans

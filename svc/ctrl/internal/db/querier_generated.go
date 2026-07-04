@@ -501,6 +501,38 @@ type Querier interface {
 	//  FROM regions
 	//  WHERE platform = ? AND name = ? LIMIT 1
 	FindRegionByPlatformAndName(ctx context.Context, arg FindRegionByPlatformAndNameParams) (Region, error)
+	//FindSlackInstallationById
+	//
+	//  SELECT
+	//      pk,
+	//      id,
+	//      workspace_id,
+	//      team_id,
+	//      bot_token,
+	//      bot_user_id,
+	//      installed_by_user_id,
+	//      created_at,
+	//      updated_at
+	//  FROM slack_installations
+	//  WHERE id = ?
+	FindSlackInstallationById(ctx context.Context, id string) (SlackInstallation, error)
+	//FindSlackProjectConnectionByProjectId
+	//
+	//  SELECT
+	//      pk,
+	//      id,
+	//      workspace_id,
+	//      project_id,
+	//      installation_id,
+	//      channel_id,
+	//      channel_name,
+	//      include_previews,
+	//      approval_policy,
+	//      created_at,
+	//      updated_at
+	//  FROM slack_project_connections
+	//  WHERE project_id = ?
+	FindSlackProjectConnectionByProjectId(ctx context.Context, projectID string) (SlackProjectConnection, error)
 	//FindVerifiedCustomDomainByDomainExcludingWorkspace
 	//
 	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, domain, challenge_type, verification_status, verification_token, ownership_verified, cname_verified, target_cname, last_checked_at, check_attempts, verification_error, domain_connect_provider, domain_connect_url, invocation_id, created_at, updated_at FROM custom_domains
@@ -1172,6 +1204,56 @@ type Querier interface {
 	//    ?
 	//  )
 	InsertRolePermission(ctx context.Context, arg InsertRolePermissionParams) error
+	//InsertSlackInstallation
+	//
+	//  INSERT INTO slack_installations (
+	//      id,
+	//      workspace_id,
+	//      team_id,
+	//      bot_token,
+	//      bot_user_id,
+	//      installed_by_user_id,
+	//      created_at,
+	//      updated_at
+	//  )
+	//  VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	InsertSlackInstallation(ctx context.Context, arg InsertSlackInstallationParams) error
+	//InsertSlackProjectConnection
+	//
+	//  INSERT INTO slack_project_connections (
+	//      id,
+	//      workspace_id,
+	//      project_id,
+	//      installation_id,
+	//      channel_id,
+	//      channel_name,
+	//      include_previews,
+	//      approval_policy,
+	//      created_at,
+	//      updated_at
+	//  )
+	//  VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	InsertSlackProjectConnection(ctx context.Context, arg InsertSlackProjectConnectionParams) error
 	//InsertWorkspace
 	//
 	//  INSERT INTO `workspaces` (

@@ -55,6 +55,7 @@ import { listDeployments } from "./deploy/deployment/list";
 import { searchDeployments } from "./deploy/deployment/llm-search";
 import { promote } from "./deploy/deployment/promote";
 import { redeploy } from "./deploy/deployment/redeploy";
+import { rejectDeployment } from "./deploy/deployment/reject";
 import { rollback } from "./deploy/deployment/rollback";
 import { getDeploymentRuntimeLogs } from "./deploy/deployment/runtime-logs";
 import { stopDeployment } from "./deploy/deployment/stop";
@@ -138,6 +139,7 @@ import { searchIdentities } from "./identity/search";
 import { searchIdentitiesWithRelations } from "./identity/searchWithRelations";
 import { updateIdentityMetadata } from "./identity/updateMetadata";
 import { updateIdentityRatelimit } from "./identity/updateRatelimit";
+import { slackRouter } from "./integrations/slack";
 import { createKey } from "./key/create";
 import { createRootKey } from "./key/createRootKey";
 import { fetchKeyPermissions } from "./key/fetch-key-permissions";
@@ -336,6 +338,7 @@ export const router = t.router({
     getUpcomingInvoice,
   }),
   github: githubRouter,
+  slack: slackRouter,
   plain: t.router({
     createIssue: createPlainIssue,
   }),
@@ -563,6 +566,7 @@ export const router = t.router({
       redeploy,
       create: createDeploy,
       authorize: authorizeDeployment,
+      reject: rejectDeployment,
       cancel: cancelDeployment,
       stop: stopDeployment,
       wake: wakeDeployment,

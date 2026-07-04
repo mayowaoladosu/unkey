@@ -12,6 +12,9 @@ TOPOLVM_BACKING_SIZE = cfg.get('topolvm_backing_size', '20G')
 has_depot_credentials = os.path.exists('./.env.depot')
 has_github_credentials = os.path.exists('./.env.github') and os.path.exists('./.github-private-key.pem')
 has_domain_connect_key = os.path.exists('./.domain-connect-private-key.pem')
+# Opt-in marker for the Slack tunnel. Create dev/.env.slack (can be empty) to
+# enable a public tunnel to the dashboard for Slack OAuth redirect + webhook.
+has_slack_credentials = os.path.exists('./.env.slack')
 
 local_resource(
   'namespace',
@@ -363,13 +366,20 @@ k8s_resource(
   trigger_mode=TRIGGER_MODE_AUTO
 )
 
-# ─── GitHub webhook tunnel (ngrok -> ctrl-api) ─────────────────────────────
-# Auto-updates the GitHub App webhook URL when credentials are present.
-if has_github_credentials:
+# ─── ngrok tunnel (one agent: ctrl-api GitHub webhook + dashboard Slack) ────
+# ngrok's free plan allows only ONE agent session, so both tunnels run inside a
+# single `dev tunnel` invocation (ngrok start --all). It auto-updates the GitHub
+# App webhook URL when github credentials are present, and always exposes the
+# dashboard for Slack's OAuth redirect + interactivity webhook, printing the
+# URLs to paste into the Slack app. Inspect traffic at http://localhost:4040.
+if has_github_credentials or has_slack_credentials:
+    tunnel_deps = ['dashboard']
+    if has_github_credentials:
+        tunnel_deps.append('ctrl-api')
     local_resource(
-        'github-tunnel',
-        serve_cmd='cd .. && go run . dev github tunnel',
-        resource_deps=['ctrl-api'],
+        'tunnel',
+        serve_cmd='cd .. && go run . dev tunnel',
+        resource_deps=tunnel_deps,
         labels=['unkey'],
         auto_init=True,
         links=['http://localhost:4040'],
@@ -453,6 +463,7 @@ local_resource(
     serve_cmd='''
       set -a
       [ -f ./.env.github ] && source ./.env.github
+      [ -f ./.env.slack ] && source ./.env.slack
       [ -f ./.github-private-key.pem ] && export UNKEY_GITHUB_PRIVATE_KEY_PEM="$(cat ./.github-private-key.pem)"
       export GITHUB_APP_ID="$UNKEY_GITHUB_APP_ID"
       set +a

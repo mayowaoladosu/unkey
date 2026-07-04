@@ -37,6 +37,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/runner"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/slack"
 	"github.com/unkeyed/unkey/svc/ctrl/services/acme/providers"
 	workerapp "github.com/unkeyed/unkey/svc/ctrl/worker/app"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/buildslot"
@@ -52,6 +53,7 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/worker/githubstatus"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/githubwebhook"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/keylastusedsync"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/slackstatus"
 
 	ratelimitdb "github.com/unkeyed/unkey/internal/services/ratelimit/db"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/auditlogs"
@@ -278,6 +280,19 @@ func Run(ctx context.Context, cfg Config) error {
 	restateSrv.Bind(hydrav1.NewGitHubStatusServiceServer(githubstatus.New(githubstatus.Config{
 		GitHub: ghClient,
 		DB:     database,
+	}), restate.WithIngressPrivate(true)))
+
+	// SlackStatusService is always bound (the deploy workflow and githubwebhook
+	// worker Send to it unconditionally), but Slack notifications require vault
+	// to decrypt per-workspace bot tokens; without it the service logs and
+	// no-ops per delivery.
+	if vaultClient == nil {
+		logger.Warn("SlackStatusService running without vault: slack notifications disabled")
+	}
+	restateSrv.Bind(hydrav1.NewSlackStatusServiceServer(slackstatus.New(slackstatus.Config{
+		Slack: slack.NewWebClient(),
+		Vault: vaultClient,
+		DB:    database,
 	}), restate.WithIngressPrivate(true)))
 
 	restateSrv.Bind(hydrav1.NewRoutingServiceServer(routing.New(routing.Config{

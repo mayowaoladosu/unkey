@@ -46,6 +46,9 @@ const (
 	// DeployServiceAuthorizeDeploymentProcedure is the fully-qualified name of the DeployService's
 	// AuthorizeDeployment RPC.
 	DeployServiceAuthorizeDeploymentProcedure = "/ctrl.v1.DeployService/AuthorizeDeployment"
+	// DeployServiceRejectDeploymentProcedure is the fully-qualified name of the DeployService's
+	// RejectDeployment RPC.
+	DeployServiceRejectDeploymentProcedure = "/ctrl.v1.DeployService/RejectDeployment"
 	// DeployServiceCancelDeploymentProcedure is the fully-qualified name of the DeployService's
 	// CancelDeployment RPC.
 	DeployServiceCancelDeploymentProcedure = "/ctrl.v1.DeployService/CancelDeployment"
@@ -70,6 +73,11 @@ type DeployServiceClient interface {
 	Promote(context.Context, *connect.Request[v1.PromoteRequest]) (*connect.Response[v1.PromoteResponse], error)
 	// Authorize deployment for an external contributor's push on a branch
 	AuthorizeDeployment(context.Context, *connect.Request[v1.AuthorizeDeploymentRequest]) (*connect.Response[v1.AuthorizeDeploymentResponse], error)
+	// Reject a deployment that is awaiting approval, transitioning it to
+	// cancelled. Unlike CancelDeployment, this targets the pre-workflow
+	// awaiting_approval state (no Restate invocation exists yet) and records a
+	// distinct reject decision.
+	RejectDeployment(context.Context, *connect.Request[v1.RejectDeploymentRequest]) (*connect.Response[v1.RejectDeploymentResponse], error)
 	// Cancel a running or queued deployment. Cancels the underlying Restate
 	// Deploy invocation, which triggers the workflow's compensation stack to
 	// transition the deployment to failed and release any held build slot.
@@ -122,6 +130,12 @@ func NewDeployServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deployServiceMethods.ByName("AuthorizeDeployment")),
 			connect.WithClientOptions(opts...),
 		),
+		rejectDeployment: connect.NewClient[v1.RejectDeploymentRequest, v1.RejectDeploymentResponse](
+			httpClient,
+			baseURL+DeployServiceRejectDeploymentProcedure,
+			connect.WithSchema(deployServiceMethods.ByName("RejectDeployment")),
+			connect.WithClientOptions(opts...),
+		),
 		cancelDeployment: connect.NewClient[v1.CancelDeploymentRequest, v1.CancelDeploymentResponse](
 			httpClient,
 			baseURL+DeployServiceCancelDeploymentProcedure,
@@ -150,6 +164,7 @@ type deployServiceClient struct {
 	rollback            *connect.Client[v1.RollbackRequest, v1.RollbackResponse]
 	promote             *connect.Client[v1.PromoteRequest, v1.PromoteResponse]
 	authorizeDeployment *connect.Client[v1.AuthorizeDeploymentRequest, v1.AuthorizeDeploymentResponse]
+	rejectDeployment    *connect.Client[v1.RejectDeploymentRequest, v1.RejectDeploymentResponse]
 	cancelDeployment    *connect.Client[v1.CancelDeploymentRequest, v1.CancelDeploymentResponse]
 	stopDeployment      *connect.Client[v1.StopDeploymentRequest, v1.StopDeploymentResponse]
 	wakeDeployment      *connect.Client[v1.WakeDeploymentRequest, v1.WakeDeploymentResponse]
@@ -180,6 +195,11 @@ func (c *deployServiceClient) AuthorizeDeployment(ctx context.Context, req *conn
 	return c.authorizeDeployment.CallUnary(ctx, req)
 }
 
+// RejectDeployment calls ctrl.v1.DeployService.RejectDeployment.
+func (c *deployServiceClient) RejectDeployment(ctx context.Context, req *connect.Request[v1.RejectDeploymentRequest]) (*connect.Response[v1.RejectDeploymentResponse], error) {
+	return c.rejectDeployment.CallUnary(ctx, req)
+}
+
 // CancelDeployment calls ctrl.v1.DeployService.CancelDeployment.
 func (c *deployServiceClient) CancelDeployment(ctx context.Context, req *connect.Request[v1.CancelDeploymentRequest]) (*connect.Response[v1.CancelDeploymentResponse], error) {
 	return c.cancelDeployment.CallUnary(ctx, req)
@@ -208,6 +228,11 @@ type DeployServiceHandler interface {
 	Promote(context.Context, *connect.Request[v1.PromoteRequest]) (*connect.Response[v1.PromoteResponse], error)
 	// Authorize deployment for an external contributor's push on a branch
 	AuthorizeDeployment(context.Context, *connect.Request[v1.AuthorizeDeploymentRequest]) (*connect.Response[v1.AuthorizeDeploymentResponse], error)
+	// Reject a deployment that is awaiting approval, transitioning it to
+	// cancelled. Unlike CancelDeployment, this targets the pre-workflow
+	// awaiting_approval state (no Restate invocation exists yet) and records a
+	// distinct reject decision.
+	RejectDeployment(context.Context, *connect.Request[v1.RejectDeploymentRequest]) (*connect.Response[v1.RejectDeploymentResponse], error)
 	// Cancel a running or queued deployment. Cancels the underlying Restate
 	// Deploy invocation, which triggers the workflow's compensation stack to
 	// transition the deployment to failed and release any held build slot.
@@ -256,6 +281,12 @@ func NewDeployServiceHandler(svc DeployServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deployServiceMethods.ByName("AuthorizeDeployment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deployServiceRejectDeploymentHandler := connect.NewUnaryHandler(
+		DeployServiceRejectDeploymentProcedure,
+		svc.RejectDeployment,
+		connect.WithSchema(deployServiceMethods.ByName("RejectDeployment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	deployServiceCancelDeploymentHandler := connect.NewUnaryHandler(
 		DeployServiceCancelDeploymentProcedure,
 		svc.CancelDeployment,
@@ -286,6 +317,8 @@ func NewDeployServiceHandler(svc DeployServiceHandler, opts ...connect.HandlerOp
 			deployServicePromoteHandler.ServeHTTP(w, r)
 		case DeployServiceAuthorizeDeploymentProcedure:
 			deployServiceAuthorizeDeploymentHandler.ServeHTTP(w, r)
+		case DeployServiceRejectDeploymentProcedure:
+			deployServiceRejectDeploymentHandler.ServeHTTP(w, r)
 		case DeployServiceCancelDeploymentProcedure:
 			deployServiceCancelDeploymentHandler.ServeHTTP(w, r)
 		case DeployServiceStopDeploymentProcedure:
@@ -319,6 +352,10 @@ func (UnimplementedDeployServiceHandler) Promote(context.Context, *connect.Reque
 
 func (UnimplementedDeployServiceHandler) AuthorizeDeployment(context.Context, *connect.Request[v1.AuthorizeDeploymentRequest]) (*connect.Response[v1.AuthorizeDeploymentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ctrl.v1.DeployService.AuthorizeDeployment is not implemented"))
+}
+
+func (UnimplementedDeployServiceHandler) RejectDeployment(context.Context, *connect.Request[v1.RejectDeploymentRequest]) (*connect.Response[v1.RejectDeploymentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ctrl.v1.DeployService.RejectDeployment is not implemented"))
 }
 
 func (UnimplementedDeployServiceHandler) CancelDeployment(context.Context, *connect.Request[v1.CancelDeploymentRequest]) (*connect.Response[v1.CancelDeploymentResponse], error) {

@@ -10,6 +10,7 @@ go_library(
         "get_deployment.go",
         "promote.go",
         "rebuild.go",
+        "reject_deployment.go",
         "rollback.go",
         "service.go",
         "stop.go",
@@ -41,11 +42,19 @@ go_library(
 go_test(
     name = "deployment_test",
     size = "small",
-    srcs = ["create_deployment_simple_test.go"],
+    srcs = [
+        "create_deployment_simple_test.go",
+        "reject_deployment_integration_test.go",
+    ],
     embed = [":deployment"],
     deps = [
         "//gen/proto/ctrl/v1:ctrl",
+        "//pkg/uid",
+        "//svc/ctrl/integration/harness",
+        "//svc/ctrl/integration/seed",
         "//svc/ctrl/internal/db",
+        "//svc/ctrl/worker/github",
+        "@com_connectrpc_connect//:connect",
         "@com_github_stretchr_testify//require",
     ],
 )

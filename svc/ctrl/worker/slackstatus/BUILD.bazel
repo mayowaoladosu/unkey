@@ -1,0 +1,39 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "slackstatus",
+    srcs = [
+        "handlers.go",
+        "message.go",
+        "service.go",
+    ],
+    importpath = "github.com/unkeyed/unkey/svc/ctrl/worker/slackstatus",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//gen/proto/hydra/v1:hydra",
+        "//gen/proto/vault/v1:vault",
+        "//gen/rpc/vault",
+        "//pkg/logger",
+        "//svc/ctrl/internal/db",
+        "//svc/ctrl/internal/slack",
+        "@com_github_restatedev_sdk_go//:sdk-go",
+    ],
+)
+
+go_test(
+    name = "slackstatus_test",
+    srcs = [
+        "message_test.go",
+        "resolve_integration_test.go",
+    ],
+    embed = [":slackstatus"],
+    deps = [
+        "//gen/proto/hydra/v1:hydra",
+        "//pkg/uid",
+        "//svc/ctrl/integration/harness",
+        "//svc/ctrl/integration/seed",
+        "//svc/ctrl/internal/db",
+        "//svc/ctrl/internal/slack",
+        "@com_github_stretchr_testify//require",
+    ],
+)
