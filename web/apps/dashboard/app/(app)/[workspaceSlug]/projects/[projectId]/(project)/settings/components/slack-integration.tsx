@@ -138,8 +138,12 @@ export const SlackIntegration = () => {
                   <span className="flex-1 truncate text-[13px] font-medium text-gray-12">
                     #{channel.channelName}
                   </span>
-                  <label className="flex items-center gap-2">
+                  <label
+                    htmlFor={`notify-production-${channel.channelId}`}
+                    className="flex items-center gap-2"
+                  >
                     <Switch
+                      id={`notify-production-${channel.channelId}`}
                       size="sm"
                       checked={channel.notifyProduction}
                       onCheckedChange={(checked) =>
@@ -153,8 +157,12 @@ export const SlackIntegration = () => {
                     />
                     <span className="text-[13px] text-gray-11">Production</span>
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label
+                    htmlFor={`notify-previews-${channel.channelId}`}
+                    className="flex items-center gap-2"
+                  >
                     <Switch
+                      id={`notify-previews-${channel.channelId}`}
                       size="sm"
                       checked={channel.notifyPreviews}
                       onCheckedChange={(checked) =>
