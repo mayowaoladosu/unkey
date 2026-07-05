@@ -8,7 +8,6 @@ import { queryKeysList } from "./api/keys/query-api-keys";
 import { keyUsageTimeseries } from "./api/keys/query-key-usage-timeseries";
 import { queryKeysOverviewLogs } from "./api/keys/query-overview-logs";
 import { keyVerificationsTimeseries } from "./api/keys/query-overview-timeseries";
-import { enableKey } from "./api/keys/toggle-key-enabled";
 import { overviewApiSearch } from "./api/overview-api-search";
 import { queryApisOverview } from "./api/overview/query-overview";
 import { queryVerificationTimeseries } from "./api/overview/query-timeseries";
@@ -140,7 +139,6 @@ import { searchIdentitiesWithRelations } from "./identity/searchWithRelations";
 import { updateIdentityMetadata } from "./identity/updateMetadata";
 import { updateIdentityRatelimit } from "./identity/updateRatelimit";
 import { slackRouter } from "./integrations/slack";
-import { createKey } from "./key/create";
 import { createRootKey } from "./key/createRootKey";
 import { fetchKeyPermissions } from "./key/fetch-key-permissions";
 import { queryKeyDetailsLogs } from "./key/query-logs";
@@ -150,15 +148,7 @@ import { getPermissionSlugs } from "./key/rbac/get-permission-slugs";
 import { queryKeysPermissions } from "./key/rbac/permissions/query";
 import { queryKeysRoles } from "./key/rbac/roles/query-keys-roles";
 import { searchKeysRoles } from "./key/rbac/roles/search-keys-roles";
-import { updateKeyRbac } from "./key/rbac/update-rbac";
 import { rerollRootKey } from "./key/reroll";
-import { updateKeysEnabled } from "./key/updateEnabled";
-import { updateKeyExpiration } from "./key/updateExpiration";
-import { updateKeyMetadata } from "./key/updateMetadata";
-import { updateKeyName } from "./key/updateName";
-import { updateKeyOwner } from "./key/updateOwnerId";
-import { updateKeyRatelimit } from "./key/updateRatelimit";
-import { updateKeyRemaining } from "./key/updateRemaining";
 import { updateRootKeyName } from "./key/updateRootKeyName";
 import { updateRootKeyPermissions } from "./key/updateRootKeyPermissions";
 import { llmSearch } from "./logs/llm-search";
@@ -239,22 +229,13 @@ import { optWorkspaceIntoBeta } from "./workspace/optIntoBeta";
 
 export const router = t.router({
   key: t.router({
-    create: createKey,
     fetchPermissions: fetchKeyPermissions,
     logs: t.router({
       query: queryKeyDetailsLogs,
       timeseries: keyDetailsVerificationsTimeseries,
     }),
     update: t.router({
-      enabled: updateKeysEnabled,
-      expiration: updateKeyExpiration,
-      metadata: updateKeyMetadata,
-      name: updateKeyName,
-      ownerId: updateKeyOwner,
-      ratelimit: updateKeyRatelimit,
-      remaining: updateKeyRemaining,
       rbac: t.router({
-        update: updateKeyRbac,
         roles: t.router({
           search: searchKeysRoles,
           query: queryKeysRoles,
@@ -300,7 +281,6 @@ export const router = t.router({
       llmSearch: keysLlmSearch,
       list: queryKeysList,
       listLlmSearch: apiKeysLlmSearch,
-      enableKey: enableKey,
       usageTimeseries: keyUsageTimeseries,
     }),
     overview: t.router({
