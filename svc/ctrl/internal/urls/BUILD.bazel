@@ -1,0 +1,8 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "urls",
+    srcs = ["urls.go"],
+    importpath = "github.com/unkeyed/unkey/svc/ctrl/internal/urls",
+    visibility = ["//svc/ctrl:__subpackages__"],
+)

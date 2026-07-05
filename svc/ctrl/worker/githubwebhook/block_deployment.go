@@ -1,13 +1,13 @@
 package githubwebhook
 
 import (
-	"fmt"
 	"time"
 
 	restate "github.com/restatedev/sdk-go"
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/urls"
 )
 
 // blockDeploymentForApproval creates a GitHub commit status to signal that
@@ -17,6 +17,7 @@ func (s *Service) blockDeploymentForApproval(
 	ctx restate.ObjectContext,
 	req *hydrav1.HandlePushRequest,
 	project db.Project,
+	app db.App,
 	repo db.GithubRepoConnection,
 	env db.Environment,
 	deploymentID string,
@@ -28,9 +29,7 @@ func (s *Service) blockDeploymentForApproval(
 		return err
 	}
 
-	logURL := fmt.Sprintf("%s/%s/projects/%s/deployments/%s",
-		s.dashboardURL, workspace.Slug, project.ID, deploymentID,
-	)
+	logURL := urls.DeploymentLogURL(s.dashboardURL, workspace.Slug, project.ID, app.ID, deploymentID)
 
 	if !s.allowUnauthenticatedDeployments {
 		_ = restate.RunVoid(ctx, func(_ restate.RunContext) error {

@@ -18,6 +18,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/restate/compensation"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/urls"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -1083,7 +1084,7 @@ func (w *Workflow) deploymentURLs(
 ) (envURL, logURL string) {
 	prefix := formatDomainPrefix(project.Slug, app.Slug)
 	envURL = fmt.Sprintf("https://%s-%s-%s.%s", prefix, environment.Slug, workspace.Slug, w.defaultDomain)
-	logURL = fmt.Sprintf("%s/%s/projects/%s/apps/%s/deployments/%s", w.dashboardURL, workspace.Slug, project.ID, app.ID, deployment.ID)
+	logURL = urls.DeploymentLogURL(w.dashboardURL, workspace.Slug, project.ID, app.ID, deployment.ID)
 	return envURL, logURL
 }
 

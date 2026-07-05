@@ -40,6 +40,7 @@ go_library(
         "//pkg/uid",
         "//pkg/validation",
         "//svc/ctrl/internal/db",
+        "//svc/ctrl/internal/urls",
         "//svc/ctrl/worker/github",
         "@build_buf_gen_go_depot_api_connectrpc_go//depot/core/v1/corev1connect",
         "@build_buf_gen_go_depot_api_protocolbuffers_go//depot/core/v1:core",

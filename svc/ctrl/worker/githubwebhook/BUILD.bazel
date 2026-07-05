@@ -18,6 +18,7 @@ go_library(
         "//pkg/uid",
         "//svc/ctrl/dedup",
         "//svc/ctrl/internal/db",
+        "//svc/ctrl/internal/urls",
         "//svc/ctrl/worker/github",
         "@com_github_restatedev_sdk_go//:sdk-go",
         "@org_golang_google_protobuf//encoding/protojson",

@@ -183,7 +183,7 @@ func (s *Service) HandlePush(ctx restate.ObjectContext, req *hydrav1.HandlePushR
 		)
 
 		if needsApproval {
-			if blockErr := s.blockDeploymentForApproval(ctx, req, project, repo, env, deploymentID); blockErr != nil {
+			if blockErr := s.blockDeploymentForApproval(ctx, req, project, app, repo, env, deploymentID); blockErr != nil {
 				return nil, blockErr
 			}
 			// A newer gated commit supersedes older siblings on the same branch,
