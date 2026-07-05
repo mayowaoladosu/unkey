@@ -9,7 +9,7 @@ import (
 	"context"
 )
 
-const findSlackProjectConnectionByProjectId = `-- name: FindSlackProjectConnectionByProjectId :one
+const listSlackProjectConnectionsByProjectId = `-- name: ListSlackProjectConnectionsByProjectId :many
 SELECT
     pk,
     id,
@@ -18,15 +18,15 @@ SELECT
     installation_id,
     channel_id,
     channel_name,
-    include_previews,
-    approval_policy,
+    notify_production,
+    notify_previews,
     created_at,
     updated_at
 FROM slack_project_connections
 WHERE project_id = ?
 `
 
-// FindSlackProjectConnectionByProjectId
+// ListSlackProjectConnectionsByProjectId
 //
 //	SELECT
 //	    pk,
@@ -36,27 +36,43 @@ WHERE project_id = ?
 //	    installation_id,
 //	    channel_id,
 //	    channel_name,
-//	    include_previews,
-//	    approval_policy,
+//	    notify_production,
+//	    notify_previews,
 //	    created_at,
 //	    updated_at
 //	FROM slack_project_connections
 //	WHERE project_id = ?
-func (q *Queries) FindSlackProjectConnectionByProjectId(ctx context.Context, projectID string) (SlackProjectConnection, error) {
-	row := q.db.QueryRowContext(ctx, findSlackProjectConnectionByProjectId, projectID)
-	var i SlackProjectConnection
-	err := row.Scan(
-		&i.Pk,
-		&i.ID,
-		&i.WorkspaceID,
-		&i.ProjectID,
-		&i.InstallationID,
-		&i.ChannelID,
-		&i.ChannelName,
-		&i.IncludePreviews,
-		&i.ApprovalPolicy,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) ListSlackProjectConnectionsByProjectId(ctx context.Context, projectID string) ([]SlackProjectConnection, error) {
+	rows, err := q.db.QueryContext(ctx, listSlackProjectConnectionsByProjectId, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SlackProjectConnection
+	for rows.Next() {
+		var i SlackProjectConnection
+		if err := rows.Scan(
+			&i.Pk,
+			&i.ID,
+			&i.WorkspaceID,
+			&i.ProjectID,
+			&i.InstallationID,
+			&i.ChannelID,
+			&i.ChannelName,
+			&i.NotifyProduction,
+			&i.NotifyPreviews,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

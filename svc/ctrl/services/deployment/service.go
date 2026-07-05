@@ -39,17 +39,20 @@ func (s *Service) deploymentClient(deploymentID string) hydrav1.DeployServiceIng
 }
 
 // resolveSlackApproval fire-and-forgets a SlackStatusService.ResolveApproval so
-// a decision made outside Slack (dashboard, API) retires the approval prompt's
-// Approve/Reject buttons. Best-effort: errors are logged, never propagated, and
-// the service no-ops when the deployment never had a prompt posted.
-func (s *Service) resolveSlackApproval(ctx context.Context, deploymentID string, approved bool) {
+// a decision made outside Slack (dashboard, API) — or from a Slack click —
+// retires the approval prompt's Approve/Reject buttons and renders the outcome.
+// resolvedBy is the actor's display name for attribution (empty when unknown).
+// Best-effort: errors are logged, never propagated, and the service no-ops when
+// the deployment never had a prompt posted.
+func (s *Service) resolveSlackApproval(ctx context.Context, deploymentID string, approved bool, resolvedBy string) {
 	if s.restate == nil {
 		return
 	}
 	if _, err := hydrav1.NewSlackStatusServiceIngressClient(s.restate, deploymentID).
 		ResolveApproval().Send(ctx, &hydrav1.SlackResolveApprovalRequest{
 		Approved:   approved,
-		ResolvedBy: "",
+		ResolvedBy: resolvedBy,
+		Superseded: false,
 	}); err != nil {
 		logger.Warn("failed to retire slack approval prompt",
 			"deployment_id", deploymentID,

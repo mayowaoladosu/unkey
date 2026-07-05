@@ -1,4 +1,4 @@
--- name: FindSlackProjectConnectionByProjectId :one
+-- name: ListSlackProjectConnectionsByProjectId :many
 SELECT
     pk,
     id,
@@ -7,8 +7,8 @@ SELECT
     installation_id,
     channel_id,
     channel_name,
-    include_previews,
-    approval_policy,
+    notify_production,
+    notify_previews,
     created_at,
     updated_at
 FROM slack_project_connections

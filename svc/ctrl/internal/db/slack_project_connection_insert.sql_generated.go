@@ -18,8 +18,8 @@ INSERT INTO slack_project_connections (
     installation_id,
     channel_id,
     channel_name,
-    include_previews,
-    approval_policy,
+    notify_production,
+    notify_previews,
     created_at,
     updated_at
 )
@@ -38,16 +38,16 @@ VALUES (
 `
 
 type InsertSlackProjectConnectionParams struct {
-	ID              string                                `db:"id"`
-	WorkspaceID     string                                `db:"workspace_id"`
-	ProjectID       string                                `db:"project_id"`
-	InstallationID  string                                `db:"installation_id"`
-	ChannelID       string                                `db:"channel_id"`
-	ChannelName     string                                `db:"channel_name"`
-	IncludePreviews bool                                  `db:"include_previews"`
-	ApprovalPolicy  SlackProjectConnectionsApprovalPolicy `db:"approval_policy"`
-	CreatedAt       int64                                 `db:"created_at"`
-	UpdatedAt       sql.NullInt64                         `db:"updated_at"`
+	ID               string        `db:"id"`
+	WorkspaceID      string        `db:"workspace_id"`
+	ProjectID        string        `db:"project_id"`
+	InstallationID   string        `db:"installation_id"`
+	ChannelID        string        `db:"channel_id"`
+	ChannelName      string        `db:"channel_name"`
+	NotifyProduction bool          `db:"notify_production"`
+	NotifyPreviews   bool          `db:"notify_previews"`
+	CreatedAt        int64         `db:"created_at"`
+	UpdatedAt        sql.NullInt64 `db:"updated_at"`
 }
 
 // InsertSlackProjectConnection
@@ -59,8 +59,8 @@ type InsertSlackProjectConnectionParams struct {
 //	    installation_id,
 //	    channel_id,
 //	    channel_name,
-//	    include_previews,
-//	    approval_policy,
+//	    notify_production,
+//	    notify_previews,
 //	    created_at,
 //	    updated_at
 //	)
@@ -84,8 +84,8 @@ func (q *Queries) InsertSlackProjectConnection(ctx context.Context, arg InsertSl
 		arg.InstallationID,
 		arg.ChannelID,
 		arg.ChannelName,
-		arg.IncludePreviews,
-		arg.ApprovalPolicy,
+		arg.NotifyProduction,
+		arg.NotifyPreviews,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

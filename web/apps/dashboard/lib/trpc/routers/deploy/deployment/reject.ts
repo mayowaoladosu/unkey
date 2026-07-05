@@ -5,6 +5,7 @@ import { DeployService } from "@/gen/proto/ctrl/v1/deployment_pb";
 
 import { db } from "@/lib/db";
 import { ratelimit, withRatelimit, workspaceProcedure } from "@/lib/trpc/trpc";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -65,6 +66,15 @@ export const rejectDeployment = workspaceProcedure
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
+      }
+      // ctrl returns FailedPrecondition when the deployment is no longer
+      // awaiting approval (already resolved) — surface that as a clear
+      // precondition error, not a generic 500.
+      if (error instanceof ConnectError && error.code === Code.FailedPrecondition) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "This deployment is no longer awaiting approval.",
+        });
       }
 
       console.error("Reject deployment request failed:", error);

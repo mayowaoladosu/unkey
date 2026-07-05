@@ -516,23 +516,6 @@ type Querier interface {
 	//  FROM slack_installations
 	//  WHERE id = ?
 	FindSlackInstallationById(ctx context.Context, id string) (SlackInstallation, error)
-	//FindSlackProjectConnectionByProjectId
-	//
-	//  SELECT
-	//      pk,
-	//      id,
-	//      workspace_id,
-	//      project_id,
-	//      installation_id,
-	//      channel_id,
-	//      channel_name,
-	//      include_previews,
-	//      approval_policy,
-	//      created_at,
-	//      updated_at
-	//  FROM slack_project_connections
-	//  WHERE project_id = ?
-	FindSlackProjectConnectionByProjectId(ctx context.Context, projectID string) (SlackProjectConnection, error)
 	//FindVerifiedCustomDomainByDomainExcludingWorkspace
 	//
 	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, domain, challenge_type, verification_status, verification_token, ownership_verified, cname_verified, target_cname, last_checked_at, check_attempts, verification_error, domain_connect_provider, domain_connect_url, invocation_id, created_at, updated_at FROM custom_domains
@@ -1236,8 +1219,8 @@ type Querier interface {
 	//      installation_id,
 	//      channel_id,
 	//      channel_name,
-	//      include_previews,
-	//      approval_policy,
+	//      notify_production,
+	//      notify_previews,
 	//      created_at,
 	//      updated_at
 	//  )
@@ -1468,6 +1451,23 @@ type Querier interface {
 	//    AND id != ?
 	//  ORDER BY created_at ASC
 	ListRunningDeploymentsByBranch(ctx context.Context, arg ListRunningDeploymentsByBranchParams) ([]string, error)
+	//ListSlackProjectConnectionsByProjectId
+	//
+	//  SELECT
+	//      pk,
+	//      id,
+	//      workspace_id,
+	//      project_id,
+	//      installation_id,
+	//      channel_id,
+	//      channel_name,
+	//      notify_production,
+	//      notify_previews,
+	//      created_at,
+	//      updated_at
+	//  FROM slack_project_connections
+	//  WHERE project_id = ?
+	ListSlackProjectConnectionsByProjectId(ctx context.Context, projectID string) ([]SlackProjectConnection, error)
 	// Fetches the Stripe customer identity for a batch of workspaces, used by the
 	// hourly Deploy billing push to decide where each workspace's month-to-date
 	// usage gets reported. The Stripe Billing Meters map usage to a customer by

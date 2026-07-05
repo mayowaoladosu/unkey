@@ -6,13 +6,13 @@ CREATE TABLE `slack_project_connections` (
 	`installation_id` varchar(128) NOT NULL,
 	`channel_id` varchar(64) NOT NULL,
 	`channel_name` varchar(256) NOT NULL,
-	`include_previews` boolean NOT NULL DEFAULT false,
-	`approval_policy` enum('anyone','admins_only') NOT NULL DEFAULT 'anyone',
+	`notify_production` boolean NOT NULL DEFAULT true,
+	`notify_previews` boolean NOT NULL DEFAULT false,
 	`created_at` bigint NOT NULL,
 	`updated_at` bigint,
 	CONSTRAINT `slack_project_connections_pk` PRIMARY KEY(`pk`),
 	CONSTRAINT `slack_project_connections_id_unique` UNIQUE(`id`),
-	CONSTRAINT `slack_project_connections_project_id_unique` UNIQUE(`project_id`)
+	CONSTRAINT `project_channel_idx` UNIQUE(`project_id`,`channel_id`)
 );
 
 CREATE INDEX `slack_installation_id_idx` ON `slack_project_connections` (`installation_id`);

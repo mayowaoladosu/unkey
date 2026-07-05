@@ -468,7 +468,10 @@ func (s *Service) createAndDeploy(ctx context.Context, p createParams) (string, 
 		"invocation_id", invocationID,
 	)
 
-	if cancelErr := s.dedup.CancelOlderSiblings(ctx, dedup.Newer{
+	// The superseded ids are ignored here: deployments created through this API
+	// path never post a Slack approval prompt (only the github webhook worker
+	// gates deployments), so there is nothing to retire on the siblings.
+	if _, cancelErr := s.dedup.CancelOlderSiblings(ctx, dedup.Newer{
 		ID:            deploymentID,
 		AppID:         c.app.ID,
 		EnvironmentID: c.env.Environment.ID,

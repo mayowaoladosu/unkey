@@ -103,6 +103,8 @@ const requireSlackEnv = () => {
 };
 
 // findInstallation loads the workspace's Slack installation, or throws NOT_FOUND.
+// registerInstallation enforces one Slack team per workspace, so findFirst
+// resolves to the single install unambiguously.
 const findInstallation = async (workspaceId: string) => {
   const installation = await db.query.slackInstallations.findFirst({
     where: (table, { eq }) => eq(table.workspaceId, workspaceId),
@@ -135,22 +137,31 @@ export const slackRouter = t.router({
     return { installed: Boolean(installation) };
   }),
 
-  // The current per-project connection, for the settings UI.
-  getConnection: workspaceProcedure
+  // All of the project's connected channels with their per-channel scope, plus
+  // the project-level approval policy (a single project-scoped settings row).
+  listConnections: workspaceProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ input, ctx }) => {
-      const connection = await db.query.slackProjectConnections.findFirst({
-        where: (table, { and, eq }) =>
-          and(eq(table.projectId, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
-      });
-      if (!connection) {
-        return null;
-      }
+      const [connections, settings] = await Promise.all([
+        db.query.slackProjectConnections.findMany({
+          where: (table, { and, eq }) =>
+            and(eq(table.projectId, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
+          orderBy: (table, { asc }) => [asc(table.channelName)],
+        }),
+        db.query.slackProjectSettings.findFirst({
+          where: (table, { and, eq }) =>
+            and(eq(table.projectId, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
+          columns: { approvalPolicy: true },
+        }),
+      ]);
       return {
-        channelId: connection.channelId,
-        channelName: connection.channelName,
-        includePreviews: connection.includePreviews,
-        approvalPolicy: connection.approvalPolicy,
+        channels: connections.map((c) => ({
+          channelId: c.channelId,
+          channelName: c.channelName,
+          notifyProduction: c.notifyProduction,
+          notifyPreviews: c.notifyPreviews,
+        })),
+        approvalPolicy: settings?.approvalPolicy ?? ("anyone" as const),
       };
     }),
 
@@ -205,6 +216,22 @@ export const slackRouter = t.router({
         });
       }
 
+      // One Slack team per Unkey workspace. Reinstalling the same team upserts
+      // (below); connecting a *different* team is refused so every install-scoped
+      // reader (findInstallation, listChannels, sendTestMessage) resolves to a
+      // single unambiguous install rather than an arbitrary findFirst row.
+      const currentInstall = await db.query.slackInstallations.findFirst({
+        where: (table, { eq }) => eq(table.workspaceId, ctx.workspace.id),
+        columns: { teamId: true },
+      });
+      if (currentInstall && currentInstall.teamId !== result.teamId) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "This Unkey workspace is already connected to a different Slack workspace. Disconnect it first.",
+        });
+      }
+
       const { encrypted } = await vault.encrypt({
         keyring: ctx.workspace.id,
         data: result.botToken,
@@ -255,8 +282,10 @@ export const slackRouter = t.router({
     return { channels };
   }),
 
-  // Connect (or repoint) a project to a channel.
-  selectChannel: slackAdminProcedure
+  // Add a channel to the project's notification fan-out. New channels default
+  // to production-only. The approval policy is project-scoped
+  // (slack_project_settings) and independent of which channels exist.
+  addChannel: slackAdminProcedure
     .input(
       z.object({
         projectId: z.string().min(1),
@@ -286,15 +315,14 @@ export const slackRouter = t.router({
           installationId: installation.id,
           channelId: input.channelId,
           channelName: input.channelName,
-          includePreviews: false,
-          approvalPolicy: "anyone",
+          notifyProduction: true,
+          notifyPreviews: false,
           createdAt: Date.now(),
           updatedAt: null,
         })
         .onDuplicateKeyUpdate({
           set: {
             installationId: installation.id,
-            channelId: input.channelId,
             channelName: input.channelName,
             updatedAt: Date.now(),
           },
@@ -303,61 +331,112 @@ export const slackRouter = t.router({
           console.error("failed to persist slack connection", err);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to save Slack channel",
+            message: "Failed to add Slack channel",
           });
         });
 
       return {};
     }),
 
-  // Update environment scope and approval policy for a project.
-  updateConfig: slackAdminProcedure
-    .input(
-      z.object({
-        projectId: z.string().min(1),
-        includePreviews: z.boolean().optional(),
-        approvalPolicy: z.enum(["anyone", "admins_only"]).optional(),
-      }),
-    )
+  // Remove one channel from the project's fan-out.
+  removeChannel: slackAdminProcedure
+    .input(z.object({ projectId: z.string().min(1), channelId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const set: {
-        includePreviews?: boolean;
-        approvalPolicy?: "anyone" | "admins_only";
-        updatedAt: number;
-      } = {
-        updatedAt: Date.now(),
-      };
-      if (input.includePreviews !== undefined) {
-        set.includePreviews = input.includePreviews;
-      }
-      if (input.approvalPolicy !== undefined) {
-        set.approvalPolicy = input.approvalPolicy;
-      }
-
       await db
-        .update(schema.slackProjectConnections)
-        .set(set)
+        .delete(schema.slackProjectConnections)
         .where(
           and(
             eq(schema.slackProjectConnections.projectId, input.projectId),
+            eq(schema.slackProjectConnections.channelId, input.channelId),
             eq(schema.slackProjectConnections.workspaceId, ctx.workspace.id),
           ),
         );
       return {};
     }),
 
-  // Post a test message to the connected channel.
+  // Update one channel's environment scope.
+  updateChannelScope: slackAdminProcedure
+    .input(
+      z.object({
+        projectId: z.string().min(1),
+        channelId: z.string().min(1),
+        notifyProduction: z.boolean(),
+        notifyPreviews: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      await db
+        .update(schema.slackProjectConnections)
+        .set({
+          notifyProduction: input.notifyProduction,
+          notifyPreviews: input.notifyPreviews,
+          updatedAt: Date.now(),
+        })
+        .where(
+          and(
+            eq(schema.slackProjectConnections.projectId, input.projectId),
+            eq(schema.slackProjectConnections.channelId, input.channelId),
+            eq(schema.slackProjectConnections.workspaceId, ctx.workspace.id),
+          ),
+        );
+      return {};
+    }),
+
+  // Set the project-level approval policy. Upserts the single project-scoped
+  // settings row so there is one authoritative value regardless of how many
+  // channels the project fans out to.
+  setApprovalPolicy: slackAdminProcedure
+    .input(
+      z.object({
+        projectId: z.string().min(1),
+        approvalPolicy: z.enum(["anyone", "admins_only"]),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Confirm the project belongs to the workspace before writing a settings
+      // row for it, so a foreign projectId can't create an orphan row keyed by
+      // (caller workspace, someone else's project). Mirrors addChannel.
+      const project = await db.query.projects.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.id, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
+        columns: { id: true },
+      });
+      if (!project) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+
+      await db
+        .insert(schema.slackProjectSettings)
+        .values({
+          id: newId("slack"),
+          workspaceId: ctx.workspace.id,
+          projectId: input.projectId,
+          approvalPolicy: input.approvalPolicy,
+          createdAt: Date.now(),
+          updatedAt: null,
+        })
+        .onDuplicateKeyUpdate({
+          set: { approvalPolicy: input.approvalPolicy, updatedAt: Date.now() },
+        });
+      return {};
+    }),
+
+  // Post a test message to one connected channel.
   sendTestMessage: slackAdminProcedure
-    .input(z.object({ projectId: z.string().min(1) }))
+    .input(z.object({ projectId: z.string().min(1), channelId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       const connection = await db.query.slackProjectConnections.findFirst({
         where: (table, { and, eq }) =>
-          and(eq(table.projectId, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
+          and(
+            eq(table.projectId, input.projectId),
+            eq(table.channelId, input.channelId),
+            eq(table.workspaceId, ctx.workspace.id),
+          ),
       });
       if (!connection) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "This project has no Slack channel connected",
+          message: "This channel is not connected to the project",
         });
       }
       const installation = await findInstallation(ctx.workspace.id);
@@ -376,27 +455,41 @@ export const slackRouter = t.router({
       return {};
     }),
 
-  // Disconnect a single project's channel.
+  // Disconnect a single project: remove all of its channels and its
+  // project-level settings so a later reconnect starts from defaults.
   disconnect: slackAdminProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      await db
-        .delete(schema.slackProjectConnections)
-        .where(
-          and(
-            eq(schema.slackProjectConnections.projectId, input.projectId),
-            eq(schema.slackProjectConnections.workspaceId, ctx.workspace.id),
+      await Promise.all([
+        db
+          .delete(schema.slackProjectConnections)
+          .where(
+            and(
+              eq(schema.slackProjectConnections.projectId, input.projectId),
+              eq(schema.slackProjectConnections.workspaceId, ctx.workspace.id),
+            ),
           ),
-        );
+        db
+          .delete(schema.slackProjectSettings)
+          .where(
+            and(
+              eq(schema.slackProjectSettings.projectId, input.projectId),
+              eq(schema.slackProjectSettings.workspaceId, ctx.workspace.id),
+            ),
+          ),
+      ]);
       return {};
     }),
 
-  // Revoke the whole workspace install; cascades to all project connections so
-  // no further notifications are sent (R5).
+  // Revoke the whole workspace install; cascades to all project connections and
+  // settings so no further notifications are sent (R5).
   revoke: slackAdminProcedure.mutation(async ({ ctx }) => {
     await db
       .delete(schema.slackProjectConnections)
       .where(eq(schema.slackProjectConnections.workspaceId, ctx.workspace.id));
+    await db
+      .delete(schema.slackProjectSettings)
+      .where(eq(schema.slackProjectSettings.workspaceId, ctx.workspace.id));
     await db
       .delete(schema.slackInstallations)
       .where(eq(schema.slackInstallations.workspaceId, ctx.workspace.id));

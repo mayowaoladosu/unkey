@@ -56,11 +56,16 @@ type Newer struct {
 // Best-effort: returns an error only when the initial DB lookup fails.
 // Per-deployment errors are logged but don't stop the loop.
 //
+// Returns the ids of the deployments it superseded so the caller can retire
+// any side effects tied to their pre-workflow state (e.g. a posted Slack
+// approval prompt on a gated sibling). The slice is nil when nothing was
+// superseded.
+//
 // Only git-sourced deployments with a branch are deduplicated -- docker
 // image redeploys are manual and should never cancel siblings.
-func (s *Service) CancelOlderSiblings(ctx context.Context, newer Newer) error {
+func (s *Service) CancelOlderSiblings(ctx context.Context, newer Newer) ([]string, error) {
 	if newer.GitBranch == "" {
-		return nil
+		return nil, nil
 	}
 
 	older, err := s.db.ListOlderActiveDeploymentsForDedup(ctx, db.ListOlderActiveDeploymentsForDedupParams{
@@ -71,11 +76,11 @@ func (s *Service) CancelOlderSiblings(ctx context.Context, newer Newer) error {
 		DeploymentID:  newer.ID,
 	})
 	if err != nil {
-		return fmt.Errorf("list older active deployments: %w", err)
+		return nil, fmt.Errorf("list older active deployments: %w", err)
 	}
 
 	if len(older) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	logger.Info("cancelling superseded sibling deployments",
@@ -109,12 +114,14 @@ func (s *Service) CancelOlderSiblings(ctx context.Context, newer Newer) error {
 	}
 
 	// ONE query to transition all siblings to superseded.
+	statusUpdated := true
 	err = s.db.UpdateDeploymentStatusBatch(ctx, db.UpdateDeploymentStatusBatchParams{
 		Status:    db.DeploymentsStatusSuperseded,
 		UpdatedAt: now,
 		Ids:       deploymentIDs,
 	})
 	if err != nil {
+		statusUpdated = false
 		logger.Error("failed to batch-mark deployments as superseded",
 			"deployment_ids", deploymentIDs,
 			"error", err,
@@ -139,5 +146,13 @@ func (s *Service) CancelOlderSiblings(ctx context.Context, newer Newer) error {
 		}
 	}
 
-	return nil
+	// Only report ids as superseded when the status transition actually landed.
+	// Callers retire Slack approval prompts for the returned ids; retiring a
+	// prompt for a deployment still marked awaiting_approval (because the batch
+	// update failed) would orphan it in the DB with no live prompt.
+	if !statusUpdated {
+		return nil, nil
+	}
+
+	return deploymentIDs, nil
 }

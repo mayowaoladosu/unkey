@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   APPROVAL_BLOCK_PREFIX,
   authorizeSlackApproval,
-  isTeamBound,
   parseApprovalBlockId,
   verifySignature,
 } from "./slack";
@@ -90,17 +89,6 @@ describe("parseApprovalBlockId", () => {
     expect(parseApprovalBlockId("slack_deploy_approval:dep_1")).toBeNull();
     expect(parseApprovalBlockId("slack_deploy_approval::ws_1")).toBeNull();
     expect(parseApprovalBlockId("slack_deploy_approval:dep_1:")).toBeNull();
-  });
-});
-
-describe("isTeamBound (KTD9)", () => {
-  it("allows only when the payload team matches the installation team", () => {
-    expect(isTeamBound("T_owner", "T_owner")).toBe(true);
-    expect(isTeamBound("T_attacker", "T_owner")).toBe(false);
-  });
-
-  it("rejects an empty payload team", () => {
-    expect(isTeamBound("", "T_owner")).toBe(false);
   });
 });
 

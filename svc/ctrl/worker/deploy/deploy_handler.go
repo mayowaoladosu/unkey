@@ -259,28 +259,27 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 		return nil, err
 	}
 
+	// Slack notifications fire as soon as the deployment starts — before the
+	// build — so a connected channel sees "Deploying…" the moment work begins
+	// rather than only after the image is built. The service no-ops when the
+	// project has no Slack connection; the ready/failed reports below edit this
+	// same message in place. (Unlike the GitHub commit status, which is created
+	// post-build because it is keyed by a resolved commit SHA, the Slack message
+	// only displays the SHA, so leading with what's known is fine.)
+	slackStatus := w.initSlackStatus(ctx, deployment, project, app, environment, workspace)
+
 	// --- Build ---
 	err = w.DeploymentStep(ctx, db.DeploymentStepsStepBuilding, deployment, func(stepCtx restate.ObjectContext) error {
 		return w.buildImage(stepCtx, req, &deployment)
 	})
 	if err != nil {
-		// The Slack reporter is normally created after the build step (so branch
-		// deploys have a resolved commit SHA); build failures would otherwise be
-		// the one terminal state with no notification, so create it here and
-		// report the failure. The service no-ops when the project is unconnected.
-		w.initSlackStatus(ctx, deployment, project, app, environment, workspace).
-			ReportStatus(hydrav1.SlackDeploymentState_SLACK_DEPLOYMENT_STATE_FAILED)
+		slackStatus.ReportStatus(hydrav1.SlackDeploymentState_SLACK_DEPLOYMENT_STATE_FAILED)
 		return nil, err
 	}
 
-	// Create the GitHub status reporter V0 after buildImage so that branch-only
+	// Create the GitHub status reporter after buildImage so that branch-only
 	// deploys have a resolved GitCommitSha (buildImage mutates the deployment pointer).
 	ghStatus := w.initGitHubStatus(ctx, deployment, project, app, environment, workspace)
-
-	// Slack deployment notifications. The service no-ops when the project has no
-	// Slack connection; Init posts the initial "Deploying…" message that the
-	// ready/failed reports below edit in place.
-	slackStatus := w.initSlackStatus(ctx, deployment, project, app, environment, workspace)
 
 	ghStatus.ReportStatus(&hydrav1.GitHubStatusReportRequest{
 		State:       hydrav1.GitHubDeploymentState_GITHUB_DEPLOYMENT_STATE_IN_PROGRESS,
@@ -1084,7 +1083,7 @@ func (w *Workflow) deploymentURLs(
 ) (envURL, logURL string) {
 	prefix := formatDomainPrefix(project.Slug, app.Slug)
 	envURL = fmt.Sprintf("https://%s-%s-%s.%s", prefix, environment.Slug, workspace.Slug, w.defaultDomain)
-	logURL = fmt.Sprintf("%s/%s/projects/%s/deployments/%s", w.dashboardURL, workspace.Slug, project.ID, deployment.ID)
+	logURL = fmt.Sprintf("%s/%s/projects/%s/apps/%s/deployments/%s", w.dashboardURL, workspace.Slug, project.ID, app.ID, deployment.ID)
 	return envURL, logURL
 }
 

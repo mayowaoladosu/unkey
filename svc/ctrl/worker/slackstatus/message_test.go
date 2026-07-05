@@ -109,7 +109,7 @@ func TestResolvedApprovalBlocks_RemovesButtonsAndShowsOutcome(t *testing.T) {
 		TriggeredBy:      "octocat",
 	}
 
-	approvedBlocks := resolvedApprovalBlocks("dep_789", req, true, "James <admin>")
+	approvedBlocks := resolvedApprovalBlocks("dep_789", req, true, false, "James <admin>")
 	for _, blk := range approvedBlocks {
 		require.NotEqual(t, "actions", blk.Type, "resolved prompt must not carry buttons")
 	}
@@ -118,9 +118,16 @@ func TestResolvedApprovalBlocks_RemovesButtonsAndShowsOutcome(t *testing.T) {
 	// resolvedBy is untrusted display text and must be escaped.
 	require.Contains(t, rendered, "James &lt;admin&gt;")
 
-	rejected := allText(resolvedApprovalBlocks("dep_789", req, false, ""))
+	rejected := allText(resolvedApprovalBlocks("dep_789", req, false, false, ""))
 	require.Contains(t, rejected, "rejected")
 	require.NotContains(t, rejected, "Resolved by")
+
+	// Superseded overrides approved/rejected and carries no resolver attribution,
+	// even when a resolvedBy is passed.
+	superseded := allText(resolvedApprovalBlocks("dep_789", req, true, true, "James"))
+	require.Contains(t, superseded, "superseded")
+	require.NotContains(t, superseded, "approved")
+	require.NotContains(t, superseded, "Resolved by")
 }
 
 // TestOutcomeBlocks_LinkPerState verifies the ready message links to the live

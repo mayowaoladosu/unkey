@@ -1187,8 +1187,12 @@ func (*PromoteResponse) Descriptor() ([]byte, []int) {
 }
 
 type AuthorizeDeploymentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeploymentId  string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	DeploymentId string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	// Optional display name of the actor resolving the deployment, used to
+	// attribute the decision on a retired Slack approval prompt. Empty when
+	// unknown (e.g. API-driven).
+	ResolvedBy    string `protobuf:"bytes,2,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1226,6 +1230,13 @@ func (*AuthorizeDeploymentRequest) Descriptor() ([]byte, []int) {
 func (x *AuthorizeDeploymentRequest) GetDeploymentId() string {
 	if x != nil {
 		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *AuthorizeDeploymentRequest) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
 	}
 	return ""
 }
@@ -1347,8 +1358,11 @@ func (*CancelDeploymentResponse) Descriptor() ([]byte, []int) {
 }
 
 type RejectDeploymentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeploymentId  string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	DeploymentId string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	// Optional display name of the actor resolving the deployment (see
+	// AuthorizeDeploymentRequest.resolved_by).
+	ResolvedBy    string `protobuf:"bytes,2,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1386,6 +1400,13 @@ func (*RejectDeploymentRequest) Descriptor() ([]byte, []int) {
 func (x *RejectDeploymentRequest) GetDeploymentId() string {
 	if x != nil {
 		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *RejectDeploymentRequest) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
 	}
 	return ""
 }
@@ -1685,15 +1706,19 @@ const file_ctrl_v1_deployment_proto_rawDesc = "" +
 	"\x10RollbackResponse\"B\n" +
 	"\x0ePromoteRequest\x120\n" +
 	"\x14target_deployment_id\x18\x01 \x01(\tR\x12targetDeploymentId\"\x11\n" +
-	"\x0fPromoteResponse\"A\n" +
+	"\x0fPromoteResponse\"b\n" +
 	"\x1aAuthorizeDeploymentRequest\x12#\n" +
-	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x1d\n" +
+	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\x12\x1f\n" +
+	"\vresolved_by\x18\x02 \x01(\tR\n" +
+	"resolvedBy\"\x1d\n" +
 	"\x1bAuthorizeDeploymentResponse\">\n" +
 	"\x17CancelDeploymentRequest\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x1a\n" +
-	"\x18CancelDeploymentResponse\">\n" +
+	"\x18CancelDeploymentResponse\"_\n" +
 	"\x17RejectDeploymentRequest\x12#\n" +
-	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x1a\n" +
+	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\x12\x1f\n" +
+	"\vresolved_by\x18\x02 \x01(\tR\n" +
+	"resolvedBy\"\x1a\n" +
 	"\x18RejectDeploymentResponse\"<\n" +
 	"\x15StopDeploymentRequest\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\"\x18\n" +

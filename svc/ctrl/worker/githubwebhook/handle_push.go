@@ -186,6 +186,11 @@ func (s *Service) HandlePush(ctx restate.ObjectContext, req *hydrav1.HandlePushR
 			if blockErr := s.blockDeploymentForApproval(ctx, req, project, repo, env, deploymentID); blockErr != nil {
 				return nil, blockErr
 			}
+			// A newer gated commit supersedes older siblings on the same branch,
+			// including older awaiting_approval deployments, and retires their
+			// live Slack approval prompts so a fork PR never accumulates multiple
+			// actionable prompts across pushes.
+			s.supersedeOlderSiblings(ctx, deploymentID, app.ID, env.ID, req.GetBranch())
 			continue
 		}
 
@@ -233,24 +238,49 @@ func (s *Service) HandlePush(ctx restate.ObjectContext, req *hydrav1.HandlePushR
 			"invocation_id", invocationID,
 		)
 
-		_ = restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
-			if cancelErr := s.dedup.CancelOlderSiblings(runCtx, dedup.Newer{
-				ID:            deploymentID,
-				AppID:         app.ID,
-				EnvironmentID: env.ID,
-				GitBranch:     req.GetBranch(),
-				CreatedAt:     time.Now().UnixMilli(),
-			}); cancelErr != nil {
-				logger.Error("failed to cancel superseded siblings",
-					"deployment_id", deploymentID,
-					"error", cancelErr,
-				)
-			}
-			return nil
-		}, restate.WithName("cancel superseded siblings"))
+		s.supersedeOlderSiblings(ctx, deploymentID, app.ID, env.ID, req.GetBranch())
 	}
 
 	return &hydrav1.HandlePushResponse{}, nil
+}
+
+// supersedeOlderSiblings cancels older active deployments for the same
+// (app, environment, branch) as deploymentID and retires any Slack approval
+// prompt they posted. It runs for both gated and non-gated pushes: a newer
+// commit supersedes older queued or awaiting-approval builds regardless of
+// whether the newer one is itself gated.
+//
+// Firing ResolveApproval(Superseded) for every returned id is safe:
+// SlackStatusService.ResolveApproval no-ops when a deployment never posted a
+// prompt (the common `pending` sibling), and only an `awaiting_approval`
+// sibling with a live prompt is actually retired. CancelOlderSiblings returns
+// ids only once their status transition has landed, so a prompt is never retired
+// for a deployment still marked awaiting_approval.
+func (s *Service) supersedeOlderSiblings(ctx restate.ObjectContext, deploymentID, appID, environmentID, branch string) {
+	supersededIDs, _ := restate.Run(ctx, func(runCtx restate.RunContext) ([]string, error) {
+		ids, cancelErr := s.dedup.CancelOlderSiblings(runCtx, dedup.Newer{
+			ID:            deploymentID,
+			AppID:         appID,
+			EnvironmentID: environmentID,
+			GitBranch:     branch,
+			CreatedAt:     time.Now().UnixMilli(),
+		})
+		if cancelErr != nil {
+			logger.Error("failed to cancel superseded siblings",
+				"deployment_id", deploymentID,
+				"error", cancelErr,
+			)
+		}
+		return ids, nil
+	}, restate.WithName("cancel superseded siblings"))
+
+	for _, id := range supersededIDs {
+		hydrav1.NewSlackStatusServiceClient(ctx, id).ResolveApproval().Send(&hydrav1.SlackResolveApprovalRequest{
+			Approved:   false,
+			ResolvedBy: "",
+			Superseded: true,
+		})
+	}
 }
 
 // requiresApproval determines whether a push needs manual approval.

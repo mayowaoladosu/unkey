@@ -28,10 +28,13 @@ func escapeMrkdwn(s string) string {
 const approvalBlockIDPrefix = "slack_deploy_approval"
 
 // shouldNotifyEnvironment reports whether an outcome notification should fire
-// for a deployment. Production always notifies; previews only when the project
-// opted in (KTD8, AE1).
-func shouldNotifyEnvironment(isProduction, includePreviews bool) bool {
-	return isProduction || includePreviews
+// for a deployment on a given channel, based on that channel's per-environment
+// scope (KTD8, AE1).
+func shouldNotifyEnvironment(isProduction, notifyProduction, notifyPreviews bool) bool {
+	if isProduction {
+		return notifyProduction
+	}
+	return notifyPreviews
 }
 
 // outcomeHeader returns the header line for a given deployment state.
@@ -133,7 +136,10 @@ func outcomeStatusText(state hydrav1.SlackDeploymentState) string {
 }
 
 // resolvedApprovalText is the fallback text line for a retired approval prompt.
-func resolvedApprovalText(approved bool) string {
+func resolvedApprovalText(approved, superseded bool) string {
+	if superseded {
+		return "Deployment superseded by a newer commit"
+	}
 	if approved {
 		return "Deployment approved"
 	}
@@ -142,11 +148,18 @@ func resolvedApprovalText(approved bool) string {
 
 // resolvedApprovalBlocks re-renders the approval prompt in its resolved state:
 // same structured fields, no Approve/Reject buttons, plus who resolved it when
-// known. Used by ResolveApproval to retire prompts decided outside Slack.
-func resolvedApprovalBlocks(deploymentID string, req *hydrav1.SlackPostApprovalRequest, approved bool, resolvedBy string) []slack.Block {
+// known. Used by ResolveApproval to retire prompts decided outside Slack. When
+// superseded, the deployment was retired by a newer commit rather than a
+// decision, so the outcome carries no resolver attribution.
+func resolvedApprovalBlocks(deploymentID string, req *hydrav1.SlackPostApprovalRequest, approved, superseded bool, resolvedBy string) []slack.Block {
 	header := "✅ Deployment approved"
 	status := "approved"
-	if !approved {
+	switch {
+	case superseded:
+		header = "⏭️ Deployment superseded"
+		status = "superseded"
+		resolvedBy = "" // no human resolved a superseded deployment
+	case !approved:
 		header = "🚫 Deployment rejected"
 		status = "rejected"
 	}

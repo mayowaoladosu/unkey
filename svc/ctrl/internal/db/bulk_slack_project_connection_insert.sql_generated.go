@@ -9,7 +9,7 @@ import (
 )
 
 // bulkInsertSlackProjectConnection is the base query for bulk insert
-const bulkInsertSlackProjectConnection = `INSERT INTO slack_project_connections ( id, workspace_id, project_id, installation_id, channel_id, channel_name, include_previews, approval_policy, created_at, updated_at ) VALUES %s`
+const bulkInsertSlackProjectConnection = `INSERT INTO slack_project_connections ( id, workspace_id, project_id, installation_id, channel_id, channel_name, notify_production, notify_previews, created_at, updated_at ) VALUES %s`
 
 // InsertSlackProjectConnections performs bulk insert in a single query
 
@@ -36,8 +36,8 @@ func (q *BulkQueries) InsertSlackProjectConnections(ctx context.Context, args []
 		allArgs = append(allArgs, arg.InstallationID)
 		allArgs = append(allArgs, arg.ChannelID)
 		allArgs = append(allArgs, arg.ChannelName)
-		allArgs = append(allArgs, arg.IncludePreviews)
-		allArgs = append(allArgs, arg.ApprovalPolicy)
+		allArgs = append(allArgs, arg.NotifyProduction)
+		allArgs = append(allArgs, arg.NotifyPreviews)
 		allArgs = append(allArgs, arg.CreatedAt)
 		allArgs = append(allArgs, arg.UpdatedAt)
 	}

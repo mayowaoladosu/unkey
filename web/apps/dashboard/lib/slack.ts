@@ -6,6 +6,9 @@ import crypto from "node:crypto";
 // style rather than pulling in the slack-go / @slack/web-api SDKs.
 
 const SLACK_API = "https://slack.com/api";
+// Bound every Slack Web API call so a hung connection can't tie up a request
+// indefinitely (mirrors the 10s timeout on the Go WebClient).
+const SLACK_TIMEOUT_MS = 10_000;
 // Reject interaction requests whose signed timestamp is older than this, to
 // bound replay of a captured payload.
 const SIGNATURE_MAX_AGE_SECONDS = 5 * 60;
@@ -24,6 +27,7 @@ async function slackGet<T>(
   }
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${botToken}` },
+    signal: AbortSignal.timeout(SLACK_TIMEOUT_MS),
   });
   return parseSlack<T>(method, res);
 }
@@ -36,6 +40,7 @@ async function slackPostForm<T>(
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString(),
+    signal: AbortSignal.timeout(SLACK_TIMEOUT_MS),
   });
   return parseSlack<T>(method, res);
 }
@@ -52,6 +57,7 @@ async function slackPostJSON<T>(
       Authorization: `Bearer ${botToken}`,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(SLACK_TIMEOUT_MS),
   });
   return parseSlack<T>(method, res);
 }
@@ -176,13 +182,6 @@ export function parseApprovalBlockId(blockId: string): ApprovalRef | null {
     return null;
   }
   return { deploymentId: parts[1], workspaceId: parts[2] };
-}
-
-// isTeamBound enforces KTD9: a signed interaction may act only if its Slack team
-// matches the installation bound to the deployment's workspace. A valid
-// signature alone only proves the request came from some install of the app.
-export function isTeamBound(payloadTeamId: string, installationTeamId: string): boolean {
-  return payloadTeamId !== "" && payloadTeamId === installationTeamId;
 }
 
 export type ApprovalPolicy = "anyone" | "admins_only";

@@ -464,9 +464,14 @@ func (*SlackPostApprovalResponse) Descriptor() ([]byte, []int) {
 // approval prompt. resolved_by is a display name when known (may be empty for
 // API-driven decisions).
 type SlackResolveApprovalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Approved      bool                   `protobuf:"varint,1,opt,name=approved,proto3" json:"approved,omitempty"`
-	ResolvedBy    string                 `protobuf:"bytes,2,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Approved   bool                   `protobuf:"varint,1,opt,name=approved,proto3" json:"approved,omitempty"`
+	ResolvedBy string                 `protobuf:"bytes,2,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	// When true the deployment was neither approved nor rejected but superseded
+	// by a newer commit before anyone acted. The prompt is retired with a
+	// distinct "superseded" outcome (and no resolver attribution); `approved` is
+	// ignored in this case.
+	Superseded    bool `protobuf:"varint,3,opt,name=superseded,proto3" json:"superseded,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -513,6 +518,13 @@ func (x *SlackResolveApprovalRequest) GetResolvedBy() string {
 		return x.ResolvedBy
 	}
 	return ""
+}
+
+func (x *SlackResolveApprovalRequest) GetSuperseded() bool {
+	if x != nil {
+		return x.Superseded
+	}
+	return false
 }
 
 type SlackResolveApprovalResponse struct {
@@ -587,11 +599,14 @@ const file_hydra_v1_slack_status_proto_rawDesc = "" +
 	"\x0ecommit_message\x18\a \x01(\tR\rcommitMessage\x12\x18\n" +
 	"\atrigger\x18\b \x01(\tR\atrigger\x12!\n" +
 	"\ftriggered_by\x18\t \x01(\tR\vtriggeredBy\"\x1b\n" +
-	"\x19SlackPostApprovalResponse\"Z\n" +
+	"\x19SlackPostApprovalResponse\"z\n" +
 	"\x1bSlackResolveApprovalRequest\x12\x1a\n" +
 	"\bapproved\x18\x01 \x01(\bR\bapproved\x12\x1f\n" +
 	"\vresolved_by\x18\x02 \x01(\tR\n" +
-	"resolvedBy\"\x1e\n" +
+	"resolvedBy\x12\x1e\n" +
+	"\n" +
+	"superseded\x18\x03 \x01(\bR\n" +
+	"superseded\"\x1e\n" +
 	"\x1cSlackResolveApprovalResponse*\xab\x01\n" +
 	"\x14SlackDeploymentState\x12&\n" +
 	"\"SLACK_DEPLOYMENT_STATE_UNSPECIFIED\x10\x00\x12&\n" +

@@ -190,6 +190,10 @@ message PromoteResponse {}
 
 message AuthorizeDeploymentRequest {
   string deployment_id = 1;
+  // Optional display name of the actor resolving the deployment, used to
+  // attribute the decision on a retired Slack approval prompt. Empty when
+  // unknown (e.g. API-driven).
+  string resolved_by = 2;
 }
 
 message AuthorizeDeploymentResponse {}
@@ -202,6 +206,9 @@ message CancelDeploymentResponse {}
 
 message RejectDeploymentRequest {
   string deployment_id = 1;
+  // Optional display name of the actor resolving the deployment (see
+  // AuthorizeDeploymentRequest.resolved_by).
+  string resolved_by = 2;
 }
 
 message RejectDeploymentResponse {}

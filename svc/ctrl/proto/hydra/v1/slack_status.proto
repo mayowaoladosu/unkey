@@ -98,6 +98,11 @@ message SlackPostApprovalResponse {}
 message SlackResolveApprovalRequest {
   bool approved = 1;
   string resolved_by = 2;
+  // When true the deployment was neither approved nor rejected but superseded
+  // by a newer commit before anyone acted. The prompt is retired with a
+  // distinct "superseded" outcome (and no resolver attribution); `approved` is
+  // ignored in this case.
+  bool superseded = 3;
 }
 
 message SlackResolveApprovalResponse {}

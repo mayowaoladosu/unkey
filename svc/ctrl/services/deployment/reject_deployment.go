@@ -83,7 +83,7 @@ func (s *Service) RejectDeployment(ctx context.Context, req *connect.Request[ctr
 	// Retire the Slack approval prompt (if one was posted) so its
 	// Approve/Reject buttons don't outlive the decision. Best-effort: the
 	// SlackStatusService no-ops when no prompt exists.
-	s.resolveSlackApproval(ctx, deploymentID, false)
+	s.resolveSlackApproval(ctx, deploymentID, false, req.Msg.GetResolvedBy())
 
 	logger.Info("deployment rejected",
 		"deployment_id", deploymentID,

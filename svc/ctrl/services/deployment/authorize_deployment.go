@@ -174,7 +174,7 @@ func (s *Service) AuthorizeDeployment(ctx context.Context, req *connect.Request[
 	// Retire the Slack approval prompt (if one was posted) so its
 	// Approve/Reject buttons don't outlive the decision. Best-effort: the
 	// SlackStatusService no-ops when no prompt exists.
-	s.resolveSlackApproval(ctx, deploymentID, true)
+	s.resolveSlackApproval(ctx, deploymentID, true, req.Msg.GetResolvedBy())
 
 	logger.Info("deployment authorized and workflow triggered",
 		"deployment_id", deploymentID,

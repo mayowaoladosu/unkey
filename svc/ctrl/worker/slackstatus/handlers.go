@@ -13,21 +13,38 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/internal/slack"
 )
 
-// resolveResult is the outcome of a connection lookup. EncryptedBotToken is
-// ciphertext, safe to journal in Restate; it is decrypted only inside the
-// message-send step so plaintext is never persisted.
-type resolveResult struct {
-	Connected         bool   `json:"connected"`
+// resolvedTarget is one channel a project fans notifications out to, with its
+// per-channel environment scope. EncryptedBotToken is ciphertext, safe to
+// journal in Restate; it is decrypted only inside the message-send step so
+// plaintext is never persisted.
+type resolvedTarget struct {
 	ChannelID         string `json:"channel_id"`
 	EncryptedBotToken string `json:"encrypted_bot_token"`
-	IncludePreviews   bool   `json:"include_previews"`
+	NotifyProduction  bool   `json:"notify_production"`
+	NotifyPreviews    bool   `json:"notify_previews"`
 }
 
-// resolve looks up the project's Slack connection and installation. A missing
-// connection or installation returns a not-connected zero value rather than an
-// error, so Restate does not retry forever on a permanently-absent connection.
+// resolveResult is the outcome of a connection lookup.
+type resolveResult struct {
+	Connected bool             `json:"connected"`
+	Targets   []resolvedTarget `json:"targets"`
+}
+
+// postedMessage identifies one message this object posted so a later state
+// change can edit it in place. The ciphertext token rides along so edits still
+// work if the channel is disconnected between post and edit.
+type postedMessage struct {
+	Channel           string `json:"channel"`
+	TS                string `json:"ts"`
+	EncryptedBotToken string `json:"encrypted_bot_token"`
+}
+
+// resolve looks up the project's Slack connections and their installations.
+// A project with no connections (or with rows whose installation is gone)
+// returns a not-connected zero value rather than an error, so Restate does not
+// retry forever on a permanently-absent connection.
 func (s *Service) resolve(ctx context.Context, projectID string) (resolveResult, error) {
-	conn, err := s.db.FindSlackProjectConnectionByProjectId(ctx, projectID)
+	conns, err := s.db.ListSlackProjectConnectionsByProjectId(ctx, projectID)
 	if err != nil {
 		if db.IsNotFound(err) {
 			return resolveResult{}, nil //nolint:exhaustruct
@@ -35,20 +52,36 @@ func (s *Service) resolve(ctx context.Context, projectID string) (resolveResult,
 		return resolveResult{}, err //nolint:exhaustruct
 	}
 
-	inst, err := s.db.FindSlackInstallationById(ctx, conn.InstallationID)
-	if err != nil {
-		if db.IsNotFound(err) {
-			return resolveResult{}, nil //nolint:exhaustruct
+	// Installations are per (workspace, team); all of a project's rows usually
+	// share one, so cache lookups by id.
+	tokens := map[string]string{}
+	targets := make([]resolvedTarget, 0, len(conns))
+	for _, conn := range conns {
+		token, ok := tokens[conn.InstallationID]
+		if !ok {
+			inst, instErr := s.db.FindSlackInstallationById(ctx, conn.InstallationID)
+			if instErr != nil {
+				if db.IsNotFound(instErr) {
+					// Dangling row (installation revoked); skip this channel.
+					continue
+				}
+				return resolveResult{}, instErr //nolint:exhaustruct
+			}
+			token = inst.BotToken
+			tokens[conn.InstallationID] = token
 		}
-		return resolveResult{}, err //nolint:exhaustruct
+		targets = append(targets, resolvedTarget{
+			ChannelID:         conn.ChannelID,
+			EncryptedBotToken: token,
+			NotifyProduction:  conn.NotifyProduction,
+			NotifyPreviews:    conn.NotifyPreviews,
+		})
 	}
 
-	return resolveResult{
-		Connected:         true,
-		ChannelID:         conn.ChannelID,
-		EncryptedBotToken: inst.BotToken,
-		IncludePreviews:   conn.IncludePreviews,
-	}, nil
+	if len(targets) == 0 {
+		return resolveResult{}, nil //nolint:exhaustruct
+	}
+	return resolveResult{Connected: true, Targets: targets}, nil
 }
 
 // decrypt turns the vault-encrypted bot token into plaintext, keyed by
@@ -56,10 +89,12 @@ func (s *Service) resolve(ctx context.Context, projectID string) (resolveResult,
 func (s *Service) decrypt(ctx context.Context, workspaceID, encrypted string) (string, error) {
 	// The worker can run without vault configured (cfg.Vault.URL empty leaves a
 	// nil client, see run.go). A nil-interface call would panic and churn through
-	// Restate's retry budget; fail with a terminal error so the handlers hit
-	// their existing log-and-return paths instead.
+	// Restate's retry budget; fail with a TerminalError so the enclosing
+	// restate.Run gives up immediately (a plain error would retry for the full
+	// 30s WithMaxRetryDuration per channel) and the handler hits its
+	// log-and-continue path.
 	if s.vault == nil {
-		return "", fmt.Errorf("vault is not configured; cannot decrypt slack bot token")
+		return "", restate.TerminalError(fmt.Errorf("vault is not configured; cannot decrypt slack bot token"), 500)
 	}
 	resp, err := s.vault.Decrypt(ctx, &vaultv1.DecryptRequest{
 		Keyring:   workspaceID,
@@ -71,9 +106,81 @@ func (s *Service) decrypt(ctx context.Context, workspaceID, encrypted string) (s
 	return resp.GetPlaintext(), nil
 }
 
-// Init posts the initial outcome message and stores the channel/ts so a later
-// ReportStatus can edit it. No-ops when the project has no Slack connection or
-// the environment is out of scope.
+// deploymentAwaitingApproval reports whether the deployment is still in the
+// awaiting_approval state. PostApproval uses it to avoid posting a live prompt
+// for a deployment that was already resolved (e.g. via the dashboard) before
+// the fire-and-forget PostApproval send arrived. A missing deployment counts as
+// not-awaiting so no prompt is posted.
+func (s *Service) deploymentAwaitingApproval(ctx context.Context, deploymentID string) (bool, error) {
+	deployment, err := s.db.FindDeploymentById(ctx, deploymentID)
+	if err != nil {
+		if db.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return deployment.Status == db.DeploymentsStatusAwaitingApproval, nil
+}
+
+// postToTargets posts the same message to every target, one journaled step per
+// channel so a failure on one channel never blocks the others. Returns the
+// successfully posted messages.
+func (s *Service) postToTargets(ctx restate.ObjectContext, workspaceID, text string, blocks []slack.Block, targets []resolvedTarget, stepPrefix, deploymentID string) []postedMessage {
+	posted := make([]postedMessage, 0, len(targets))
+	for _, target := range targets {
+		msg := slack.Message{
+			Channel: target.ChannelID,
+			Text:    text,
+			Blocks:  blocks,
+			TS:      "",
+		}
+		token := target.EncryptedBotToken
+		post, err := restate.Run(ctx, func(rc restate.RunContext) (slack.PostResult, error) {
+			plaintext, decErr := s.decrypt(rc, workspaceID, token)
+			if decErr != nil {
+				return slack.PostResult{}, decErr //nolint:exhaustruct
+			}
+			return s.slack.PostMessage(rc, plaintext, msg)
+		}, restate.WithName(fmt.Sprintf("%s %s", stepPrefix, target.ChannelID)), restate.WithMaxRetryDuration(30*time.Second))
+		if err != nil {
+			logger.Error("failed to post slack message", "deployment_id", deploymentID, "channel", target.ChannelID, "error", err)
+			continue
+		}
+		posted = append(posted, postedMessage{
+			Channel:           post.Channel,
+			TS:                post.TS,
+			EncryptedBotToken: token,
+		})
+	}
+	return posted
+}
+
+// updateMessages edits every previously posted message, one journaled step per
+// channel; errors are logged, never propagated.
+func (s *Service) updateMessages(ctx restate.ObjectContext, workspaceID, text string, blocks []slack.Block, messages []postedMessage, stepPrefix, deploymentID string) {
+	for _, m := range messages {
+		msg := slack.Message{
+			Channel: m.Channel,
+			Text:    text,
+			Blocks:  blocks,
+			TS:      m.TS,
+		}
+		token := m.EncryptedBotToken
+		if err := restate.RunVoid(ctx, func(rc restate.RunContext) error {
+			plaintext, decErr := s.decrypt(rc, workspaceID, token)
+			if decErr != nil {
+				return decErr
+			}
+			return s.slack.UpdateMessage(rc, plaintext, msg)
+		}, restate.WithName(fmt.Sprintf("%s %s", stepPrefix, m.Channel)), restate.WithMaxRetryDuration(30*time.Second)); err != nil {
+			logger.Error("failed to update slack message", "deployment_id", deploymentID, "channel", m.Channel, "error", err)
+		}
+	}
+}
+
+// Init posts the initial outcome message to every in-scope channel and stores
+// their identities so a later ReportStatus can edit them. No-ops when the
+// project has no Slack connection or no channel covers the environment.
 func (s *Service) Init(ctx restate.ObjectContext, req *hydrav1.SlackStatusInitRequest) (*hydrav1.SlackStatusInitResponse, error) {
 	deploymentID := restate.Key(ctx)
 
@@ -87,39 +194,30 @@ func (s *Service) Init(ctx restate.ObjectContext, req *hydrav1.SlackStatusInitRe
 	if !resolved.Connected {
 		return &hydrav1.SlackStatusInitResponse{}, nil
 	}
-	// Environment scoping: skip previews unless the project opted in.
-	if !shouldNotifyEnvironment(req.GetIsProduction(), resolved.IncludePreviews) {
+
+	// Per-channel environment scoping.
+	inScope := make([]resolvedTarget, 0, len(resolved.Targets))
+	for _, target := range resolved.Targets {
+		if shouldNotifyEnvironment(req.GetIsProduction(), target.NotifyProduction, target.NotifyPreviews) {
+			inScope = append(inScope, target)
+		}
+	}
+	if len(inScope) == 0 {
 		return &hydrav1.SlackStatusInitResponse{}, nil
 	}
 
 	restate.Set(ctx, stateConfig, req)
 
-	msg := slack.Message{
-		Channel: resolved.ChannelID,
-		Text:    outcomeHeader(hydrav1.SlackDeploymentState_SLACK_DEPLOYMENT_STATE_IN_PROGRESS),
-		Blocks:  outcomeBlocks(deploymentID, req, hydrav1.SlackDeploymentState_SLACK_DEPLOYMENT_STATE_IN_PROGRESS),
-		TS:      "",
+	state := hydrav1.SlackDeploymentState_SLACK_DEPLOYMENT_STATE_IN_PROGRESS
+	posted := s.postToTargets(ctx, req.GetWorkspaceId(), outcomeHeader(state), outcomeBlocks(deploymentID, req, state), inScope, "post slack message", deploymentID)
+	if len(posted) > 0 {
+		restate.Set(ctx, stateMessages, posted)
 	}
-
-	post, err := restate.Run(ctx, func(rc restate.RunContext) (slack.PostResult, error) {
-		token, decErr := s.decrypt(rc, req.GetWorkspaceId(), resolved.EncryptedBotToken)
-		if decErr != nil {
-			return slack.PostResult{}, decErr //nolint:exhaustruct
-		}
-		return s.slack.PostMessage(rc, token, msg)
-	}, restate.WithName("post slack message"), restate.WithMaxRetryDuration(30*time.Second))
-	if err != nil {
-		logger.Error("failed to post slack message", "deployment_id", deploymentID, "error", err)
-		return &hydrav1.SlackStatusInitResponse{}, nil
-	}
-
-	restate.Set(ctx, stateChannel, post.Channel)
-	restate.Set(ctx, stateTS, post.TS)
 
 	return &hydrav1.SlackStatusInitResponse{}, nil
 }
 
-// ReportStatus edits the message posted by Init to reflect a new state.
+// ReportStatus edits the messages posted by Init to reflect a new state.
 // Fire-and-forget — errors are logged, never propagated.
 func (s *Service) ReportStatus(ctx restate.ObjectContext, req *hydrav1.SlackStatusReportRequest) (*hydrav1.SlackStatusReportResponse, error) {
 	deploymentID := restate.Key(ctx)
@@ -128,43 +226,20 @@ func (s *Service) ReportStatus(ctx restate.ObjectContext, req *hydrav1.SlackStat
 	if err != nil || config == nil {
 		return &hydrav1.SlackStatusReportResponse{}, nil
 	}
-	channel, _ := restate.Get[string](ctx, stateChannel)
-	ts, _ := restate.Get[string](ctx, stateTS)
-	if channel == "" || ts == "" {
+	messages, _ := restate.Get[[]postedMessage](ctx, stateMessages)
+	if len(messages) == 0 {
 		return &hydrav1.SlackStatusReportResponse{}, nil
 	}
 
-	resolved, err := restate.Run(ctx, func(rc restate.RunContext) (resolveResult, error) {
-		return s.resolve(rc, config.GetProjectId())
-	}, restate.WithName("resolve slack connection"), restate.WithMaxRetryDuration(30*time.Second))
-	if err != nil || !resolved.Connected {
-		return &hydrav1.SlackStatusReportResponse{}, nil
-	}
-
-	msg := slack.Message{
-		Channel: channel,
-		Text:    outcomeHeader(req.GetState()),
-		Blocks:  outcomeBlocks(deploymentID, config, req.GetState()),
-		TS:      ts,
-	}
-
-	if updateErr := restate.RunVoid(ctx, func(rc restate.RunContext) error {
-		token, decErr := s.decrypt(rc, config.GetWorkspaceId(), resolved.EncryptedBotToken)
-		if decErr != nil {
-			return decErr
-		}
-		return s.slack.UpdateMessage(rc, token, msg)
-	}, restate.WithName("update slack message"), restate.WithMaxRetryDuration(30*time.Second)); updateErr != nil {
-		logger.Error("failed to update slack message", "deployment_id", deploymentID, "error", updateErr)
-	}
+	s.updateMessages(ctx, config.GetWorkspaceId(), outcomeHeader(req.GetState()), outcomeBlocks(deploymentID, config, req.GetState()), messages, "update slack message", deploymentID)
 
 	return &hydrav1.SlackStatusReportResponse{}, nil
 }
 
-// PostApproval posts the interactive approval prompt for a gated deployment.
-// Approval prompts are not subject to environment scoping: gated deployments are
-// external-contributor previews, so scoping them out would make the default
-// config never post an actionable prompt.
+// PostApproval posts the interactive approval prompt to every connected channel
+// for a gated deployment. Approval prompts are not subject to environment
+// scoping: gated deployments are external-contributor previews, so scoping them
+// out would make the default config never post an actionable prompt.
 func (s *Service) PostApproval(ctx restate.ObjectContext, req *hydrav1.SlackPostApprovalRequest) (*hydrav1.SlackPostApprovalResponse, error) {
 	deploymentID := restate.Key(ctx)
 
@@ -173,14 +248,7 @@ func (s *Service) PostApproval(ctx restate.ObjectContext, req *hydrav1.SlackPost
 	// dashboard). Re-check status so a late prompt with live buttons is never
 	// posted for an already-resolved deployment.
 	stillPending, err := restate.Run(ctx, func(rc restate.RunContext) (bool, error) {
-		deployment, findErr := s.db.FindDeploymentById(rc, deploymentID)
-		if findErr != nil {
-			if db.IsNotFound(findErr) {
-				return false, nil
-			}
-			return false, findErr
-		}
-		return deployment.Status == db.DeploymentsStatusAwaitingApproval, nil
+		return s.deploymentAwaitingApproval(rc, deploymentID)
 	}, restate.WithName("check deployment still awaiting approval"), restate.WithMaxRetryDuration(30*time.Second))
 	if err != nil {
 		logger.Warn("failed to check deployment status, skipping approval prompt", "deployment_id", deploymentID, "error", err)
@@ -201,37 +269,20 @@ func (s *Service) PostApproval(ctx restate.ObjectContext, req *hydrav1.SlackPost
 		return &hydrav1.SlackPostApprovalResponse{}, nil
 	}
 
-	msg := slack.Message{
-		Channel: resolved.ChannelID,
-		Text:    "Deployment awaiting approval",
-		Blocks:  approvalBlocks(deploymentID, req),
-		TS:      "",
+	posted := s.postToTargets(ctx, req.GetWorkspaceId(), "Deployment awaiting approval", approvalBlocks(deploymentID, req), resolved.Targets, "post slack approval prompt", deploymentID)
+	if len(posted) > 0 {
+		// Dedicated keys: the outcome messages (Init/ReportStatus) share this
+		// virtual object and must not have their identities clobbered.
+		restate.Set(ctx, stateApprovalMessages, posted)
+		restate.Set(ctx, stateApprovalConfig, req)
 	}
-
-	post, err := restate.Run(ctx, func(rc restate.RunContext) (slack.PostResult, error) {
-		token, decErr := s.decrypt(rc, req.GetWorkspaceId(), resolved.EncryptedBotToken)
-		if decErr != nil {
-			return slack.PostResult{}, decErr //nolint:exhaustruct
-		}
-		return s.slack.PostMessage(rc, token, msg)
-	}, restate.WithName("post slack approval prompt"), restate.WithMaxRetryDuration(30*time.Second))
-	if err != nil {
-		logger.Error("failed to post slack approval prompt", "deployment_id", deploymentID, "error", err)
-		return &hydrav1.SlackPostApprovalResponse{}, nil
-	}
-
-	// Dedicated keys: the outcome message (Init/ReportStatus) shares this
-	// virtual object and must not have its channel/ts clobbered, and vice versa.
-	restate.Set(ctx, stateApprovalChannel, post.Channel)
-	restate.Set(ctx, stateApprovalTS, post.TS)
-	restate.Set(ctx, stateApprovalConfig, req)
 
 	return &hydrav1.SlackPostApprovalResponse{}, nil
 }
 
-// ResolveApproval edits the approval prompt to its resolved state, removing the
-// Approve/Reject buttons. Fired fire-and-forget by AuthorizeDeployment and
-// RejectDeployment so decisions made outside Slack retire the prompt. No-ops
+// ResolveApproval edits the approval prompts to their resolved state, removing
+// the Approve/Reject buttons. Fired fire-and-forget by AuthorizeDeployment and
+// RejectDeployment so decisions made outside Slack retire the prompts. No-ops
 // when no prompt was posted (unconnected project, or the prompt send failed).
 func (s *Service) ResolveApproval(ctx restate.ObjectContext, req *hydrav1.SlackResolveApprovalRequest) (*hydrav1.SlackResolveApprovalResponse, error) {
 	deploymentID := restate.Key(ctx)
@@ -240,35 +291,20 @@ func (s *Service) ResolveApproval(ctx restate.ObjectContext, req *hydrav1.SlackR
 	if err != nil || config == nil {
 		return &hydrav1.SlackResolveApprovalResponse{}, nil
 	}
-	channel, _ := restate.Get[string](ctx, stateApprovalChannel)
-	ts, _ := restate.Get[string](ctx, stateApprovalTS)
-	if channel == "" || ts == "" {
+	messages, _ := restate.Get[[]postedMessage](ctx, stateApprovalMessages)
+	if len(messages) == 0 {
 		return &hydrav1.SlackResolveApprovalResponse{}, nil
 	}
 
-	resolved, err := restate.Run(ctx, func(rc restate.RunContext) (resolveResult, error) {
-		return s.resolve(rc, config.GetProjectId())
-	}, restate.WithName("resolve slack connection"), restate.WithMaxRetryDuration(30*time.Second))
-	if err != nil || !resolved.Connected {
-		return &hydrav1.SlackResolveApprovalResponse{}, nil
-	}
-
-	msg := slack.Message{
-		Channel: channel,
-		Text:    resolvedApprovalText(req.GetApproved()),
-		Blocks:  resolvedApprovalBlocks(deploymentID, config, req.GetApproved(), req.GetResolvedBy()),
-		TS:      ts,
-	}
-
-	if updateErr := restate.RunVoid(ctx, func(rc restate.RunContext) error {
-		token, decErr := s.decrypt(rc, config.GetWorkspaceId(), resolved.EncryptedBotToken)
-		if decErr != nil {
-			return decErr
-		}
-		return s.slack.UpdateMessage(rc, token, msg)
-	}, restate.WithName("retire slack approval prompt"), restate.WithMaxRetryDuration(30*time.Second)); updateErr != nil {
-		logger.Error("failed to retire slack approval prompt", "deployment_id", deploymentID, "error", updateErr)
-	}
+	s.updateMessages(
+		ctx,
+		config.GetWorkspaceId(),
+		resolvedApprovalText(req.GetApproved(), req.GetSuperseded()),
+		resolvedApprovalBlocks(deploymentID, config, req.GetApproved(), req.GetSuperseded(), req.GetResolvedBy()),
+		messages,
+		"retire slack approval prompt",
+		deploymentID,
+	)
 
 	return &hydrav1.SlackResolveApprovalResponse{}, nil
 }
