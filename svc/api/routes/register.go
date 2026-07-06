@@ -103,6 +103,12 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 		QuotaCache: svc.Caches.WorkspaceQuota,
 		Ratelimit:  svc.Ratelimit,
 	})
+	withPortalAuthentication := middleware.WithAuthentication(middleware.AuthenticationConfig{
+		Auth:       svc.PortalAuth,
+		Database:   svc.Database,
+		QuotaCache: svc.Caches.WorkspaceQuota,
+		Ratelimit:  svc.Ratelimit,
+	})
 
 	publicMiddlewares := []zen.Middleware{
 		withPanicRecovery,
@@ -123,6 +129,19 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 		withTimeout,
 		withValidation,
 		withAuthentication,
+	}
+
+	// Portal routes authenticate only portal-session cookies. They share the
+	// protected stack but swap in the portal-only authenticator.
+	portalMiddlewares := []zen.Middleware{
+		withPanicRecovery,
+		withObservability,
+		withMetrics,
+		withLogging,
+		withErrorHandling,
+		withTimeout,
+		withValidation,
+		withPortalAuthentication,
 	}
 
 	srv.RegisterRoute(publicMiddlewares, &v2Liveness.Handler{})
