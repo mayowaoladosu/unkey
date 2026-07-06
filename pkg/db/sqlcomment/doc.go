@@ -8,5 +8,6 @@
 //
 // Dynamic tags (route, source) travel on [context.Context] via [WithDynamic].
 // Static tags (application, service, region, release_sha) are set once per
-// process when opening database connections.
+// process when opening database connections. release_sha is link-time metadata
+// from [github.com/unkeyed/unkey/pkg/buildinfo.Revision].
 package sqlcomment

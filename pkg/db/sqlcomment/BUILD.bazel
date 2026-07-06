@@ -6,7 +6,6 @@ go_library(
         "annotate.go",
         "context.go",
         "doc.go",
-        "env.go",
         "static.go",
     ],
     importpath = "github.com/unkeyed/unkey/pkg/db/sqlcomment",

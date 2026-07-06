@@ -5,7 +5,6 @@ import { annotateSql, staticTagsFromEnv } from "./sqlcomment";
 const dashboardTags = {
   application: "unkey",
   service: "dashboard",
-  environment: "staging",
   region: "us-east-1",
   releaseSha: "a1b2c3d",
 };
@@ -29,7 +28,6 @@ describe("sqlcomment", () => {
 
     expect(got).toContain(drizzleSelectKeys);
     expect(got).toContain("service='dashboard'");
-    expect(got).toContain("environment='staging'");
     expect(got).toContain("release_sha='a1b2c3d'");
     expect(got).not.toContain("mode=");
   });

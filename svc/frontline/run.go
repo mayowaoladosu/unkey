@@ -189,7 +189,7 @@ func Run(ctx context.Context, cfg Config) error {
 	// replica. When the operator omits a dedicated replica DSN we fall back
 	// to the primary; pkgdb does the same internally so both pools end up
 	// targeting the same endpoint.
-	dbTags := sqlcomment.ForService("frontline", cfg.Region, sqlcomment.EnvironmentFromEnv())
+	dbTags := sqlcomment.ForService("frontline", cfg.Region)
 
 	readDSN := cfg.Database.ReadonlyReplica
 	if readDSN == "" {

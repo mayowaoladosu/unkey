@@ -12,7 +12,6 @@ const applicationName = "unkey"
 type Static struct {
 	Application string
 	Service     string
-	Environment string
 	Region      string
 	ReleaseSHA  string
 
@@ -30,12 +29,14 @@ func (s Static) staticPrefix() string {
 }
 
 // ForService builds the standard static tag set for a Unkey service process.
-// environment may be empty; it is omitted from the comment when unset.
-func ForService(service, region, environment string) Static {
+// ReleaseSHA comes from [buildinfo.Revision], which Bazel and goreleaser inject
+// at link time. We do not tag a deployment environment name: infra does not set
+// one on platform pods (cluster labels like production001/canary stay outside
+// the process).
+func ForService(service, region string) Static {
 	s := Static{
 		Application: applicationName,
 		Service:     service,
-		Environment: environment,
 		Region:      region,
 		ReleaseSHA:  shortRevision(buildinfo.Revision),
 		prefix:      "",
@@ -49,7 +50,6 @@ func buildStaticPrefix(s Static) string {
 	b.Grow(128)
 	appendTag(&b, "application", s.Application)
 	appendTag(&b, "service", s.Service)
-	appendTag(&b, "environment", s.Environment)
 	appendTag(&b, "region", s.Region)
 	appendTag(&b, "release_sha", s.ReleaseSHA)
 	return b.String()

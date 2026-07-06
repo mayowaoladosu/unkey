@@ -1,7 +1,6 @@
 export type SqlCommentStaticTags = {
   application: string;
   service: string;
-  environment?: string;
   region?: string;
   releaseSha?: string;
 };
@@ -25,7 +24,6 @@ function formatComment(
   const entries: Array<[string, string | undefined]> = [
     ["application", staticTags.application],
     ["service", staticTags.service],
-    ["environment", staticTags.environment],
     ["region", staticTags.region],
     ["release_sha", staticTags.releaseSha],
     ["route", dynamicTags.route],
@@ -67,7 +65,6 @@ export function staticTagsFromEnv(service: string): SqlCommentStaticTags {
   return {
     application: "unkey",
     service,
-    environment: process.env.UNKEY_ENVIRONMENT,
     region: process.env.UNKEY_REGION ?? process.env.REGION,
     releaseSha,
   };

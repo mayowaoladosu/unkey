@@ -108,7 +108,7 @@ func Run(ctx context.Context, cfg Config) error {
 	buildinfo.RegisterBuildInfoMetrics("ctrl")
 
 	// Initialize database
-	database, err := db.New(cfg.Database, sqlcomment.ForService("ctrl-api", cfg.Region, sqlcomment.EnvironmentFromEnv()))
+	database, err := db.New(cfg.Database, sqlcomment.ForService("ctrl-api", cfg.Region))
 	if err != nil {
 		return fmt.Errorf("unable to create db: %w", err)
 	}

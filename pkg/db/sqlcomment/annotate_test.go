@@ -11,7 +11,7 @@ import (
 func TestAnnotate_sqlcOperation(t *testing.T) {
 	t.Parallel()
 
-	static := ForService("frontline", "eu-central-1", "production")
+	static := ForService("frontline", "eu-central-1")
 	query := `-- name: FindKeyForVerification :one
 select id from keys where hash = ?`
 
@@ -27,7 +27,7 @@ select id from keys where hash = ?`
 func TestAnnotate_dynamicTags(t *testing.T) {
 	t.Parallel()
 
-	static := ForService("api", "us-east-1", "")
+	static := ForService("api", "us-east-1")
 	got := Annotate("select 1", static, "rw", Dynamic{
 		Route:  "trpc.keys.create",
 		Source: "app",
@@ -47,7 +47,7 @@ func TestAnnotate_disabledWithoutService(t *testing.T) {
 func TestAnnotate_escapesQuotes(t *testing.T) {
 	t.Parallel()
 
-	static := ForService("api", "us-east-1", "")
+	static := ForService("api", "us-east-1")
 	got := Annotate("select 1", static, "rw", Dynamic{Route: "a'b"})
 	require.Contains(t, got, `route='a\'b'`)
 }
@@ -63,7 +63,7 @@ func TestWithDynamic_roundTrip(t *testing.T) {
 func TestAnnotate_preservesMultilineSQL(t *testing.T) {
 	t.Parallel()
 
-	static := ForService("ctrl-worker", "us-east-1", "staging")
+	static := ForService("ctrl-worker", "us-east-1")
 	query := `-- name: GlobalCountersImported :many
 select workspace_id
 from ratelimit_global_counters
