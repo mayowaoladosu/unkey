@@ -1,0 +1,117 @@
+---
+title: "PlanetScale query tags"
+description: "SQLCommenter metadata for attributing MySQL load in PlanetScale Query Insights"
+---
+
+Unkey annotates every MySQL statement with [SQLCommenter](https://google.github.io/sqlcommenter/)-compatible metadata before it reaches PlanetScale. Tags show up in Query Insights so we can attribute query time to services, deploys, sqlc operations, and (for dashboard) tRPC routes.
+
+## Why
+
+PlanetScale Query Insights groups queries by fingerprint. Without tags, hot paths like `FindKeyForVerification` appear as anonymous load. Tags let us answer:
+
+- Which service issued this query?
+- Which deploy introduced the regression?
+- Which sqlc operation or tRPC route drove the spike?
+
+Keep tag cardinality low. Insights indexes tag keys; high-cardinality values (user ids, key ids) must never appear in comments.
+
+## Tag schema
+
+| Key | Source | Example |
+| --- | --- | --- |
+| `application` | constant | `unkey` |
+| `service` | process name | `api`, `frontline`, `dashboard` |
+| `environment` | `UNKEY_ENVIRONMENT` | `staging`, `production` |
+| `region` | service config / `UNKEY_REGION` | `us-east-1` |
+| `release_sha` | build revision (7 chars) | `a1b2c3d` |
+| `operation` | sqlc `-- name:` header | `FindKeyForVerification` |
+| `mode` | connection role | `rw`, `ro` |
+| `route` | request context | `keys.verifyKey` (tRPC path) |
+| `source` | request context | `trpc`, `http` |
+
+Example comment appended to SQL:
+
+```sql
+SELECT ... FROM keys WHERE ... /*application='unkey',service='api',environment='staging',region='us-east-1',release_sha='a1b2c3d',operation='FindKeyForVerification',mode='ro'*/
+```
+
+## Go services
+
+Annotation happens in [`pkg/mysql.Replica`](../../../pkg/mysql/replica.go) (and the mirrored [`pkg/db`](../../../pkg/db) package). sqlc call sites stay unchanged.
+
+1. Pass static tags when opening the database:
+
+```go
+tags := sqlcomment.ForService("api", cfg.Region, sqlcomment.EnvironmentFromEnv())
+database, err := db.New(db.Config{
+    PrimaryDSN:  cfg.DatabasePrimary,
+    ReadOnlyDSN: cfg.DatabaseReadOnly,
+    Tags:        tags,
+})
+```
+
+2. Optional dynamic tags via context:
+
+```go
+ctx = sqlcomment.WithDynamic(ctx, sqlcomment.Dynamic{Route: "POST /v1/keys.verifyKey", Source: "http"})
+rows, err := database.RO().QueryContext(ctx, query, args...)
+```
+
+`sqlcomment.Static{}` disables annotation (tests and dev seeds).
+
+Package reference: [`pkg/sqlcomment`](../../../pkg/sqlcomment/doc.go).
+
+## TypeScript apps
+
+Dashboard and portal use [`createCommentedPool`](../../../web/internal/db/src/commented-pool.ts) from `@unkey/db`. The pool proxy annotates `query` and `execute` calls before they reach mysql2.
+
+Dashboard tRPC sets `route` and `source` through `runWithSqlCommentTags` in the base procedure middleware.
+
+Static tags read `UNKEY_ENVIRONMENT`, `UNKEY_REGION` / `REGION`, and `UNKEY_GIT_COMMIT_SHA` / `GIT_COMMIT`.
+
+## Verification
+
+After deploy to staging:
+
+1. Open PlanetScale Query Insights for the `unkey` database.
+2. Find a high-traffic fingerprint (for example `FindKeyForVerification`).
+3. Confirm `service`, `operation`, and `release_sha` appear on sampled queries.
+4. For dashboard traffic, confirm `route` tags on tRPC-backed queries.
+
+Local unit tests:
+
+```bash
+mise exec -- bazel test //pkg/sqlcomment:sqlcomment_test
+mise exec -- go test -bench=. -benchmem ./pkg/sqlcomment/
+mise exec -- pnpm --dir=web exec vitest run internal/db/src/sqlcomment.test.ts
+mise exec -- pnpm --dir=web exec vitest bench internal/db/src/sqlcomment.bench.ts --run
+```
+
+## Performance
+
+Annotation runs on every query but stays far below MySQL latency:
+
+| Path | Approx. cost (Go, M4 Pro) | Allocs |
+| --- | --- | --- |
+| Disabled (`Static{}`) | ~5 ns | 0 |
+| sqlc query (steady state, cached) | ~67 ns | 0 |
+| With dynamic `route`/`source` tags | ~175 ns | 2 |
+
+The Go implementation uses a fast `-- name:` parser (no regex), a precomputed static tag prefix per pool, and a `sync.Map` cache keyed by `(query, mode, static)` when dynamic tags are empty. That covers almost all sqlc traffic in `api` and `frontline`.
+
+TypeScript dashboard annotation is ~0.5 µs per query (vitest bench). The mysql2 pool proxy adds one function call; Drizzle still builds the SQL string as before.
+
+Alternatives considered:
+
+- **sqlc codegen plugin** — zero runtime cost, but couples tagging to generation and duplicates logic across Go and TypeScript.
+- **PlanetScale proxy-side tagging** — not available for Vitess query comments from application metadata.
+- **Manual per-query comments** — error-prone and does not scale across hundreds of sqlc queries.
+
+Client-boundary annotation with caching is the best tradeoff: one injection point, correct Insights attribution, sub-microsecond overhead.
+
+## Agent notes
+
+- Do not add high-cardinality values to SQL comments.
+- New Go services: wire `sqlcomment.ForService` in `run.go` when constructing `db.Config`.
+- New TS apps using `@unkey/db`: use `createCommentedPool` instead of `mysql.createPool`.
+- HTTP handlers that bypass tRPC can set `sqlcomment.WithDynamic` (Go) or `runWithSqlCommentTags` (TS) per request.

@@ -12,6 +12,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/retry"
+	"github.com/unkeyed/unkey/pkg/sqlcomment"
 )
 
 // Config defines the parameters needed to establish database connections.
@@ -24,6 +25,10 @@ type Config struct {
 	// The readonly replica will be used for most read queries.
 	// If omitted, the primary is used.
 	ReadOnlyDSN string
+
+	// Tags are appended to every SQL statement as SQLCommenter metadata for
+	// PlanetScale Query Insights. Leave Service empty to disable annotation.
+	Tags sqlcomment.Static
 }
 
 // database implements the Database interface, providing access to database replicas
@@ -98,6 +103,7 @@ func New(config Config) (*database, error) {
 		db:        write,
 		mode:      "rw",
 		debugLogs: false,
+		tags:      config.Tags,
 	}
 
 	// Initialize read replica with primary by default
@@ -105,6 +111,7 @@ func New(config Config) (*database, error) {
 		db:        write,
 		mode:      "rw",
 		debugLogs: false,
+		tags:      config.Tags,
 	}
 
 	// If a separate read-only DSN is provided, establish that connection
@@ -118,6 +125,7 @@ func New(config Config) (*database, error) {
 			db:        read,
 			mode:      "ro",
 			debugLogs: false,
+			tags:      config.Tags,
 		}
 		logger.Info("database configured with separate read replica")
 	} else {

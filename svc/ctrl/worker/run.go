@@ -35,6 +35,7 @@ import (
 	restateadmin "github.com/unkeyed/unkey/pkg/restate/admin"
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
 	"github.com/unkeyed/unkey/pkg/runner"
+	"github.com/unkeyed/unkey/pkg/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	"github.com/unkeyed/unkey/svc/ctrl/services/acme/providers"
@@ -146,7 +147,7 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	// Initialize database
-	database, err := db.New(cfg.Database)
+	database, err := db.New(cfg.Database, sqlcomment.ForService("ctrl-worker", cfg.Region, sqlcomment.EnvironmentFromEnv()))
 	if err != nil {
 		return fmt.Errorf("unable to create db: %w", err)
 	}

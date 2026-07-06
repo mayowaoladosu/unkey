@@ -21,6 +21,8 @@ import (
 	keysdb "github.com/unkeyed/unkey/internal/services/keys/db"
 	"github.com/unkeyed/unkey/internal/services/ratelimit"
 	"github.com/unkeyed/unkey/internal/services/usagelimiter"
+	"os"
+
 	"github.com/unkeyed/unkey/pkg/batch"
 	"github.com/unkeyed/unkey/pkg/buildinfo"
 	"github.com/unkeyed/unkey/pkg/cache"
@@ -38,6 +40,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
 	"github.com/unkeyed/unkey/pkg/runner"
+	"github.com/unkeyed/unkey/pkg/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/pkg/zen"
 	"github.com/unkeyed/unkey/svc/frontline/internal/caches"
@@ -187,11 +190,13 @@ func Run(ctx context.Context, cfg Config) error {
 	// replica. When the operator omits a dedicated replica DSN we fall back
 	// to the primary; pkgdb does the same internally so both pools end up
 	// targeting the same endpoint.
+	dbTags := sqlcomment.ForService("frontline", cfg.Region, sqlcomment.EnvironmentFromEnv())
+
 	readDSN := cfg.Database.ReadonlyReplica
 	if readDSN == "" {
 		readDSN = cfg.Database.Primary
 	}
-	database, databaseClose, err := db.New(readDSN)
+	database, databaseClose, err := db.New(readDSN, dbTags)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
@@ -204,6 +209,7 @@ func Run(ctx context.Context, cfg Config) error {
 	engineDatabase, err := pkgdb.New(pkgdb.Config{
 		PrimaryDSN:  cfg.Database.Primary,
 		ReadOnlyDSN: cfg.Database.ReadonlyReplica,
+		Tags:        dbTags,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to connect to engine database: %w", err)

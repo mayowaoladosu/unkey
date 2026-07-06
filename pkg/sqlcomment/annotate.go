@@ -1,0 +1,126 @@
+package sqlcomment
+
+import (
+	"strings"
+	"sync"
+)
+
+// annotateCache memoizes annotated queries when dynamic tags are empty. sqlc
+// emits a fixed query string per operation, so the hot path (for example
+// FindKeyForVerification) hits this cache on every call after the first.
+//
+// Benchmarks on Apple M4 Pro (Go 1.24): ~67 ns/op and 0 allocs/op for cached
+// sqlc queries vs ~746 ns/op and 11 allocs/op for the initial regex-based
+// implementation. MySQL round-trips are typically milliseconds, so this cost
+// is negligible relative to network and query execution.
+var annotateCache sync.Map
+
+type annotateCacheKey struct {
+	query  string
+	mode   string
+	static Static
+}
+
+// Annotate rewrites query for PlanetScale Insights:
+//  1. Strips the sqlc `-- name:` header when present and emits operation=<name>.
+//  2. Appends a SQLCommenter block with static, dynamic, and connection mode tags.
+//
+// When static.Enabled() is false, query is returned unchanged.
+func Annotate(query string, static Static, mode string, dynamic Dynamic) string {
+	if !static.Enabled() {
+		return query
+	}
+
+	if dynamic.Route == "" && dynamic.Source == "" {
+		key := annotateCacheKey{query: query, mode: mode, static: static}
+		if cached, ok := annotateCache.Load(key); ok {
+			return cached.(string)
+		}
+	}
+
+	annotated := annotateSlow(query, static, mode, dynamic)
+
+	if dynamic.Route == "" && dynamic.Source == "" {
+		key := annotateCacheKey{query: query, mode: mode, static: static}
+		annotateCache.Store(key, annotated)
+	}
+
+	return annotated
+}
+
+func annotateSlow(query string, static Static, mode string, dynamic Dynamic) string {
+	body, operation := stripSQLCHeader(query)
+	comment := formatComment(static, mode, dynamic, operation)
+	if comment == "" {
+		return strings.TrimSpace(body)
+	}
+	return strings.TrimSpace(body) + " " + comment
+}
+
+func stripSQLCHeader(query string) (body, operation string) {
+	if len(query) < len("-- name:") || !strings.HasPrefix(query, "-- name:") {
+		return query, ""
+	}
+
+	rest := strings.TrimLeft(query[len("-- name:"):], " \t")
+	if rest == "" {
+		return query, ""
+	}
+
+	end := strings.IndexAny(rest, " \t\r\n")
+	if end < 0 {
+		return query, ""
+	}
+	operation = rest[:end]
+
+	newline := strings.IndexByte(rest, '\n')
+	if newline < 0 {
+		return query, ""
+	}
+	return rest[newline+1:], operation
+}
+
+func formatComment(static Static, mode string, dynamic Dynamic, operation string) string {
+	prefix := static.staticPrefix()
+	capacity := len(prefix) + len(operation) + len(dynamic.Route) + len(dynamic.Source) + len(mode) + 48
+	var b strings.Builder
+	b.Grow(capacity)
+
+	b.WriteString("/*")
+	if prefix != "" {
+		b.WriteString(prefix)
+	}
+
+	appendTag(&b, "operation", operation)
+	appendTag(&b, "route", dynamic.Route)
+	appendTag(&b, "source", dynamic.Source)
+	appendTag(&b, "mode", mode)
+
+	if b.Len() == len("/*") {
+		return ""
+	}
+	b.WriteString("*/")
+	return b.String()
+}
+
+func appendTag(b *strings.Builder, key, value string) {
+	if value == "" {
+		return
+	}
+	if b.Len() > len("/*") {
+		b.WriteByte(',')
+	}
+	b.WriteString(key)
+	b.WriteString("='")
+	b.WriteString(escape(value))
+	b.WriteByte('\'')
+}
+
+func escape(value string) string {
+	if !strings.ContainsAny(value, `\'`) {
+		return value
+	}
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `'`, `\'`)
+	return value
+}

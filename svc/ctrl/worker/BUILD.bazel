@@ -31,6 +31,7 @@ go_library(
         "//pkg/restate/admin",
         "//pkg/rpc/interceptor",
         "//pkg/runner",
+        "//pkg/sqlcomment",
         "//pkg/uid",
         "//svc/ctrl/internal/auditlogs",
         "//svc/ctrl/internal/db",

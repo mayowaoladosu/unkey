@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "sqlcomment",
+    srcs = [
+        "annotate.go",
+        "context.go",
+        "doc.go",
+        "env.go",
+        "static.go",
+    ],
+    importpath = "github.com/unkeyed/unkey/pkg/sqlcomment",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/buildinfo"],
+)
+
+go_test(
+    name = "sqlcomment_test",
+    size = "small",
+    srcs = [
+        "annotate_bench_test.go",
+        "annotate_test.go",
+    ],
+    embed = [":sqlcomment"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

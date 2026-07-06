@@ -15,6 +15,7 @@ go_library(
         "//pkg/clock",
         "//pkg/healthcheck",
         "//pkg/restate/admin",
+        "//pkg/sqlcomment",
         "//pkg/testutil/containers",
         "//svc/ctrl/integration/seed",
         "//svc/ctrl/internal/db",
