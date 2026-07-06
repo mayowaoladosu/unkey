@@ -6,13 +6,7 @@ import (
 )
 
 // annotateCache memoizes annotated queries when dynamic tags are empty. sqlc
-// emits a fixed query string per operation, so the hot path (for example
-// FindKeyForVerification) hits this cache on every call after the first.
-//
-// Benchmarks on Apple M4 Pro (Go 1.24): ~67 ns/op and 0 allocs/op for cached
-// sqlc queries vs ~746 ns/op and 11 allocs/op for the initial regex-based
-// implementation. MySQL round-trips are typically milliseconds, so this cost
-// is negligible relative to network and query execution.
+// emits a fixed query string per operation, so repeated calls reuse the result.
 var annotateCache sync.Map
 
 type annotateCacheKey struct {
@@ -38,7 +32,7 @@ func Annotate(query string, static Static, mode string, dynamic Dynamic) string 
 		}
 	}
 
-	annotated := annotateSlow(query, static, mode, dynamic)
+	annotated := buildAnnotatedQuery(query, static, mode, dynamic)
 
 	if dynamic.Route == "" && dynamic.Source == "" {
 		key := annotateCacheKey{query: query, mode: mode, static: static}
@@ -48,7 +42,7 @@ func Annotate(query string, static Static, mode string, dynamic Dynamic) string 
 	return annotated
 }
 
-func annotateSlow(query string, static Static, mode string, dynamic Dynamic) string {
+func buildAnnotatedQuery(query string, static Static, mode string, dynamic Dynamic) string {
 	body, operation := stripSQLCHeader(query)
 	comment := formatComment(static, mode, dynamic, operation)
 	if comment == "" {

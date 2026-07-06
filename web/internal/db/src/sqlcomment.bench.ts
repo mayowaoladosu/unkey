@@ -7,15 +7,15 @@ const drizzleSelect =
 const staticTags = staticTagsFromEnv("dashboard");
 
 describe("sqlcomment benchmarks", () => {
-  bench("annotateSql disabled (no service)", () => {
+  bench("tagging disabled (empty service)", () => {
     annotateSql(drizzleSelect, { application: "unkey", service: "" });
   });
 
-  bench("annotateSql drizzle select (static tags only)", () => {
+  bench("tagging enabled (static tags only)", () => {
     annotateSql(drizzleSelect, staticTags);
   });
 
-  bench("annotateSql drizzle select with tRPC tags", () => {
+  bench("tagging enabled (static + tRPC route/source)", () => {
     annotateSql(drizzleSelect, staticTags, {
       route: "deploy.envVars.create",
       source: "trpc",
