@@ -22,7 +22,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/config"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
-	"github.com/unkeyed/unkey/pkg/sqlcomment"
+	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/testutil/containers"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/integration/seed"

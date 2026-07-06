@@ -59,7 +59,7 @@ rows, err := database.RO().QueryContext(ctx, query, args...)
 
 `sqlcomment.Static{}` disables annotation (tests and dev seeds).
 
-Package reference: [`pkg/sqlcomment`](../../../pkg/sqlcomment/doc.go).
+Package reference: [`pkg/db/sqlcomment`](../../../pkg/db/sqlcomment/doc.go).
 
 ## TypeScript apps
 
@@ -88,7 +88,7 @@ After deploy to staging:
 Local unit tests:
 
 ```bash
-mise exec -- bazel test //pkg/sqlcomment:sqlcomment_test
+mise exec -- bazel test //pkg/db/sqlcomment:sqlcomment_test
 mise exec -- pnpm --dir=web exec vitest run internal/db/src/sqlcomment.test.ts
 ```
 

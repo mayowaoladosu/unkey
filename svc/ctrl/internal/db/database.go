@@ -5,7 +5,7 @@ import (
 
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/mysql"
-	"github.com/unkeyed/unkey/pkg/sqlcomment"
+	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 )
 
 type database struct {

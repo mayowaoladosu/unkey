@@ -9,7 +9,7 @@ go_library(
         "env.go",
         "static.go",
     ],
-    importpath = "github.com/unkeyed/unkey/pkg/sqlcomment",
+    importpath = "github.com/unkeyed/unkey/pkg/db/sqlcomment",
     visibility = ["//visibility:public"],
     deps = ["//pkg/buildinfo"],
 )
