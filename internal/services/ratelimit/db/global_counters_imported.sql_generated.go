@@ -11,16 +11,27 @@ import (
 
 const globalCountersImported = `-- name: GlobalCountersImported :many
 SELECT
-    workspace_id,
-    namespace,
-    identifier,
-    duration_ms,
-    sequence,
-    CAST(SUM(CASE WHEN region = ? THEN count ELSE 0 END) AS SIGNED) AS regional,
-    CAST(SUM(CASE WHEN region != ? THEN count ELSE 0 END) AS SIGNED) AS imported
-FROM ratelimit_global_counters
-WHERE expires_at > ?
-GROUP BY workspace_id, namespace, identifier, duration_ms, sequence
+  workspace_id,
+  namespace,
+  identifier,
+  duration_ms,
+  sequence,
+  CAST(
+    SUM(IF(region = ?, count, 0)) AS SIGNED
+  ) AS regional,
+  CAST(
+    SUM(IF(region != ?, count, 0)) AS SIGNED
+  ) AS imported
+FROM
+  ratelimit_global_counters FORCE INDEX (active_window_import_idx)
+WHERE
+  expires_at > ?
+GROUP BY
+  workspace_id,
+  namespace,
+  identifier,
+  duration_ms,
+  sequence
 `
 
 type GlobalCountersImportedParams struct {
@@ -48,16 +59,27 @@ type GlobalCountersImportedRow struct {
 // cast to SIGNED so sqlc maps them to int64, matching atomic.Int64 in the caller.
 //
 //	SELECT
-//	    workspace_id,
-//	    namespace,
-//	    identifier,
-//	    duration_ms,
-//	    sequence,
-//	    CAST(SUM(CASE WHEN region = ? THEN count ELSE 0 END) AS SIGNED) AS regional,
-//	    CAST(SUM(CASE WHEN region != ? THEN count ELSE 0 END) AS SIGNED) AS imported
-//	FROM ratelimit_global_counters
-//	WHERE expires_at > ?
-//	GROUP BY workspace_id, namespace, identifier, duration_ms, sequence
+//	  workspace_id,
+//	  namespace,
+//	  identifier,
+//	  duration_ms,
+//	  sequence,
+//	  CAST(
+//	    SUM(IF(region = ?, count, 0)) AS SIGNED
+//	  ) AS regional,
+//	  CAST(
+//	    SUM(IF(region != ?, count, 0)) AS SIGNED
+//	  ) AS imported
+//	FROM
+//	  ratelimit_global_counters FORCE INDEX (active_window_import_idx)
+//	WHERE
+//	  expires_at > ?
+//	GROUP BY
+//	  workspace_id,
+//	  namespace,
+//	  identifier,
+//	  duration_ms,
+//	  sequence
 func (q *Queries) GlobalCountersImported(ctx context.Context, arg GlobalCountersImportedParams) ([]GlobalCountersImportedRow, error) {
 	rows, err := q.db.QueryContext(ctx, globalCountersImported, arg.SelfRegion, arg.SelfRegion, arg.Now)
 	if err != nil {

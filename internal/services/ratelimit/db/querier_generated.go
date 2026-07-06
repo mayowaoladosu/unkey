@@ -27,16 +27,27 @@ type Querier interface {
 	// cast to SIGNED so sqlc maps them to int64, matching atomic.Int64 in the caller.
 	//
 	//  SELECT
-	//      workspace_id,
-	//      namespace,
-	//      identifier,
-	//      duration_ms,
-	//      sequence,
-	//      CAST(SUM(CASE WHEN region = ? THEN count ELSE 0 END) AS SIGNED) AS regional,
-	//      CAST(SUM(CASE WHEN region != ? THEN count ELSE 0 END) AS SIGNED) AS imported
-	//  FROM ratelimit_global_counters
-	//  WHERE expires_at > ?
-	//  GROUP BY workspace_id, namespace, identifier, duration_ms, sequence
+	//    workspace_id,
+	//    namespace,
+	//    identifier,
+	//    duration_ms,
+	//    sequence,
+	//    CAST(
+	//      SUM(IF(region = ?, count, 0)) AS SIGNED
+	//    ) AS regional,
+	//    CAST(
+	//      SUM(IF(region != ?, count, 0)) AS SIGNED
+	//    ) AS imported
+	//  FROM
+	//    ratelimit_global_counters FORCE INDEX (active_window_import_idx)
+	//  WHERE
+	//    expires_at > ?
+	//  GROUP BY
+	//    workspace_id,
+	//    namespace,
+	//    identifier,
+	//    duration_ms,
+	//    sequence
 	GlobalCountersImported(ctx context.Context, arg GlobalCountersImportedParams) ([]GlobalCountersImportedRow, error)
 	// GlobalCountersListAll returns raw per-region global counter rows for tests
 	// that need to assert which region wrote which observation. Production callers

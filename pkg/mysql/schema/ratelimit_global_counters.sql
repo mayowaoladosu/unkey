@@ -15,3 +15,5 @@ CREATE TABLE `ratelimit_global_counters` (
 
 CREATE INDEX `expires_at_idx` ON `ratelimit_global_counters` (`expires_at`);
 
+CREATE INDEX `active_window_import_idx` ON `ratelimit_global_counters` (`expires_at`,`workspace_id`,`namespace`,`identifier`,`duration_ms`,`sequence`,`region`,`count`);
+
