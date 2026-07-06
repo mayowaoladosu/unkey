@@ -42,25 +42,22 @@ func TestGetDeployment(t *testing.T) {
 
 	d := res.Body.Data
 	require.Equal(t, dep.ID, d.Id)
-	require.Equal(t, setup.Project.ID, d.ProjectId)
-	require.Equal(t, setup.App.ID, d.AppId)
-	require.Equal(t, setup.Environment.ID, d.EnvironmentId)
-	require.Equal(t, "main", d.GitBranch)
-	require.Equal(t, "9f2c1a7", d.GitCommitSha)
-	require.Equal(t, "add KEBAP endpoint", d.GitCommitMessage)
-	require.Equal(t, "octocat", d.GitCommitAuthorHandle)
 	require.Equal(t, openapi.DeploymentStatusPending, d.Status)
-	require.Equal(t, openapi.DeploymentDesiredStateRunning, d.DesiredState)
-	require.Equal(t, openapi.DeploymentTriggerUnknown, d.Trigger)
-	require.Equal(t, 8080, d.Port)
-	require.Equal(t, openapi.SIGTERM, d.ShutdownSignal)
-	require.Equal(t, openapi.Http1, d.UpstreamProtocol)
-	require.NotNil(t, d.Command)
-	require.Nil(t, d.Healthcheck)
+	require.Equal(t, 8080, d.Runtime.Port)
+	require.Equal(t, openapi.SIGTERM, d.Runtime.ShutdownSignal)
+	require.Equal(t, openapi.Http1, d.Runtime.UpstreamProtocol)
+	require.NotNil(t, d.Runtime.Command)
+	require.Nil(t, d.Runtime.Healthcheck)
 
 	// Internal fields must never appear in the response body.
 	for _, leaked := range []string{"k8s_name", "k8sName", "workspace_id", "workspaceId", "sentinel", "encrypted", "build_id", "buildId", "invocation", "github_deployment", "githubDeployment", "\"pk\""} {
 		require.False(t, strings.Contains(res.RawBody, leaked), "response leaked internal field %q: %s", leaked, res.RawBody)
+	}
+
+	// Fields intentionally dropped from the response must not reappear. Git
+	// metadata is seeded above, so this also proves it is not surfaced.
+	for _, dropped := range []string{"projectId", "appId", "environmentId", "desiredState", "gitBranch", "gitCommitSha", "gitCommitMessage", "gitCommitAuthorHandle", "prNumber", "forkRepository", "trigger", "triggeredBy"} {
+		require.False(t, strings.Contains(res.RawBody, dropped), "response exposed dropped field %q: %s", dropped, res.RawBody)
 	}
 }
 
