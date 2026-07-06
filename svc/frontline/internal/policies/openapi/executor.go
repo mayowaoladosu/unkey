@@ -23,6 +23,7 @@ func New(clk clock.Clock) (*Executor, error) {
 		Fresh:    time.Hour,
 		Stale:    24 * time.Hour,
 		MaxSize:  64,
+		Cost:     nil,
 		Resource: "openapi_validators",
 		Clock:    clk,
 	})

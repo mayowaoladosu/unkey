@@ -68,14 +68,14 @@ func (s *service) getPolicies(ctx context.Context, route db.FindFrontlineRouteBy
 	cached, hit, err := s.policyCache.SWR(ctx, route.DeploymentID, func(ctx context.Context) (caches.CachedPolicies, error) {
 		parsed, parseErr := policies.ParseMiddleware(route.SentinelConfig)
 		if parseErr != nil {
-			return caches.CachedPolicies{Err: parseErr}, nil
+			return caches.CachedPolicies{Policies: nil, Err: parseErr}, nil
 		}
 
 		if err := s.hydrateOpenapiSpecs(ctx, route.DeploymentID, parsed); err != nil {
-			return caches.CachedPolicies{}, err
+			return caches.CachedPolicies{Policies: nil, Err: nil}, err
 		}
 
-		return caches.CachedPolicies{Policies: parsed}, nil
+		return caches.CachedPolicies{Policies: parsed, Err: nil}, nil
 	}, func(err error) cache.Op {
 		if err != nil {
 			return cache.Noop

@@ -474,6 +474,7 @@ func buildEngine(
 		Fresh:    10 * time.Second,
 		Stale:    10 * time.Minute,
 		MaxSize:  100_000,
+		Cost:     nil,
 		Resource: "frontline_key_cache",
 		Clock:    clk,
 	})

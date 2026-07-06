@@ -89,6 +89,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    time.Minute,
 		Stale:    24 * time.Hour,
 		MaxSize:  1_000_000,
+		Cost:     nil,
 		Resource: "ratelimit_namespace",
 		Clock:    config.Clock,
 	})
@@ -100,6 +101,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    10 * time.Second,
 		Stale:    10 * time.Minute,
 		MaxSize:  1_000_000,
+		Cost:     nil,
 		Resource: "verification_key_by_hash",
 		Clock:    config.Clock,
 	})
@@ -111,6 +113,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    10 * time.Second,
 		Stale:    24 * time.Hour,
 		MaxSize:  1_000_000,
+		Cost:     nil,
 		Resource: "live_api_by_id",
 		Clock:    config.Clock,
 	})
@@ -122,6 +125,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    time.Minute,
 		Stale:    24 * time.Hour,
 		MaxSize:  1_000_000,
+		Cost:     nil,
 		Resource: "clickhouse_setting",
 		Clock:    config.Clock,
 	})
@@ -133,6 +137,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    10 * time.Minute,
 		Stale:    24 * time.Hour,
 		MaxSize:  1_000_000,
+		Cost:     nil,
 		Resource: "key_auth_to_api_row",
 		Clock:    config.Clock,
 	})
@@ -144,6 +149,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    10 * time.Minute,
 		Stale:    24 * time.Hour,
 		MaxSize:  1_000_000,
+		Cost:     nil,
 		Resource: "api_to_key_auth_row",
 		Clock:    config.Clock,
 	})
@@ -155,6 +161,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    time.Minute,
 		Stale:    24 * time.Hour,
 		MaxSize:  100_000,
+		Cost:     nil,
 		Resource: "workspace_quota",
 		Clock:    config.Clock,
 	})
@@ -166,6 +173,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    10 * time.Second,
 		Stale:    5 * time.Minute,
 		MaxSize:  100_000,
+		Cost:     nil,
 		Resource: "portal_session",
 		Clock:    config.Clock,
 	})
@@ -177,6 +185,7 @@ func New(config Config) (Caches, error) {
 		Fresh:    10 * time.Second,
 		Stale:    24 * time.Hour,
 		MaxSize:  100_000,
+		Cost:     nil,
 		Resource: "workspace_by_org_id",
 		Clock:    config.Clock,
 	})

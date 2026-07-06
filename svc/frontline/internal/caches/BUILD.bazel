@@ -2,7 +2,11 @@ load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "caches",
-    srcs = ["caches.go"],
+    srcs = [
+        "caches.go",
+        "cost.go",
+        "policies.go",
+    ],
     importpath = "github.com/unkeyed/unkey/svc/frontline/internal/caches",
     visibility = ["//visibility:public"],
     deps = [

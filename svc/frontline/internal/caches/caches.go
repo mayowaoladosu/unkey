@@ -79,6 +79,7 @@ func New(config Config) (*Caches, error) {
 		Fresh:    10 * time.Second,
 		Stale:    60 * time.Second,
 		MaxSize:  10_000,
+		Cost:     nil,
 		Resource: "instances_by_deployment",
 		Clock:    config.Clock,
 	})
@@ -90,6 +91,7 @@ func New(config Config) (*Caches, error) {
 		Fresh:    time.Hour,
 		Stale:    time.Hour * 12,
 		MaxSize:  10_000,
+		Cost:     nil,
 		Resource: "tls_certificate",
 		Clock:    config.Clock,
 	})
