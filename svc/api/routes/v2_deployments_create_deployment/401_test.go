@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
-	"github.com/unkeyed/unkey/svc/api/openapi"
 	handler "github.com/unkeyed/unkey/svc/api/routes/v2_deployments_create_deployment"
 )
 
@@ -21,13 +19,7 @@ func TestUnauthorized(t *testing.T) {
 		Permissions: []string{"environment.*.create_deployment"},
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceImage,
-		DockerImage:     ptr.P("nginx:latest"),
-	}
+	req := imageRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, "nginx:latest")
 
 	headers := http.Header{
 		"Content-Type":  {"application/json"},

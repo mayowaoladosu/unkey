@@ -48,10 +48,6 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	if err = validateSourceFields(req); err != nil {
-		return err
-	}
-
 	environment, err := db.Query.FindEnvironmentByIdentifiers(ctx, h.DB.RO(), db.FindEnvironmentByIdentifiersParams{
 		WorkspaceID: principal.WorkspaceID,
 		Project:     req.Project,
@@ -108,11 +104,20 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		Actor:           actorInfo,
 	}
 
-	switch req.Source {
-	case openapi.DeploymentSourceImage:
-		ctrlReq.DockerImage = *req.DockerImage
+	switch {
+	case req.Image != nil:
+		ctrlReq.DockerImage = req.Image.DockerImage
 
-	case openapi.DeploymentSourceGit:
+	case req.Git != nil:
+		git := req.Git
+		if hasValue(git.Repository) && !hasValue(git.CommitSha) {
+			return fault.New(
+				"repository requires commitSha",
+				fault.Code(codes.App.Validation.InvalidInput.URN()),
+				fault.Internal("repository set without commitSha"),
+				fault.Public("repository requires commitSha."),
+			)
+		}
 		// Git builds need a connected repository. ctrl resolves branch/commit
 		// against the app's installation, so a missing connection is a caller
 		// precondition, not an internal failure.
@@ -122,20 +127,20 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 					"no repo connection",
 					fault.Code(codes.App.Precondition.PreconditionFailed.URN()),
 					fault.Internal("app has no github repo connection for git source"),
-					fault.Public("This app has no connected GitHub repository. Deploy a prebuilt image with source=image, or connect a repository first."),
+					fault.Public("This app has no connected GitHub repository. Deploy a prebuilt image with the image source, or connect a repository first."),
 				)
 			}
 			return fault.Wrap(err, fault.Internal("failed to check repo connection"))
 		}
 		// nolint: exhaustruct // ctrl fills the commit metadata it resolves from git
 		ctrlReq.GitCommit = &ctrlv1.GitCommitInfo{
-			Branch:         ptr.SafeDeref(req.Branch),
-			CommitSha:      ptr.SafeDeref(req.CommitSha),
-			ForkRepository: ptr.SafeDeref(req.ForkRepository),
+			Branch:         ptr.SafeDeref(git.Branch),
+			CommitSha:      ptr.SafeDeref(git.CommitSha),
+			ForkRepository: ptr.SafeDeref(git.Repository),
 		}
 
-	case openapi.DeploymentSourceDeployment:
-		gitCommit, dockerImage, err := h.resolveRedeploy(ctx, principal.WorkspaceID, environment.AppID, environment.ID, *req.DeploymentId)
+	case req.Deployment != nil:
+		gitCommit, dockerImage, err := h.resolveRedeploy(ctx, principal.WorkspaceID, environment.AppID, environment.ID, req.Deployment.DeploymentId)
 		if err != nil {
 			return err
 		}
@@ -144,10 +149,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 
 	default:
 		return fault.New(
-			"unknown source",
+			"exactly one source required",
 			fault.Code(codes.App.Validation.InvalidInput.URN()),
-			fault.Internal("unknown source reached switch after validation"),
-			fault.Public("Unknown source. Use image, git, or deployment."),
+			fault.Internal("no source set after validation"),
+			fault.Public("Provide exactly one of image, git, or deployment."),
 		)
 	}
 
@@ -177,50 +182,6 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			DeploymentId: ctrlResp.GetDeploymentId(),
 		},
 	})
-}
-
-func validateSourceFields(req Request) error {
-	switch req.Source {
-	case openapi.DeploymentSourceImage:
-		if !hasValue(req.DockerImage) {
-			return fault.New(
-				"missing dockerImage",
-				fault.Code(codes.App.Validation.InvalidInput.URN()),
-				fault.Internal("dockerImage missing for image source"),
-				fault.Public("A dockerImage is required when source is image."),
-			)
-		}
-
-	case openapi.DeploymentSourceGit:
-		if hasValue(req.ForkRepository) && !hasValue(req.CommitSha) {
-			return fault.New(
-				"forkRepository requires commitSha",
-				fault.Code(codes.App.Validation.InvalidInput.URN()),
-				fault.Internal("forkRepository set without commitSha"),
-				fault.Public("forkRepository requires commitSha."),
-			)
-		}
-
-	case openapi.DeploymentSourceDeployment:
-		if !hasValue(req.DeploymentId) {
-			return fault.New(
-				"missing deploymentId",
-				fault.Code(codes.App.Validation.InvalidInput.URN()),
-				fault.Internal("deploymentId missing for deployment source"),
-				fault.Public("A deploymentId is required when source is deployment."),
-			)
-		}
-
-	default:
-		return fault.New(
-			"unknown source",
-			fault.Code(codes.App.Validation.InvalidInput.URN()),
-			fault.Internal("unknown source value"),
-			fault.Public("Unknown source. Use image, git, or deployment."),
-		)
-	}
-
-	return nil
 }
 
 func (h *Handler) resolveRedeploy(ctx context.Context, workspaceID, appID, environmentID, deploymentID string) (*ctrlv1.GitCommitInfo, string, error) {

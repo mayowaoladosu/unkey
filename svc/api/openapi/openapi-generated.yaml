@@ -614,7 +614,6 @@ components:
                 - project
                 - app
                 - environmentSlug
-                - source
             properties:
                 project:
                     "$ref": "#/components/schemas/ResourceIdentifier"
@@ -622,42 +621,20 @@ components:
                     "$ref": "#/components/schemas/ResourceIdentifier"
                 environmentSlug:
                     "$ref": "#/components/schemas/ResourceIdentifier"
-                source:
-                    type: string
-                    enum:
-                        - image
-                        - git
-                        - deployment
-                    x-enum-varnames:
-                        - DeploymentSourceImage
-                        - DeploymentSourceGit
-                        - DeploymentSourceDeployment
-                    description: |
-                        Where the deployment comes from. image: a prebuilt Docker image. git: build
-                        from the app's connected GitHub repository. deployment: re-run an existing deployment.
-                dockerImage:
-                    type: string
-                    description: Docker image to deploy as-is. Required when source is image.
-                    example: "ghcr.io/acme/api:v1.2.3"
-                branch:
-                    type: string
-                    description: Branch to build (its HEAD). Used when source is git. Omit branch and commitSha to use the app's default branch.
-                    example: "main"
-                commitSha:
-                    type: string
-                    description: Commit to build (full or abbreviated SHA). Used when source is git. Takes precedence over branch.
-                    example: "9f2c1a7"
-                forkRepository:
-                    type: string
-                    pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
-                    description: Fork to build from, as "owner/repo". Used when source is git. Requires commitSha.
-                    example: "contributor/acme-api"
-                deploymentId:
-                    type: string
-                    description: Existing deployment to redeploy. Required when source is deployment.
-                    example: "d_abc123xyz"
-            additionalProperties: false
-            description: Create a deployment. Set source, then provide the fields for that source.
+                git:
+                    "$ref": "#/components/schemas/DeploymentSourceGit"
+                image:
+                    "$ref": "#/components/schemas/DeploymentSourceImage"
+                deployment:
+                    "$ref": "#/components/schemas/DeploymentSourceDeployment"
+            oneOf:
+                - required:
+                    - image
+                - required:
+                    - git
+                - required:
+                    - deployment
+            description: Create a deployment. Provide exactly one of git, image, or deployment.
         V2DeploymentsCreateDeploymentResponseBody:
             type: object
             required:
@@ -3645,6 +3622,45 @@ components:
                     format: int64
                     description: Unix timestamp in milliseconds
                     example: 1704067200000
+        DeploymentSourceGit:
+            type: object
+            properties:
+                branch:
+                    type: string
+                    description: Branch to build (its HEAD). Omit branch and commitSha to use the app's default branch.
+                    example: "main"
+                commitSha:
+                    type: string
+                    description: Commit to build (full or abbreviated SHA). Takes precedence over branch.
+                    example: "9f2c1a7"
+                repository:
+                    type: string
+                    pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+                    description: Fork to build from instead of the app's connected repository, as "owner/repo". Requires commitSha.
+                    example: "contributor/acme-api"
+            description: Build from the app's connected GitHub repository.
+        DeploymentSourceImage:
+            type: object
+            required:
+                - dockerImage
+            properties:
+                dockerImage:
+                    type: string
+                    minLength: 1
+                    description: Docker image to deploy as-is.
+                    example: "ghcr.io/acme/api:v1.2.3"
+            description: Deploy a prebuilt Docker image as-is.
+        DeploymentSourceDeployment:
+            type: object
+            required:
+                - deploymentId
+            properties:
+                deploymentId:
+                    type: string
+                    minLength: 1
+                    description: Existing deployment to redeploy.
+                    example: "d_abc123xyz"
+            description: Re-run an existing deployment.
         V2DeploymentsCreateDeploymentResponseData:
             type: object
             required:
@@ -6669,9 +6685,9 @@ paths:
             description: |
                 Create a deployment for an app in a project.
 
-                Pick a `source`:
+                Provide exactly one source:
                 - `image`: deploy a prebuilt Docker image as-is (no build).
-                - `git`: build and deploy from the app's connected GitHub repository — a branch, a specific commit, or a fork commit. Requires the app to have a repository connected.
+                - `git`: build and deploy from the app's connected GitHub repository, a branch, a specific commit, or a fork commit. Requires the app to have a repository connected.
                 - `deployment`: re-run an existing deployment by its id. Git-connected apps rebuild from the recorded commit; other apps reuse the recorded image.
 
                 Returns immediately with a `deploymentId`. The build and rollout run asynchronously — poll `deployments.getDeployment` to watch status until it is ready.

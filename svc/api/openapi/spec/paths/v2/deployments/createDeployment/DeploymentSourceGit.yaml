@@ -1,0 +1,16 @@
+type: object
+properties:
+  branch:
+    type: string
+    description: Branch to build (its HEAD). Omit branch and commitSha to use the app's default branch.
+    example: "main"
+  commitSha:
+    type: string
+    description: Commit to build (full or abbreviated SHA). Takes precedence over branch.
+    example: "9f2c1a7"
+  repository:
+    type: string
+    pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+    description: Fork to build from instead of the app's connected repository, as "owner/repo". Requires commitSha.
+    example: "contributor/acme-api"
+description: Build from the app's connected GitHub repository.

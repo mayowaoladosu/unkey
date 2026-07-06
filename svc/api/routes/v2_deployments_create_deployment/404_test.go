@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
@@ -25,13 +24,7 @@ func TestEnvironmentNotFound(t *testing.T) {
 
 	t.Run("unknown environment", func(t *testing.T) {
 		capture.called = false
-		req := handler.Request{
-			Project:         setup.Project.Slug,
-			App:             setup.App.Slug,
-			EnvironmentSlug: "does-not-exist",
-			Source:          openapi.DeploymentSourceImage,
-			DockerImage:     ptr.P("nginx:latest"),
-		}
+		req := imageRequest(t, setup.Project.Slug, setup.App.Slug, "does-not-exist", "nginx:latest")
 
 		res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, authHeaders(setup.RootKey), req)
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
@@ -41,13 +34,7 @@ func TestEnvironmentNotFound(t *testing.T) {
 
 	t.Run("unknown project resolves to environment not found", func(t *testing.T) {
 		capture.called = false
-		req := handler.Request{
-			Project:         "does-not-exist",
-			App:             setup.App.Slug,
-			EnvironmentSlug: setup.Environment.Slug,
-			Source:          openapi.DeploymentSourceImage,
-			DockerImage:     ptr.P("nginx:latest"),
-		}
+		req := imageRequest(t, "does-not-exist", setup.App.Slug, setup.Environment.Slug, "nginx:latest")
 
 		res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, authHeaders(setup.RootKey), req)
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
@@ -66,13 +53,7 @@ func TestRedeployDeploymentNotFound(t *testing.T) {
 		Permissions: []string{"environment.*.create_deployment"},
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P("d_does_not_exist"),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, "d_does_not_exist")
 
 	res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
@@ -106,13 +87,7 @@ func TestRedeployCrossWorkspaceMasked(t *testing.T) {
 		Permissions: []string{"environment.*.create_deployment"},
 	})
 
-	req := handler.Request{
-		Project:         attacker.Project.Slug,
-		App:             attacker.App.Slug,
-		EnvironmentSlug: attacker.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(victimDep.ID),
-	}
+	req := deploymentRequest(t, attacker.Project.Slug, attacker.App.Slug, attacker.Environment.Slug, victimDep.ID)
 
 	res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, authHeaders(attacker.RootKey), req)
 	require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
@@ -161,13 +136,7 @@ func TestRedeployWrongAppOrEnvironmentMasked(t *testing.T) {
 	})
 
 	// Redeploy that deployment while targeting the first app/environment.
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(otherDep.ID),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, otherDep.ID)
 
 	res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)

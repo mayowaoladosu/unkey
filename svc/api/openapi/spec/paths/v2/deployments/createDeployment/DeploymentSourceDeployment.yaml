@@ -1,0 +1,10 @@
+type: object
+required:
+  - deploymentId
+properties:
+  deploymentId:
+    type: string
+    minLength: 1
+    description: Existing deployment to redeploy.
+    example: "d_abc123xyz"
+description: Re-run an existing deployment.

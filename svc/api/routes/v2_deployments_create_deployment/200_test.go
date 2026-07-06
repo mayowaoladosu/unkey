@@ -24,13 +24,7 @@ func TestImageSource(t *testing.T) {
 		Permissions: []string{"environment.*.create_deployment"},
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceImage,
-		DockerImage:     ptr.P("nginx:latest"),
-	}
+	req := imageRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, "nginx:latest")
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -59,13 +53,7 @@ func TestImageSourceCliTrigger(t *testing.T) {
 	headers := authHeaders(setup.RootKey)
 	headers.Set("X-Unkey-Client", "unkey-cli/1.2.3")
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceImage,
-		DockerImage:     ptr.P("nginx:latest"),
-	}
+	req := imageRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, "nginx:latest")
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -84,14 +72,10 @@ func TestGitSource(t *testing.T) {
 	})
 	connectRepo(t, h, setup.Workspace.ID, setup.Project.ID, setup.App.ID)
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceGit,
-		Branch:          ptr.P("main"),
-		CommitSha:       ptr.P("abc123"),
-	}
+	req := gitRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, openapi.DeploymentSourceGit{
+		Branch:    ptr.P("main"),
+		CommitSha: ptr.P("abc123"),
+	})
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -115,14 +99,10 @@ func TestGitSourceWithFork(t *testing.T) {
 	})
 	connectRepo(t, h, setup.Workspace.ID, setup.Project.ID, setup.App.ID)
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceGit,
-		CommitSha:       ptr.P("9f2c1a7"),
-		ForkRepository:  ptr.P("contributor/acme-api"),
-	}
+	req := gitRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, openapi.DeploymentSourceGit{
+		CommitSha:  ptr.P("9f2c1a7"),
+		Repository: ptr.P("contributor/acme-api"),
+	})
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -152,13 +132,7 @@ func TestRedeployGitApp(t *testing.T) {
 		GitBranch:     "main",
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(dep.ID),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, dep.ID)
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -187,13 +161,7 @@ func TestRedeployImageReuse(t *testing.T) {
 		EnvironmentID: setup.Environment.ID,
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(dep.ID),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, dep.ID)
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -230,13 +198,7 @@ func TestRedeployForkDeployment(t *testing.T) {
 		ForkRepositoryFullName: "contributor/acme-api",
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(dep.ID),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, dep.ID)
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -276,13 +238,7 @@ func TestRedeployImageDeploymentOnConnectedApp(t *testing.T) {
 	})
 	setDeploymentImage(t, h, dep.ID, "nginx:latest")
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(dep.ID),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, dep.ID)
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)
@@ -313,13 +269,7 @@ func TestRedeployDeploymentWithoutBuiltImage(t *testing.T) {
 		EnvironmentID: setup.Environment.ID,
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceDeployment,
-		DeploymentId:    ptr.P(dep.ID),
-	}
+	req := deploymentRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, dep.ID)
 
 	res := testutil.CallRoute[handler.Request, openapi.PreconditionFailedErrorResponse](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusPreconditionFailed, res.Status, "expected 412, received: %s", res.RawBody)
@@ -335,13 +285,7 @@ func TestSpecificEnvironmentPermission(t *testing.T) {
 	setup := h.CreateTestDeploymentSetup()
 	rootKey := h.CreateRootKey(setup.Workspace.ID, "environment."+setup.Environment.ID+".create_deployment")
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceImage,
-		DockerImage:     ptr.P("nginx:latest"),
-	}
+	req := imageRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, "nginx:latest")
 
 	res := testutil.CallRoute[handler.Request, handler.Response](h, route, authHeaders(rootKey), req)
 	require.Equal(t, http.StatusCreated, res.Status, "expected 201, received: %s", res.RawBody)

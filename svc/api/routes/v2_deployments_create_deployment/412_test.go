@@ -25,13 +25,9 @@ func TestGitSourceWithoutRepoConnection(t *testing.T) {
 		Permissions: []string{"environment.*.create_deployment"},
 	})
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceGit,
-		Branch:          ptr.P("main"),
-	}
+	req := gitRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, openapi.DeploymentSourceGit{
+		Branch: ptr.P("main"),
+	})
 
 	res := testutil.CallRoute[handler.Request, openapi.PreconditionFailedErrorResponse](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusPreconditionFailed, res.Status, "expected 412, received: %s", res.RawBody)
@@ -57,13 +53,9 @@ func TestControlPlanePreconditionFailure(t *testing.T) {
 	})
 	connectRepo(t, h, setup.Workspace.ID, setup.Project.ID, setup.App.ID)
 
-	req := handler.Request{
-		Project:         setup.Project.Slug,
-		App:             setup.App.Slug,
-		EnvironmentSlug: setup.Environment.Slug,
-		Source:          openapi.DeploymentSourceGit,
-		Branch:          ptr.P("main"),
-	}
+	req := gitRequest(t, setup.Project.Slug, setup.App.Slug, setup.Environment.Slug, openapi.DeploymentSourceGit{
+		Branch: ptr.P("main"),
+	})
 
 	res := testutil.CallRoute[handler.Request, openapi.PreconditionFailedErrorResponse](h, route, authHeaders(setup.RootKey), req)
 	require.Equal(t, http.StatusPreconditionFailed, res.Status, "expected 412, received: %s", res.RawBody)

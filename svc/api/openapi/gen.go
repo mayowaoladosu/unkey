@@ -4,7 +4,11 @@
 package openapi
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/oapi-codegen/nullable"
+	"github.com/oapi-codegen/runtime"
 )
 
 const (
@@ -100,13 +104,6 @@ const (
 	STOPPED          V2DeployGetDeploymentResponseDataStatus = "STOPPED"
 	SUPERSEDED       V2DeployGetDeploymentResponseDataStatus = "SUPERSEDED"
 	UNSPECIFIED      V2DeployGetDeploymentResponseDataStatus = "UNSPECIFIED"
-)
-
-// Defines values for V2DeploymentsCreateDeploymentRequestBodySource.
-const (
-	DeploymentSourceDeployment V2DeploymentsCreateDeploymentRequestBodySource = "deployment"
-	DeploymentSourceGit        V2DeploymentsCreateDeploymentRequestBodySource = "git"
-	DeploymentSourceImage      V2DeploymentsCreateDeploymentRequestBodySource = "image"
 )
 
 // Defines values for V2KeysUpdateCreditsRequestBodyOperation.
@@ -333,6 +330,30 @@ type DeploymentStatus string
 
 // DeploymentTrigger What triggered this deployment.
 type DeploymentTrigger string
+
+// DeploymentSourceDeployment Re-run an existing deployment.
+type DeploymentSourceDeployment struct {
+	// DeploymentId Existing deployment to redeploy.
+	DeploymentId string `json:"deploymentId"`
+}
+
+// DeploymentSourceGit Build from the app's connected GitHub repository.
+type DeploymentSourceGit struct {
+	// Branch Branch to build (its HEAD). Omit branch and commitSha to use the app's default branch.
+	Branch *string `json:"branch,omitempty"`
+
+	// CommitSha Commit to build (full or abbreviated SHA). Takes precedence over branch.
+	CommitSha *string `json:"commitSha,omitempty"`
+
+	// Repository Fork to build from instead of the app's connected repository, as "owner/repo". Requires commitSha.
+	Repository *string `json:"repository,omitempty"`
+}
+
+// DeploymentSourceImage Deploy a prebuilt Docker image as-is.
+type DeploymentSourceImage struct {
+	// DockerImage Docker image to deploy as-is.
+	DockerImage string `json:"dockerImage"`
+}
 
 // EmptyResponse Empty response object by design. A successful response indicates this operation was successfully executed.
 type EmptyResponse = map[string]interface{}
@@ -1347,43 +1368,39 @@ type V2DeployGitCommit struct {
 	Timestamp *int64 `json:"timestamp,omitempty"`
 }
 
-// V2DeploymentsCreateDeploymentRequestBody Create a deployment. Set source, then provide the fields for that source.
+// V2DeploymentsCreateDeploymentRequestBody Create a deployment. Provide exactly one of git, image, or deployment.
 type V2DeploymentsCreateDeploymentRequestBody struct {
 	// App Identifies a resource by either its unique ID or its slug.
 	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
 	App ResourceIdentifier `json:"app"`
 
-	// Branch Branch to build (its HEAD). Used when source is git. Omit branch and commitSha to use the app's default branch.
-	Branch *string `json:"branch,omitempty"`
-
-	// CommitSha Commit to build (full or abbreviated SHA). Used when source is git. Takes precedence over branch.
-	CommitSha *string `json:"commitSha,omitempty"`
-
-	// DeploymentId Existing deployment to redeploy. Required when source is deployment.
-	DeploymentId *string `json:"deploymentId,omitempty"`
-
-	// DockerImage Docker image to deploy as-is. Required when source is image.
-	DockerImage *string `json:"dockerImage,omitempty"`
+	// Deployment Re-run an existing deployment.
+	Deployment *DeploymentSourceDeployment `json:"deployment,omitempty"`
 
 	// EnvironmentSlug Identifies a resource by either its unique ID or its slug.
 	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
 	EnvironmentSlug ResourceIdentifier `json:"environmentSlug"`
 
-	// ForkRepository Fork to build from, as "owner/repo". Used when source is git. Requires commitSha.
-	ForkRepository *string `json:"forkRepository,omitempty"`
+	// Git Build from the app's connected GitHub repository.
+	Git *DeploymentSourceGit `json:"git,omitempty"`
+
+	// Image Deploy a prebuilt Docker image as-is.
+	Image *DeploymentSourceImage `json:"image,omitempty"`
 
 	// Project Identifies a resource by either its unique ID or its slug.
 	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
 	Project ResourceIdentifier `json:"project"`
-
-	// Source Where the deployment comes from. image: a prebuilt Docker image. git: build
-	// from the app's connected GitHub repository. deployment: re-run an existing deployment.
-	Source V2DeploymentsCreateDeploymentRequestBodySource `json:"source"`
+	union   json.RawMessage
 }
 
-// V2DeploymentsCreateDeploymentRequestBodySource Where the deployment comes from. image: a prebuilt Docker image. git: build
-// from the app's connected GitHub repository. deployment: re-run an existing deployment.
-type V2DeploymentsCreateDeploymentRequestBodySource string
+// V2DeploymentsCreateDeploymentRequestBody0 defines model for .
+type V2DeploymentsCreateDeploymentRequestBody0 = interface{}
+
+// V2DeploymentsCreateDeploymentRequestBody1 defines model for .
+type V2DeploymentsCreateDeploymentRequestBody1 = interface{}
+
+// V2DeploymentsCreateDeploymentRequestBody2 defines model for .
+type V2DeploymentsCreateDeploymentRequestBody2 = interface{}
 
 // V2DeploymentsCreateDeploymentResponseBody defines model for V2DeploymentsCreateDeploymentResponseBody.
 type V2DeploymentsCreateDeploymentResponseBody struct {
@@ -3657,3 +3674,190 @@ type RatelimitMultiLimitJSONRequestBody = V2RatelimitMultiLimitRequestBody
 
 // RatelimitSetOverrideJSONRequestBody defines body for RatelimitSetOverride for application/json ContentType.
 type RatelimitSetOverrideJSONRequestBody = V2RatelimitSetOverrideRequestBody
+
+// AsV2DeploymentsCreateDeploymentRequestBody0 returns the union data inside the V2DeploymentsCreateDeploymentRequestBody as a V2DeploymentsCreateDeploymentRequestBody0
+func (t V2DeploymentsCreateDeploymentRequestBody) AsV2DeploymentsCreateDeploymentRequestBody0() (V2DeploymentsCreateDeploymentRequestBody0, error) {
+	var body V2DeploymentsCreateDeploymentRequestBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromV2DeploymentsCreateDeploymentRequestBody0 overwrites any union data inside the V2DeploymentsCreateDeploymentRequestBody as the provided V2DeploymentsCreateDeploymentRequestBody0
+func (t *V2DeploymentsCreateDeploymentRequestBody) FromV2DeploymentsCreateDeploymentRequestBody0(v V2DeploymentsCreateDeploymentRequestBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeV2DeploymentsCreateDeploymentRequestBody0 performs a merge with any union data inside the V2DeploymentsCreateDeploymentRequestBody, using the provided V2DeploymentsCreateDeploymentRequestBody0
+func (t *V2DeploymentsCreateDeploymentRequestBody) MergeV2DeploymentsCreateDeploymentRequestBody0(v V2DeploymentsCreateDeploymentRequestBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsV2DeploymentsCreateDeploymentRequestBody1 returns the union data inside the V2DeploymentsCreateDeploymentRequestBody as a V2DeploymentsCreateDeploymentRequestBody1
+func (t V2DeploymentsCreateDeploymentRequestBody) AsV2DeploymentsCreateDeploymentRequestBody1() (V2DeploymentsCreateDeploymentRequestBody1, error) {
+	var body V2DeploymentsCreateDeploymentRequestBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromV2DeploymentsCreateDeploymentRequestBody1 overwrites any union data inside the V2DeploymentsCreateDeploymentRequestBody as the provided V2DeploymentsCreateDeploymentRequestBody1
+func (t *V2DeploymentsCreateDeploymentRequestBody) FromV2DeploymentsCreateDeploymentRequestBody1(v V2DeploymentsCreateDeploymentRequestBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeV2DeploymentsCreateDeploymentRequestBody1 performs a merge with any union data inside the V2DeploymentsCreateDeploymentRequestBody, using the provided V2DeploymentsCreateDeploymentRequestBody1
+func (t *V2DeploymentsCreateDeploymentRequestBody) MergeV2DeploymentsCreateDeploymentRequestBody1(v V2DeploymentsCreateDeploymentRequestBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsV2DeploymentsCreateDeploymentRequestBody2 returns the union data inside the V2DeploymentsCreateDeploymentRequestBody as a V2DeploymentsCreateDeploymentRequestBody2
+func (t V2DeploymentsCreateDeploymentRequestBody) AsV2DeploymentsCreateDeploymentRequestBody2() (V2DeploymentsCreateDeploymentRequestBody2, error) {
+	var body V2DeploymentsCreateDeploymentRequestBody2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromV2DeploymentsCreateDeploymentRequestBody2 overwrites any union data inside the V2DeploymentsCreateDeploymentRequestBody as the provided V2DeploymentsCreateDeploymentRequestBody2
+func (t *V2DeploymentsCreateDeploymentRequestBody) FromV2DeploymentsCreateDeploymentRequestBody2(v V2DeploymentsCreateDeploymentRequestBody2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeV2DeploymentsCreateDeploymentRequestBody2 performs a merge with any union data inside the V2DeploymentsCreateDeploymentRequestBody, using the provided V2DeploymentsCreateDeploymentRequestBody2
+func (t *V2DeploymentsCreateDeploymentRequestBody) MergeV2DeploymentsCreateDeploymentRequestBody2(v V2DeploymentsCreateDeploymentRequestBody2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t V2DeploymentsCreateDeploymentRequestBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["app"], err = json.Marshal(t.App)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'app': %w", err)
+	}
+
+	if t.Deployment != nil {
+		object["deployment"], err = json.Marshal(t.Deployment)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'deployment': %w", err)
+		}
+	}
+
+	object["environmentSlug"], err = json.Marshal(t.EnvironmentSlug)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'environmentSlug': %w", err)
+	}
+
+	if t.Git != nil {
+		object["git"], err = json.Marshal(t.Git)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'git': %w", err)
+		}
+	}
+
+	if t.Image != nil {
+		object["image"], err = json.Marshal(t.Image)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image': %w", err)
+		}
+	}
+
+	object["project"], err = json.Marshal(t.Project)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'project': %w", err)
+	}
+
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *V2DeploymentsCreateDeploymentRequestBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["app"]; found {
+		err = json.Unmarshal(raw, &t.App)
+		if err != nil {
+			return fmt.Errorf("error reading 'app': %w", err)
+		}
+	}
+
+	if raw, found := object["deployment"]; found {
+		err = json.Unmarshal(raw, &t.Deployment)
+		if err != nil {
+			return fmt.Errorf("error reading 'deployment': %w", err)
+		}
+	}
+
+	if raw, found := object["environmentSlug"]; found {
+		err = json.Unmarshal(raw, &t.EnvironmentSlug)
+		if err != nil {
+			return fmt.Errorf("error reading 'environmentSlug': %w", err)
+		}
+	}
+
+	if raw, found := object["git"]; found {
+		err = json.Unmarshal(raw, &t.Git)
+		if err != nil {
+			return fmt.Errorf("error reading 'git': %w", err)
+		}
+	}
+
+	if raw, found := object["image"]; found {
+		err = json.Unmarshal(raw, &t.Image)
+		if err != nil {
+			return fmt.Errorf("error reading 'image': %w", err)
+		}
+	}
+
+	if raw, found := object["project"]; found {
+		err = json.Unmarshal(raw, &t.Project)
+		if err != nil {
+			return fmt.Errorf("error reading 'project': %w", err)
+		}
+	}
+
+	return err
+}
