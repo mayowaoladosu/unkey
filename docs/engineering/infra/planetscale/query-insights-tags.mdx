@@ -89,32 +89,8 @@ Local unit tests:
 
 ```bash
 mise exec -- bazel test //pkg/sqlcomment:sqlcomment_test
-mise exec -- go test -bench=. -benchmem ./pkg/sqlcomment/
 mise exec -- pnpm --dir=web exec vitest run internal/db/src/sqlcomment.test.ts
-mise exec -- pnpm --dir=web exec vitest bench internal/db/src/sqlcomment.bench.ts --run
 ```
-
-## Performance
-
-Annotation runs on every query but stays far below MySQL latency:
-
-| Path | Approx. cost (Go, M4 Pro) | Allocs |
-| --- | --- | --- |
-| Disabled (`Static{}`) | ~5 ns | 0 |
-| sqlc query (steady state, cached) | ~67 ns | 0 |
-| With dynamic `route`/`source` tags | ~175 ns | 2 |
-
-The Go implementation uses a fast `-- name:` parser (no regex), a precomputed static tag prefix per pool, and a `sync.Map` cache keyed by `(query, mode, static)` when dynamic tags are empty. That covers almost all sqlc traffic in `api` and `frontline`.
-
-TypeScript (vitest bench): tagging disabled (`service` empty) is ~24 ns/op; with tags enabled on a typical Drizzle select it is ~0.5 µs/op. That gap is expected: disabled returns the query unchanged, enabled appends a comment block. Both are far below MySQL latency.
-
-Alternatives considered:
-
-- **sqlc codegen plugin** — zero runtime cost, but couples tagging to generation and duplicates logic across Go and TypeScript.
-- **PlanetScale proxy-side tagging** — not available for Vitess query comments from application metadata.
-- **Manual per-query comments** — error-prone and does not scale across hundreds of sqlc queries.
-
-Client-boundary annotation with caching is the best tradeoff: one injection point, correct Insights attribution, sub-microsecond overhead.
 
 ## Agent notes
 

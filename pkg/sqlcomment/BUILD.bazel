@@ -17,10 +17,7 @@ go_library(
 go_test(
     name = "sqlcomment_test",
     size = "small",
-    srcs = [
-        "annotate_bench_test.go",
-        "annotate_test.go",
-    ],
+    srcs = ["annotate_test.go"],
     embed = [":sqlcomment"],
     deps = ["@com_github_stretchr_testify//require"],
 )
