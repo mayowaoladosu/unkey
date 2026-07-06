@@ -6660,32 +6660,20 @@ paths:
                                     summary: Deployment details
                                     value:
                                         data:
-                                            appId: app_1234abcd
-                                            command:
-                                                - node
-                                                - server.js
-                                            cpuMillicores: 250
                                             createdAt: 1704067200000
-                                            desiredState: running
-                                            environmentId: env_1234abcd
-                                            gitBranch: main
-                                            gitCommitAuthorAvatarUrl: https://avatars.githubusercontent.com/u/583231
-                                            gitCommitAuthorHandle: octocat
-                                            gitCommitMessage: 'fix: handle empty payloads'
-                                            gitCommitSha: 9f2c1a7c8e4b2d1f0a3e5c7b9d1f2a4c6e8b0d2f
-                                            gitCommitTimestamp: 1704067200000
                                             id: dep_1234abcd
-                                            image: ghcr.io/acme/api:v1.2.3
-                                            memoryMib: 256
-                                            port: 8080
-                                            projectId: proj_1234abcd
-                                            shutdownSignal: SIGTERM
+                                            runtime:
+                                                command:
+                                                    - node
+                                                    - server.js
+                                                cpuMillicores: 250
+                                                memoryMib: 256
+                                                port: 8080
+                                                shutdownSignal: SIGTERM
+                                                storageMib: 0
+                                                upstreamProtocol: http1
                                             status: ready
-                                            storageMib: 0
-                                            trigger: api
-                                            triggeredBy: user_1234abcd
                                             updatedAt: 1704153600000
-                                            upstreamProtocol: http1
                                         meta:
                                             requestId: req_1234abcd
                             schema:

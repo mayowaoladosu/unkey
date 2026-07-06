@@ -46,27 +46,15 @@ post:
                   requestId: req_1234abcd
                 data:
                   id: dep_1234abcd
-                  projectId: proj_1234abcd
-                  appId: app_1234abcd
-                  environmentId: env_1234abcd
                   status: ready
-                  desiredState: running
-                  gitCommitSha: 9f2c1a7c8e4b2d1f0a3e5c7b9d1f2a4c6e8b0d2f
-                  gitBranch: main
-                  gitCommitMessage: "fix: handle empty payloads"
-                  gitCommitAuthorHandle: octocat
-                  gitCommitAuthorAvatarUrl: https://avatars.githubusercontent.com/u/583231
-                  gitCommitTimestamp: 1704067200000
-                  image: ghcr.io/acme/api:v1.2.3
-                  trigger: api
-                  triggeredBy: user_1234abcd
-                  cpuMillicores: 250
-                  memoryMib: 256
-                  storageMib: 0
-                  port: 8080
-                  command: ["node", "server.js"]
-                  shutdownSignal: SIGTERM
-                  upstreamProtocol: http1
+                  runtime:
+                    cpuMillicores: 250
+                    memoryMib: 256
+                    storageMib: 0
+                    port: 8080
+                    command: ["node", "server.js"]
+                    shutdownSignal: SIGTERM
+                    upstreamProtocol: http1
                   createdAt: 1704067200000
                   updatedAt: 1704153600000
     "400":
