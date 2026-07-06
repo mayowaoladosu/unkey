@@ -29,7 +29,6 @@ go_test(
     name = "v2_apis_list_keys_test",
     size = "medium",
     srcs = [
-        "200_portal_session_test.go",
         "200_test.go",
         "400_test.go",
         "401_test.go",
@@ -37,6 +36,7 @@ go_test(
         "403_test.go",
         "404_test.go",
         "412_test.go",
+        "portal_rejection_test.go",
     ],
     deps = [
         ":v2_apis_list_keys",
