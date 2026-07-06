@@ -104,6 +104,7 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 	publicMiddlewares := []zen.Middleware{
 		withPanicRecovery,
 		withObservability,
+		zen.WithSQLComment(),
 		withMetrics,
 		withLogging,
 		withErrorHandling,
@@ -114,6 +115,7 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 	protectedMiddlewares := []zen.Middleware{
 		withPanicRecovery,
 		withObservability,
+		zen.WithSQLComment(),
 		withMetrics,
 		withLogging,
 		withErrorHandling,

@@ -28,6 +28,18 @@ func (s Static) staticPrefix() string {
 	return s.prefix
 }
 
+// Disabled returns static tags with annotation turned off. Use in tests, dev
+// CLIs, and integration harnesses that do not need Query Insights attribution.
+func Disabled() Static {
+	return Static{
+		Application: "",
+		Service:     "",
+		Region:      "",
+		ReleaseSHA:  "",
+		prefix:      "",
+	}
+}
+
 // ForService builds the standard static tag set for a Unkey service process.
 // ReleaseSHA comes from [buildinfo.Revision], which Bazel and goreleaser inject
 // at link time. We do not tag a deployment environment name: infra does not set

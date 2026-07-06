@@ -18,6 +18,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
 	"github.com/unkeyed/unkey/pkg/db"
+	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/logger"
 )
 
@@ -64,7 +65,11 @@ func seed(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	database, err := db.New(db.Config{PrimaryDSN: cmd.RequireString("database-primary"), ReadOnlyDSN: ""})
+	database, err := db.New(db.Config{
+		PrimaryDSN:  cmd.RequireString("database-primary"),
+		ReadOnlyDSN: "",
+		Tags:        sqlcomment.Disabled(),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to connect to MySQL: %w", err)
 	}

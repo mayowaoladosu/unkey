@@ -49,7 +49,15 @@ func TestAnnotate_escapesQuotes(t *testing.T) {
 
 	static := ForService("api", "us-east-1")
 	got := Annotate("select 1", static, "rw", Dynamic{Route: "a'b"})
-	require.Contains(t, got, `route='a\'b'`)
+	require.Contains(t, got, `route='a%27b'`)
+}
+
+func TestAnnotate_urlEncodesRoute(t *testing.T) {
+	t.Parallel()
+
+	static := ForService("api", "us-east-1")
+	got := Annotate("select 1", static, "rw", Dynamic{Route: "POST /v2/keys.verifyKey"})
+	require.Contains(t, got, `route='POST%20%2Fv2%2Fkeys.verifyKey'`)
 }
 
 func TestWithDynamic_roundTrip(t *testing.T) {

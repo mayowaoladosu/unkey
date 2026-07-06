@@ -3,9 +3,9 @@ package db
 import (
 	"context"
 
+	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/mysql"
-	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 )
 
 type database struct {

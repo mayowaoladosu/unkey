@@ -50,13 +50,22 @@ describe("sqlcomment", () => {
     expect(got).not.toContain("source=");
   });
 
-  it("escapes single quotes in tag values", () => {
+  it("meta-escapes single quotes after url-encoding", () => {
     const got = annotateSql(drizzleSelectKeys, dashboardTags, {
       route: "keys.o'brien",
       source: "trpc",
     });
 
     expect(got).toContain(`route='keys.o\\'brien'`);
+  });
+
+  it("url-encodes spaces and slashes in route values", () => {
+    const got = annotateSql(drizzleSelectKeys, dashboardTags, {
+      route: "POST /v2/keys.verifyKey",
+      source: "http",
+    });
+
+    expect(got).toContain(`route='POST%20%2Fv2%2Fkeys.verifyKey'`);
   });
 
   it("builds static tags from env", () => {

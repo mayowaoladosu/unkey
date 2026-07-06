@@ -54,6 +54,7 @@ go_test(
         "//pkg/codes",
         "//pkg/counter",
         "//pkg/db",
+        "//pkg/db/sqlcomment",
         "//pkg/fault",
         "//pkg/hash",
         "//pkg/ptr",

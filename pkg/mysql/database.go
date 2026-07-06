@@ -9,10 +9,10 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/unkeyed/unkey/pkg/assert"
+	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/retry"
-	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 )
 
 // Config defines the parameters needed to establish database connections.

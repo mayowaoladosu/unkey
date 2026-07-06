@@ -14,7 +14,8 @@ export type SqlCommentDynamicTags = {
 };
 
 function escapeTagValue(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+  const encoded = encodeURIComponent(value);
+  return encoded.replaceAll("'", "\\'");
 }
 
 function formatComment(

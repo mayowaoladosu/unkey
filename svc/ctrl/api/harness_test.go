@@ -20,9 +20,9 @@ import (
 	restateServer "github.com/restatedev/sdk-go/server"
 	"github.com/stretchr/testify/require"
 	"github.com/unkeyed/unkey/pkg/config"
+	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
-	"github.com/unkeyed/unkey/pkg/db/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/testutil/containers"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/integration/seed"
@@ -107,7 +107,7 @@ func newWebhookHarness(t *testing.T, cfg webhookHarnessConfig) *webhookHarness {
 	}, 30*time.Second, 250*time.Millisecond, "restate never routed an invocation to the test worker")
 
 	mysqlCfg := containers.MySQL(t)
-	database, err := db.New(mysqlCfg.DSN, sqlcomment.Static{})
+	database, err := db.New(mysqlCfg.DSN, sqlcomment.Disabled())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close()) })
 

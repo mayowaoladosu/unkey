@@ -1,6 +1,7 @@
 package sqlcomment
 
 import (
+	"net/url"
 	"strings"
 	"sync"
 )
@@ -111,10 +112,11 @@ func appendTag(b *strings.Builder, key, value string) {
 }
 
 func escape(value string) string {
-	if !strings.ContainsAny(value, `\'`) {
-		return value
-	}
-	value = strings.ReplaceAll(value, `\`, `\\`)
-	value = strings.ReplaceAll(value, `'`, `\'`)
-	return value
+	return urlEncode(value)
+}
+
+// urlEncode percent-encodes tag values per the SQLCommenter spec. QueryEscape
+// uses '+' for space; PlanetScale expects '%20'.
+func urlEncode(value string) string {
+	return strings.ReplaceAll(url.QueryEscape(value), "+", "%20")
 }

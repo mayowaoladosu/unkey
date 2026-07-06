@@ -6,6 +6,7 @@ go_library(
         "annotate.go",
         "context.go",
         "doc.go",
+        "ingress.go",
         "static.go",
     ],
     importpath = "github.com/unkeyed/unkey/pkg/db/sqlcomment",
@@ -16,7 +17,10 @@ go_library(
 go_test(
     name = "sqlcomment_test",
     size = "small",
-    srcs = ["annotate_test.go"],
+    srcs = [
+        "annotate_test.go",
+        "ingress_test.go",
+    ],
     embed = [":sqlcomment"],
     deps = ["@com_github_stretchr_testify//require"],
 )

@@ -1,11 +1,11 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { Pool, PoolOptions } from "mysql2/promise";
+import type { Pool, PoolConnection, PoolOptions } from "mysql2/promise";
 import mysql from "mysql2/promise";
 import { type SqlCommentDynamicTags, type SqlCommentStaticTags, annotateSql } from "./sqlcomment";
 
-type Queryable = Pick<Pool, "query" | "execute">;
+type Queryable = Pick<PoolConnection, "query" | "execute">;
 
-function wrapQueryable<T extends Queryable>(pool: T, staticTags: SqlCommentStaticTags): T {
+function wrapQueryable<T extends Queryable>(target: T, staticTags: SqlCommentStaticTags): T {
   const annotateArg = (sql: unknown): unknown => {
     if (typeof sql !== "string") {
       return sql;
@@ -13,18 +13,15 @@ function wrapQueryable<T extends Queryable>(pool: T, staticTags: SqlCommentStati
     return annotateSql(sql, staticTags, dynamicTagsFromStore());
   };
 
-  return new Proxy(pool, {
-    get(target, property, receiver) {
+  return new Proxy(target, {
+    get(obj, property, receiver) {
       if (property === "query" || property === "execute") {
         return (sql: unknown, ...args: unknown[]) => {
           const annotated = annotateArg(sql);
-          return Reflect.apply(target[property as "query" | "execute"], target, [
-            annotated,
-            ...args,
-          ]);
+          return Reflect.apply(obj[property as "query" | "execute"], obj, [annotated, ...args]);
         };
       }
-      return Reflect.get(target, property, receiver);
+      return Reflect.get(obj, property, receiver);
     },
   });
 }
@@ -41,5 +38,17 @@ export function dynamicTagsFromStore(): SqlCommentDynamicTags {
 
 export function createCommentedPool(options: PoolOptions, staticTags: SqlCommentStaticTags): Pool {
   const pool = mysql.createPool(options);
-  return wrapQueryable(pool, staticTags);
+  const wrapped = wrapQueryable(pool, staticTags);
+
+  return new Proxy(wrapped, {
+    get(target, property, receiver) {
+      if (property === "getConnection") {
+        return async (...args: unknown[]) => {
+          const conn = await pool.getConnection(...(args as []));
+          return wrapQueryable(conn, staticTags);
+        };
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  }) as Pool;
 }
