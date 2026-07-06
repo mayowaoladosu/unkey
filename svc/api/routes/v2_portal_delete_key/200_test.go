@@ -2,43 +2,37 @@ package handler_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/ptr"
-	"github.com/unkeyed/unkey/pkg/uid"
-	"github.com/unkeyed/unkey/pkg/zen"
-	"github.com/unkeyed/unkey/svc/api/internal/middleware"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_keys_delete_key"
+	deletekey "github.com/unkeyed/unkey/svc/api/routes/v2_keys_delete_key"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_portal_delete_key"
 )
 
-// portalMiddleware returns a middleware stack that authenticates requests
-// (including portal session cookies) but skips OpenAPI spec validation. The
-// OpenAPI spec only declares rootKey security, so cookie-authenticated portal
-// requests would be rejected by the validator.
-func portalMiddleware(h *testutil.Harness) []zen.Middleware {
-	return []zen.Middleware{
-		zen.WithObservability(),
-		zen.WithLogging(),
-		middleware.WithErrorHandling(),
-		middleware.WithAuthentication(middleware.AuthenticationConfig{
-			Auth:       h.Auth,
-			Database:   h.DB,
-			QuotaCache: h.Caches.WorkspaceQuota,
-			Ratelimit:  h.Ratelimit,
-		}),
+type (
+	Request  = deletekey.Request
+	Response = deletekey.Response
+)
+
+// newHandler builds the portal.deleteKey handler backed by a configured
+// keys.deleteKey handler.
+func newHandler(h *testutil.Harness) *handler.Handler {
+	return &handler.Handler{
+		Handler: &deletekey.Handler{
+			DB:        h.DB,
+			Auditlogs: h.Auditlogs,
+			KeyCache:  h.Caches.VerificationKeyByHash,
+		},
 	}
 }
 
-// setupPortalRoute builds a harness with the delete-key handler registered
+// setupPortalRoute builds a harness with the portal deleteKey handler registered
 // behind the portal middleware stack, plus a freshly created API in the user
 // workspace. Every portal session test starts from this identical setup.
 func setupPortalRoute(t *testing.T) (*testutil.Harness, *handler.Handler, db.Workspace, db.Api) {
@@ -46,12 +40,8 @@ func setupPortalRoute(t *testing.T) (*testutil.Harness, *handler.Handler, db.Wor
 
 	h := testutil.NewHarness(t)
 
-	route := &handler.Handler{
-		DB:        h.DB,
-		Auditlogs: h.Auditlogs,
-		KeyCache:  h.Caches.VerificationKeyByHash,
-	}
-	h.Register(route, portalMiddleware(h)...)
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
 
 	workspace := h.Resources().UserWorkspace
 
@@ -62,41 +52,6 @@ func setupPortalRoute(t *testing.T) (*testutil.Harness, *handler.Handler, db.Wor
 	})
 
 	return h, route, workspace, api
-}
-
-// createPortalSession inserts a portal session row and returns a cookie header
-// suitable for use in CallRoute.
-func createPortalSession(
-	t *testing.T,
-	h *testutil.Harness,
-	workspaceID string,
-	externalID string,
-	permissions []string,
-) http.Header {
-	t.Helper()
-	ctx := context.Background()
-
-	sessionID := uid.New(uid.PortalSessionPrefix)
-
-	permsJSON, err := json.Marshal(permissions)
-	require.NoError(t, err)
-
-	err = db.Query.InsertPortalSession(ctx, h.DB.RW(), db.InsertPortalSessionParams{
-		ID:             sessionID,
-		WorkspaceID:    workspaceID,
-		PortalConfigID: uid.New(uid.PortalConfigPrefix),
-		ExternalID:     externalID,
-		Permissions:    permsJSON,
-		Preview:        false,
-		ExpiresAt:      time.Now().Add(24 * time.Hour).UnixMilli(),
-		CreatedAt:      time.Now().UnixMilli(),
-	})
-	require.NoError(t, err)
-
-	return http.Header{
-		"Content-Type": {"application/json"},
-		"Cookie":       {fmt.Sprintf("portal_session=%s", sessionID)},
-	}
 }
 
 // TestPortalSessionDeleteOwnKey verifies a portal session can delete a key that
@@ -119,15 +74,15 @@ func TestPortalSessionDeleteOwnKey(t *testing.T) {
 		IdentityID:  ptr.P(identity.ID),
 	})
 
-	headers := createPortalSession(t, h, workspace.ID, externalID, []string{
+	headers := h.CreatePortalSession(workspace.ID, externalID, []string{
 		fmt.Sprintf("api.%s.delete_key", api.ID),
 	})
 
-	req := handler.Request{
+	req := Request{
 		KeyId: keyResponse.KeyID,
 	}
 
-	res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
+	res := testutil.CallRoute[Request, Response](h, route, headers, req)
 	require.Equal(t, 200, res.Status)
 	require.NotNil(t, res.Body)
 
@@ -158,15 +113,15 @@ func TestPortalSessionCannotDeleteOtherIdentityKey(t *testing.T) {
 	})
 
 	// Session is authenticated as user A but has the permission to delete keys.
-	headers := createPortalSession(t, h, workspace.ID, "portal_user_A", []string{
+	headers := h.CreatePortalSession(workspace.ID, "portal_user_A", []string{
 		fmt.Sprintf("api.%s.delete_key", api.ID),
 	})
 
-	req := handler.Request{
+	req := Request{
 		KeyId: keyResponse.KeyID,
 	}
 
-	res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, headers, req)
+	res := testutil.CallRoute[Request, openapi.NotFoundErrorResponse](h, route, headers, req)
 	require.Equal(t, 404, res.Status)
 	require.NotNil(t, res.Body)
 	require.Contains(t, res.Body.Error.Detail, "The specified key was not found")
@@ -191,15 +146,15 @@ func TestPortalSessionCannotDeleteKeyWithoutIdentity(t *testing.T) {
 		Name:        &keyName,
 	})
 
-	headers := createPortalSession(t, h, workspace.ID, "portal_user_A", []string{
+	headers := h.CreatePortalSession(workspace.ID, "portal_user_A", []string{
 		fmt.Sprintf("api.%s.delete_key", api.ID),
 	})
 
-	req := handler.Request{
+	req := Request{
 		KeyId: keyResponse.KeyID,
 	}
 
-	res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, headers, req)
+	res := testutil.CallRoute[Request, openapi.NotFoundErrorResponse](h, route, headers, req)
 	require.Equal(t, 404, res.Status)
 	require.NotNil(t, res.Body)
 

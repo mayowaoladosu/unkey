@@ -3,9 +3,7 @@ package handler_test
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
@@ -15,63 +13,26 @@ import (
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/uid"
-	"github.com/unkeyed/unkey/pkg/zen"
-	"github.com/unkeyed/unkey/svc/api/internal/middleware"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_analytics_get_verifications"
+	getverifications "github.com/unkeyed/unkey/svc/api/routes/v2_analytics_get_verifications"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_portal_get_verifications"
 )
 
-// portalMiddleware returns a middleware stack that authenticates requests
-// (including portal session cookies) but skips OpenAPI spec validation. The
-// OpenAPI spec only declares rootKey security, so cookie-authenticated portal
-// requests would be rejected by the validator.
-func portalMiddleware(h *testutil.Harness) []zen.Middleware {
-	return []zen.Middleware{
-		zen.WithObservability(),
-		zen.WithLogging(),
-		middleware.WithErrorHandling(),
-		middleware.WithAuthentication(middleware.AuthenticationConfig{
-			Auth:       h.Auth,
-			Database:   h.DB,
-			QuotaCache: h.Caches.WorkspaceQuota,
-			Ratelimit:  h.Ratelimit,
-		}),
-	}
-}
+type (
+	Request  = getverifications.Request
+	Response = getverifications.Response
+)
 
-// createPortalSession inserts a portal session row and returns a cookie header
-// suitable for use in CallRoute.
-func createPortalSession(
-	t *testing.T,
-	h *testutil.Harness,
-	workspaceID string,
-	externalID string,
-	permissions []string,
-) http.Header {
-	t.Helper()
-	ctx := context.Background()
-
-	sessionID := uid.New(uid.PortalSessionPrefix)
-
-	permsJSON, err := json.Marshal(permissions)
-	require.NoError(t, err)
-
-	err = db.Query.InsertPortalSession(ctx, h.DB.RW(), db.InsertPortalSessionParams{
-		ID:             sessionID,
-		WorkspaceID:    workspaceID,
-		PortalConfigID: uid.New(uid.PortalConfigPrefix),
-		ExternalID:     externalID,
-		Permissions:    permsJSON,
-		Preview:        false,
-		ExpiresAt:      time.Now().Add(24 * time.Hour).UnixMilli(),
-		CreatedAt:      time.Now().UnixMilli(),
-	})
-	require.NoError(t, err)
-
-	return http.Header{
-		"Content-Type": {"application/json"},
-		"Cookie":       {fmt.Sprintf("portal_session=%s", sessionID)},
+// newHandler builds the portal.getVerifications handler backed by a configured
+// analytics.getVerifications handler.
+func newHandler(h *testutil.Harness) *handler.Handler {
+	return &handler.Handler{
+		Handler: &getverifications.Handler{
+			DB:                         h.DB,
+			AnalyticsConnectionManager: h.AnalyticsConnectionManager,
+			Caches:                     h.Caches,
+		},
 	}
 }
 
@@ -87,12 +48,8 @@ func TestPortalSessionAnalyticsScopedToOwnKeys(t *testing.T) {
 	})
 	h.SetupAnalytics(workspace.ID)
 
-	route := &handler.Handler{
-		DB:                         h.DB,
-		AnalyticsConnectionManager: h.AnalyticsConnectionManager,
-		Caches:                     h.Caches,
-	}
-	h.Register(route, portalMiddleware(h)...)
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
 
 	// Identity A (the portal session's identity) owns one key.
 	externalA := "portal_user_A"
@@ -182,16 +139,16 @@ func TestPortalSessionAnalyticsScopedToOwnKeys(t *testing.T) {
 		})
 	}
 
-	headers := createPortalSession(t, h, workspace.ID, externalA, []string{
+	headers := h.CreatePortalSession(workspace.ID, externalA, []string{
 		"api.*.read_analytics",
 	})
 
-	req := handler.Request{
+	req := Request{
 		Query: "SELECT COUNT(*) as count FROM key_verifications_v1",
 	}
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
+		res := testutil.CallRoute[Request, Response](h, route, headers, req)
 		require.Equal(c, 200, res.Status)
 		require.NotNil(c, res.Body)
 		require.Len(c, res.Body.Data, 1)
@@ -221,12 +178,8 @@ func TestPortalSessionAnalyticsNonWildcardPermission(t *testing.T) {
 	})
 	h.SetupAnalytics(workspace.ID)
 
-	route := &handler.Handler{
-		DB:                         h.DB,
-		AnalyticsConnectionManager: h.AnalyticsConnectionManager,
-		Caches:                     h.Caches,
-	}
-	h.Register(route, portalMiddleware(h)...)
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
 
 	// Identity A owns a key in each API.
 	externalA := "portal_user_A"
@@ -308,16 +261,16 @@ func TestPortalSessionAnalyticsNonWildcardPermission(t *testing.T) {
 
 	// Permission is scoped to api1 only (non-wildcard); the query must reference
 	// api1's key_space_id so authorization resolves to the api1 permission.
-	headers := createPortalSession(t, h, workspace.ID, externalA, []string{
+	headers := h.CreatePortalSession(workspace.ID, externalA, []string{
 		fmt.Sprintf("api.%s.read_analytics", api1.ID),
 	})
 
-	req := handler.Request{
+	req := Request{
 		Query: fmt.Sprintf("SELECT COUNT(*) as count FROM key_verifications_v1 WHERE key_space_id = '%s'", api1.KeyAuthID.String),
 	}
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
+		res := testutil.CallRoute[Request, Response](h, route, headers, req)
 		require.Equal(c, 200, res.Status)
 		require.NotNil(c, res.Body)
 		require.Len(c, res.Body.Data, 1)
@@ -343,12 +296,8 @@ func TestPortalSessionAnalyticsNoKeysReturnsEmpty(t *testing.T) {
 	})
 	h.SetupAnalytics(workspace.ID)
 
-	route := &handler.Handler{
-		DB:                         h.DB,
-		AnalyticsConnectionManager: h.AnalyticsConnectionManager,
-		Caches:                     h.Caches,
-	}
-	h.Register(route, portalMiddleware(h)...)
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
 
 	// Another identity has events; the portal session's identity has zero keys.
 	otherIdentity := h.CreateIdentity(seed.CreateIdentityRequest{
@@ -377,11 +326,11 @@ func TestPortalSessionAnalyticsNoKeysReturnsEmpty(t *testing.T) {
 		})
 	}
 
-	headers := createPortalSession(t, h, workspace.ID, "portal_user_zero_keys", []string{
+	headers := h.CreatePortalSession(workspace.ID, "portal_user_zero_keys", []string{
 		"api.*.read_analytics",
 	})
 
-	req := handler.Request{
+	req := Request{
 		Query: "SELECT COUNT(*) as count FROM key_verifications_v1",
 	}
 
@@ -389,7 +338,7 @@ func TestPortalSessionAnalyticsNoKeysReturnsEmpty(t *testing.T) {
 	// matches no rows, so the count is zero. EventuallyWithT tolerates the
 	// analytics table not being immediately queryable after setup.
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
+		res := testutil.CallRoute[Request, Response](h, route, headers, req)
 		require.Equal(c, 200, res.Status)
 		require.NotNil(c, res.Body)
 		require.Len(c, res.Body.Data, 1)
@@ -413,22 +362,18 @@ func TestPortalSessionAnalyticsWithoutPermissionForbidden(t *testing.T) {
 	})
 	h.SetupAnalytics(workspace.ID)
 
-	route := &handler.Handler{
-		DB:                         h.DB,
-		AnalyticsConnectionManager: h.AnalyticsConnectionManager,
-		Caches:                     h.Caches,
-	}
-	h.Register(route, portalMiddleware(h)...)
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
 
 	// Session owns no keys AND has no read_analytics permission.
-	headers := createPortalSession(t, h, workspace.ID, "portal_user_no_perm", []string{
+	headers := h.CreatePortalSession(workspace.ID, "portal_user_no_perm", []string{
 		"api.*.read_api",
 	})
 
-	req := handler.Request{
+	req := Request{
 		Query: "SELECT COUNT(*) as count FROM key_verifications_v1",
 	}
 
-	res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
+	res := testutil.CallRoute[Request, Response](h, route, headers, req)
 	require.Equal(t, 403, res.Status, "session without read_analytics must be forbidden even with zero keys")
 }

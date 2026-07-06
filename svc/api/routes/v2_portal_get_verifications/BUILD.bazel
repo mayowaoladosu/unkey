@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "v2_portal_get_verifications",
@@ -9,5 +9,22 @@ go_library(
         "//pkg/zen",
         "//svc/api/internal/portalscope",
         "//svc/api/routes/v2_analytics_get_verifications",
+    ],
+)
+
+go_test(
+    name = "v2_portal_get_verifications_test",
+    srcs = ["200_test.go"],
+    deps = [
+        ":v2_portal_get_verifications",
+        "//pkg/clickhouse/schema",
+        "//pkg/db",
+        "//pkg/ptr",
+        "//pkg/uid",
+        "//svc/api/internal/testutil",
+        "//svc/api/internal/testutil/seed",
+        "//svc/api/routes/v2_analytics_get_verifications",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )
