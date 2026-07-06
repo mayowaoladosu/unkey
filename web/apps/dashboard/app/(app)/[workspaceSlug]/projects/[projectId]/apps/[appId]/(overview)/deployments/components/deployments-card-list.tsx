@@ -98,7 +98,8 @@ export function DeploymentsCardList({
 
   return (
     <>
-      <div className="border border-grayA-4 rounded-[14px] overflow-hidden">
+      <div className={paginated ? "pb-28" : undefined}>
+        <div className="border border-grayA-4 rounded-[14px] overflow-hidden">
         {title && <ListHeader title={title} action={headerAction} />}
         <div className="divide-y divide-grayA-4">
           {data.map(({ deployment, environment }) => {
@@ -118,8 +119,9 @@ export function DeploymentsCardList({
                 })}
               />
             );
-          })}
+        })}
         </div>
+      </div>
       </div>
       {paginated && (
         <PaginationFooter

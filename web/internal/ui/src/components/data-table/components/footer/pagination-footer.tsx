@@ -44,7 +44,7 @@ export const PaginationFooter = memo(function PaginationFooter({
   // Minimized state - parked at right side
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-10 animate-fade-slide-in">
+      <div className="fixed bottom-6 right-6 z-30 animate-fade-slide-in">
         <button
           type="button"
           onClick={() => setIsOpen(true)}
@@ -73,7 +73,7 @@ export const PaginationFooter = memo(function PaginationFooter({
   return (
     <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 w-full items-center justify-center flex flex-col z-10 animation-ease-out pointer-events-none",
+        "fixed bottom-0 left-0 right-0 w-full items-center justify-center flex flex-col z-30 animation-ease-out pointer-events-none",
         "opacity-100",
       )}
     >
