@@ -145,14 +145,16 @@ notes below are the non-obvious caveats for running the stack.
 
 ### Commit co-author email
 
-- The startup update script also patches the Cursor-managed co-author hook
- (`~/.cursor/agent-hooks/*/commit-msg.cursor.co-author`) to use GitHub's
- canonical no-reply email `Flo <53355483+Flo4604@users.noreply.github.com>`
- instead of the legacy `Flo <Flo4604@users.noreply.github.com>`. The legacy
- form does not resolve to the GitHub account, which left the CLA bot pending.
- Keep that line in the update script; the hook is `@cursor-managed` and can be
- regenerated with the legacy email. The durable fix is to set the correct
- email in Cursor account settings.
+- The startup update script rewrites the `CO_AUTHOR` line in the Cursor-managed
+ co-author hook (`~/.cursor/agent-hooks/*/commit-msg.cursor.co-author`) to
+ `Flo <flo@unkey.com>`, overriding whatever email Cursor generates. Keep that
+ line in the update script; the hook is `@cursor-managed` and gets regenerated.
+ The durable fix is to set the desired email in Cursor account settings.
+- Commits are authored/committed by `Cursor Agent <cursoragent@cursor.com>` and
+ SSH-signed (`commit.gpgsign=true`, `gpg.format=ssh`); the `Co-authored-by`
+ trailer is only attribution and does not affect signing. Whether GitHub shows
+ "Verified" depends on the committer identity and its registered SSH signing
+ key, not on the co-author trailer.
 
 ### mise / PATH
 
