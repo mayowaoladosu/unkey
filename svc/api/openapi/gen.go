@@ -226,11 +226,6 @@ type Deployment struct {
 	UpdatedAt int64 `json:"updatedAt,omitempty"`
 }
 
-// DeploymentStatus Current lifecycle status of the deployment. Poll until it reaches a
-// terminal state: ready (serving), failed, skipped, superseded, stopped,
-// or cancelled.
-type DeploymentStatus string
-
 // DeploymentRuntime defines model for DeploymentRuntime.
 type DeploymentRuntime struct {
 	// Command Container entrypoint command override. Empty when none is set.
@@ -279,6 +274,11 @@ type DeploymentSourceImage struct {
 	// DockerImage Docker image to deploy as-is.
 	DockerImage string `json:"dockerImage"`
 }
+
+// DeploymentStatus Current lifecycle status of the deployment. Poll until it reaches a
+// terminal state: ready (serving), failed, skipped, superseded, stopped,
+// or cancelled.
+type DeploymentStatus string
 
 // EmptyResponse Empty response object by design. A successful response indicates this operation was successfully executed.
 type EmptyResponse = map[string]interface{}

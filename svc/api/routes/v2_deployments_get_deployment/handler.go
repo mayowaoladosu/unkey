@@ -7,9 +7,9 @@ import (
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/deployment"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
@@ -41,7 +41,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	deployment, err := db.Query.FindDeploymentById(ctx, h.DB.RO(), req.DeploymentId)
+	dep, err := db.Query.FindDeploymentById(ctx, h.DB.RO(), req.DeploymentId)
 	if err != nil && !db.IsNotFound(err) {
 		return fault.Wrap(
 			err,
@@ -53,7 +53,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 
 	// FindDeploymentById is not workspace-scoped, so a match in another workspace
 	// is masked as not found to avoid leaking a deployment's existence.
-	if db.IsNotFound(err) || deployment.WorkspaceID != principal.WorkspaceID {
+	if db.IsNotFound(err) || dep.WorkspaceID != principal.WorkspaceID {
 		return fault.New(
 			"deployment not found",
 			fault.Code(codes.Data.Deployment.NotFound.URN()),
@@ -70,7 +70,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		}),
 		rbac.T(rbac.Tuple{
 			ResourceType: rbac.Environment,
-			ResourceID:   deployment.EnvironmentID,
+			ResourceID:   dep.EnvironmentID,
 			Action:       rbac.ReadDeployment,
 		}),
 	))
@@ -87,42 +87,6 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		Meta: openapi.Meta{
 			RequestId: s.RequestID(),
 		},
-		Data: toResponse(deployment),
+		Data: deployment.ToResponse(dep),
 	})
-}
-
-func toResponse(d db.Deployment) openapi.Deployment {
-	command := []string(d.Command)
-	if command == nil {
-		command = []string{}
-	}
-
-	var healthcheck *openapi.EnvironmentHealthcheck
-	if hc := d.Healthcheck.Healthcheck; hc != nil {
-		healthcheck = &openapi.EnvironmentHealthcheck{
-			Method:              openapi.EnvironmentHealthcheckMethod(hc.Method),
-			Path:                hc.Path,
-			IntervalSeconds:     ptr.P(hc.IntervalSeconds),
-			TimeoutSeconds:      ptr.P(hc.TimeoutSeconds),
-			FailureThreshold:    ptr.P(hc.FailureThreshold),
-			InitialDelaySeconds: ptr.P(hc.InitialDelaySeconds),
-		}
-	}
-
-	return openapi.Deployment{
-		Id:     d.ID,
-		Status: openapi.DeploymentStatus(d.Status),
-		Runtime: openapi.DeploymentRuntime{
-			CpuMillicores:    int(d.CpuMillicores),
-			MemoryMib:        int(d.MemoryMib),
-			StorageMib:       int(d.StorageMib),
-			Port:             int(d.Port),
-			Command:          command,
-			ShutdownSignal:   openapi.EnvironmentShutdownSignal(d.ShutdownSignal),
-			UpstreamProtocol: openapi.EnvironmentUpstreamProtocol(d.UpstreamProtocol),
-			Healthcheck:      healthcheck,
-		},
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt.Int64,
-	}
 }

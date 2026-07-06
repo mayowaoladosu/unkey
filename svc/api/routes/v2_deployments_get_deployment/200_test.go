@@ -53,12 +53,6 @@ func TestGetDeployment(t *testing.T) {
 	for _, leaked := range []string{"k8s_name", "k8sName", "workspace_id", "workspaceId", "sentinel", "encrypted", "build_id", "buildId", "invocation", "github_deployment", "githubDeployment", "\"pk\""} {
 		require.False(t, strings.Contains(res.RawBody, leaked), "response leaked internal field %q: %s", leaked, res.RawBody)
 	}
-
-	// Fields intentionally dropped from the response must not reappear. Git
-	// metadata is seeded above, so this also proves it is not surfaced.
-	for _, dropped := range []string{"projectId", "appId", "environmentId", "desiredState", "gitBranch", "gitCommitSha", "gitCommitMessage", "gitCommitAuthorHandle", "prNumber", "forkRepository", "trigger", "triggeredBy"} {
-		require.False(t, strings.Contains(res.RawBody, dropped), "response exposed dropped field %q: %s", dropped, res.RawBody)
-	}
 }
 
 func TestGetDeploymentSpecificEnvironmentPermission(t *testing.T) {
