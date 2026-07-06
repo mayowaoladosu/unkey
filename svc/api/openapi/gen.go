@@ -1206,8 +1206,6 @@ type V2DeployGitCommit struct {
 	Timestamp *int64 `json:"timestamp,omitempty"`
 }
 
-<<<<<<< HEAD
-=======
 // V2DeploymentsCreateDeploymentRequestBody Create a deployment. Set source, then provide the fields for that source.
 type V2DeploymentsCreateDeploymentRequestBody struct {
 	// App Identifies a resource by either its unique ID or its slug.
@@ -1260,45 +1258,6 @@ type V2DeploymentsCreateDeploymentResponseData struct {
 	DeploymentId string `json:"deploymentId"`
 }
 
-// V2EnvironmentsAddEnvironmentVariablesRequestBody defines model for V2EnvironmentsAddEnvironmentVariablesRequestBody.
-type V2EnvironmentsAddEnvironmentVariablesRequestBody struct {
-	// App Identifies a resource by either its unique ID or its slug.
-	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
-	App ResourceIdentifier `json:"app"`
-
-	// Environment Identifies a resource by either its unique ID or its slug.
-	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
-	Environment ResourceIdentifier `json:"environment"`
-
-	// Project Identifies a resource by either its unique ID or its slug.
-	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
-	Project ResourceIdentifier `json:"project"`
-
-	// Variables The variables to add. Every key must not already exist; if any one does,
-	// the request is rejected with a 409 and nothing is changed. Use
-	// `setEnvironmentVariables` to update existing values.
-	//
-	// A new key uses the field defaults when optional fields (`kind`,
-	// `description`) are omitted; only `key` and `value` are required on every
-	// entry. `kind` defaults to `writeonly`.
-	//
-	// Each key may appear at most once; duplicates are rejected with a 400. The
-	// whole operation is atomic: if any part fails the environment is left
-	// unchanged. All values are encrypted at rest. Limited to 50 variables per
-	// request.
-	Variables []EnvironmentVariableInput `json:"variables"`
-}
-
-// V2EnvironmentsAddEnvironmentVariablesResponseBody defines model for V2EnvironmentsAddEnvironmentVariablesResponseBody.
-type V2EnvironmentsAddEnvironmentVariablesResponseBody struct {
-	// Data Empty response object by design. A successful response indicates this operation was successfully executed.
-	Data EmptyResponse `json:"data"`
-
-	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
-	Meta Meta `json:"meta"`
-}
-
->>>>>>> ba9e4f6d4 (feat(api): create deployment endpoint (#6617))
 // V2EnvironmentsGetEnvironmentRequestBody defines model for V2EnvironmentsGetEnvironmentRequestBody.
 type V2EnvironmentsGetEnvironmentRequestBody struct {
 	// App Identifies a resource by either its unique ID or its slug.
@@ -3388,15 +3347,9 @@ type DeployCreateDeploymentJSONRequestBody = V2DeployCreateDeploymentRequestBody
 // DeployGetDeploymentJSONRequestBody defines body for DeployGetDeployment for application/json ContentType.
 type DeployGetDeploymentJSONRequestBody = V2DeployGetDeploymentRequestBody
 
-<<<<<<< HEAD
-=======
 // DeploymentsCreateDeploymentJSONRequestBody defines body for DeploymentsCreateDeployment for application/json ContentType.
 type DeploymentsCreateDeploymentJSONRequestBody = V2DeploymentsCreateDeploymentRequestBody
 
-// EnvironmentsAddEnvironmentVariablesJSONRequestBody defines body for EnvironmentsAddEnvironmentVariables for application/json ContentType.
-type EnvironmentsAddEnvironmentVariablesJSONRequestBody = V2EnvironmentsAddEnvironmentVariablesRequestBody
-
->>>>>>> ba9e4f6d4 (feat(api): create deployment endpoint (#6617))
 // EnvironmentsGetEnvironmentJSONRequestBody defines body for EnvironmentsGetEnvironment for application/json ContentType.
 type EnvironmentsGetEnvironmentJSONRequestBody = V2EnvironmentsGetEnvironmentRequestBody
 
