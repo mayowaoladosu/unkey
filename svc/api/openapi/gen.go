@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	DashboardScopes = "dashboard.Scopes"
-	RootKeyScopes   = "rootKey.Scopes"
+	DashboardScopes     = "dashboard.Scopes"
+	PortalSessionScopes = "portalSession.Scopes"
+	RootKeyScopes       = "rootKey.Scopes"
 )
 
 // Defines values for EnvironmentHealthcheckMethod.
@@ -3119,11 +3120,26 @@ type PermissionsListPermissionsJSONRequestBody = V2PermissionsListPermissionsReq
 // PermissionsListRolesJSONRequestBody defines body for PermissionsListRoles for application/json ContentType.
 type PermissionsListRolesJSONRequestBody = V2PermissionsListRolesRequestBody
 
+// PortalCreateKeyJSONRequestBody defines body for PortalCreateKey for application/json ContentType.
+type PortalCreateKeyJSONRequestBody = V2KeysCreateKeyRequestBody
+
 // PortalCreateSessionJSONRequestBody defines body for PortalCreateSession for application/json ContentType.
 type PortalCreateSessionJSONRequestBody = V2PortalCreateSessionRequestBody
 
+// PortalDeleteKeyJSONRequestBody defines body for PortalDeleteKey for application/json ContentType.
+type PortalDeleteKeyJSONRequestBody = V2KeysDeleteKeyRequestBody
+
 // PortalExchangeSessionJSONRequestBody defines body for PortalExchangeSession for application/json ContentType.
 type PortalExchangeSessionJSONRequestBody = V2PortalExchangeSessionRequestBody
+
+// PortalGetVerificationsJSONRequestBody defines body for PortalGetVerifications for application/json ContentType.
+type PortalGetVerificationsJSONRequestBody = V2AnalyticsGetVerificationsRequestBody
+
+// PortalListKeysJSONRequestBody defines body for PortalListKeys for application/json ContentType.
+type PortalListKeysJSONRequestBody = V2ApisListKeysRequestBody
+
+// PortalRerollKeyJSONRequestBody defines body for PortalRerollKey for application/json ContentType.
+type PortalRerollKeyJSONRequestBody = V2KeysRerollKeyRequestBody
 
 // ProjectsCreateProjectJSONRequestBody defines body for ProjectsCreateProject for application/json ContentType.
 type ProjectsCreateProjectJSONRequestBody = V2ProjectsCreateProjectRequestBody

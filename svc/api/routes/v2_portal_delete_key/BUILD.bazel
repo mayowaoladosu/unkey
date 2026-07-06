@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "v2_portal_delete_key",
+    srcs = ["handler.go"],
+    importpath = "github.com/unkeyed/unkey/svc/api/routes/v2_portal_delete_key",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/zen",
+        "//svc/api/internal/portalscope",
+        "//svc/api/routes/v2_keys_delete_key",
+    ],
+)

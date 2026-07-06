@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "v2_portal_get_verifications",
+    srcs = ["handler.go"],
+    importpath = "github.com/unkeyed/unkey/svc/api/routes/v2_portal_get_verifications",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/zen",
+        "//svc/api/internal/portalscope",
+        "//svc/api/routes/v2_analytics_get_verifications",
+    ],
+)
