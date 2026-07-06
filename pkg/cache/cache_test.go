@@ -2,6 +2,7 @@ package cache_test
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -72,6 +73,28 @@ func TestRefresh(t *testing.T) {
 	}
 	require.LessOrEqual(t, refreshedFromOrigin.Load(), int32(5))
 
+}
+
+func TestCostWeigher(t *testing.T) {
+	c, err := cache.New(cache.Config[string, string]{
+		MaxSize:  100,
+		Cost:     func(v string) uint32 { return uint32(len(v)) },
+		Fresh:    time.Minute,
+		Stale:    time.Minute * 5,
+		Resource: "test",
+		Clock:    clock.New(),
+	})
+	require.NoError(t, err)
+
+	c.Set(context.Background(), "small", "x")
+	c.Set(context.Background(), "large", strings.Repeat("a", 90))
+
+	_, hit := c.Get(context.Background(), "small")
+	require.Equal(t, cache.Miss, hit)
+
+	value, hit := c.Get(context.Background(), "large")
+	require.Equal(t, cache.Hit, hit)
+	require.Equal(t, strings.Repeat("a", 90), value)
 }
 
 func TestNull(t *testing.T) {

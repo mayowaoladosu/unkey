@@ -41,8 +41,12 @@ type Config[K comparable, V any] struct {
 	// fetching from the origin server
 	Stale time.Duration
 
-	// Start evicting the least recently used entry when the cache grows to MaxSize
+	// Start evicting the least recently used entry when the cache grows to MaxSize.
+	// When Cost is set, MaxSize is a total weight budget; otherwise it is an entry count.
 	MaxSize int
+
+	// Cost assigns a weight to each cached value for eviction. Defaults to 1 per entry.
+	Cost func(V) uint32
 
 	Resource string
 
@@ -64,11 +68,19 @@ func New[K comparable, V any](config Config[K, V]) (Cache[K, V], error) {
 		return nil, err
 	}
 
+	cost := func(_ K, value swrEntry[V]) uint32 {
+		return 1
+	}
+	if config.Cost != nil {
+		weigh := config.Cost
+		cost = func(_ K, value swrEntry[V]) uint32 {
+			return weigh(value.Value)
+		}
+	}
+
 	otter, err := builder.
 		CollectStats().
-		Cost(func(key K, value swrEntry[V]) uint32 {
-			return 1
-		}).
+		Cost(cost).
 		WithTTL(config.Stale).
 		DeletionListener(func(key K, value swrEntry[V], cause otter.DeletionCause) {
 			metrics.CacheDeleted.WithLabelValues(config.Resource, cause.String()).Inc()

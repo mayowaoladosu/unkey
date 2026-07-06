@@ -55,7 +55,8 @@ func New(config Config) (*Caches, error) {
 	frontlineRoute, err := cache.New(cache.Config[string, db.FindFrontlineRouteByFQDNRow]{
 		Fresh:    30 * time.Second,
 		Stale:    5 * time.Minute,
-		MaxSize:  10_000,
+		MaxSize:  routeCacheByteBudget,
+		Cost:     frontlineRouteCost,
 		Resource: "frontline_route",
 		Clock:    config.Clock,
 	})
@@ -66,7 +67,8 @@ func New(config Config) (*Caches, error) {
 	policies, err := cache.New(cache.Config[string, []*frontlinev1.Policy]{
 		Fresh:    30 * time.Second,
 		Stale:    5 * time.Minute,
-		MaxSize:  10_000,
+		MaxSize:  policiesCacheByteBudget,
+		Cost:     policiesCost,
 		Resource: "policies",
 		Clock:    config.Clock,
 	})
