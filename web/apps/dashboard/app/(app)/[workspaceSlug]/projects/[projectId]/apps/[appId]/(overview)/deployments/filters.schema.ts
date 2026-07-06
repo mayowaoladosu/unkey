@@ -121,6 +121,7 @@ export type DeploymentListQuerySearchParams = {
   startTime: number | null;
   endTime: number | null;
   since: string | null;
+  page: number;
 };
 
 export const parseAsAllOperatorsFilterArray = parseAsFilterValueArray<DeploymentListFilterOperator>(

@@ -5,10 +5,11 @@ import { collection } from "@/lib/collections";
 import { routes } from "@/lib/navigation/routes";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { BookBookmark } from "@unkey/icons";
-import { Button, Empty } from "@unkey/ui";
+import { Button, Empty, PaginationFooter } from "@unkey/ui";
 import type { ReactNode } from "react";
 import { useAppId, useProjectData } from "../../data-provider";
 import { useDeployments } from "../hooks/use-deployments";
+import { usePaginatedDeployments } from "../hooks/use-paginated-deployments";
 import { DeploymentRow } from "./deployment-row";
 import { DeploymentsSkeleton } from "./deployments-skeleton";
 
@@ -25,10 +26,27 @@ type DeploymentsCardListProps = {
   limit?: number;
   title?: string;
   headerAction?: ReactNode;
+  paginated?: boolean;
 };
 
-export function DeploymentsCardList({ limit, title, headerAction }: DeploymentsCardListProps = {}) {
-  const { deployments } = useDeployments();
+export function DeploymentsCardList({
+  limit,
+  title,
+  headerAction,
+  paginated = false,
+}: DeploymentsCardListProps = {}) {
+  const collectionResult = useDeployments({ enabled: !paginated });
+  const paginatedResult = usePaginatedDeployments({ enabled: paginated });
+  const { deployments, page, pageSize, totalPages, totalCount, onPageChange } = paginated
+    ? paginatedResult
+    : {
+        deployments: collectionResult.deployments,
+        page: 1,
+        pageSize: 0,
+        totalPages: 1,
+        totalCount: 0,
+        onPageChange: () => undefined,
+      };
   const { projectId } = useProjectData();
   const appId = useAppId();
   const appsQuery = useLiveQuery(
@@ -79,28 +97,42 @@ export function DeploymentsCardList({ limit, title, headerAction }: DeploymentsC
   }
 
   return (
-    <div className="border border-grayA-4 rounded-[14px] overflow-hidden">
-      {title && <ListHeader title={title} action={headerAction} />}
-      <div className="divide-y divide-grayA-4">
-        {data.map(({ deployment, environment }) => {
-          const isCurrent = currentDeploymentId === deployment.id;
-          return (
-            <DeploymentRow
-              key={deployment.id}
-              deployment={deployment}
-              environment={environment}
-              isCurrent={isCurrent}
-              isRolledBack={isCurrent && (app?.isRolledBack ?? false)}
-              href={routes.projects.apps.deployment({
-                workspaceSlug: workspace.slug,
-                projectId,
-                appId: deployment.appId,
-                deploymentId: deployment.id,
-              })}
-            />
-          );
-        })}
+    <>
+      <div className="border border-grayA-4 rounded-[14px] overflow-hidden">
+        {title && <ListHeader title={title} action={headerAction} />}
+        <div className="divide-y divide-grayA-4">
+          {data.map(({ deployment, environment }) => {
+            const isCurrent = currentDeploymentId === deployment.id;
+            return (
+              <DeploymentRow
+                key={deployment.id}
+                deployment={deployment}
+                environment={environment}
+                isCurrent={isCurrent}
+                isRolledBack={isCurrent && (app?.isRolledBack ?? false)}
+                href={routes.projects.apps.deployment({
+                  workspaceSlug: workspace.slug,
+                  projectId,
+                  appId: deployment.appId,
+                  deploymentId: deployment.id,
+                })}
+              />
+            );
+          })}
+        </div>
       </div>
-    </div>
+      {paginated && (
+        <PaginationFooter
+          page={page}
+          pageSize={pageSize}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          onPageChange={onPageChange}
+          itemLabel="deployments"
+          loading={deployments.isLoading}
+          hide={totalPages <= 1}
+        />
+      )}
+    </>
   );
 }

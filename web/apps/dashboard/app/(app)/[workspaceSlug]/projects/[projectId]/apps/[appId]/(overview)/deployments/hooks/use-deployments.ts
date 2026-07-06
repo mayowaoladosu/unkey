@@ -1,5 +1,5 @@
 import { collection } from "@/lib/collections";
-import { DEPLOYMENTS_DEFAULT_LIMIT } from "@/lib/collections/deploy/deployments";
+import { DEPLOYMENTS_DEFAULT_LIMIT, type Deployment } from "@/lib/collections/deploy/deployments";
 import type { Environment } from "@/lib/collections/deploy/environments";
 import { parseDuration } from "@/lib/duration";
 import { and, eq, gte, lte, useLiveQuery } from "@tanstack/react-db";
@@ -8,7 +8,7 @@ import { useProjectData } from "../../data-provider";
 import type { DeploymentListFilterField } from "../filters.schema";
 import { useFilters } from "./use-filters";
 
-export const useDeployments = () => {
+export const useDeployments = ({ enabled = true }: { enabled?: boolean } = {}) => {
   const { projectId, appId, environments } = useProjectData();
   const { filters } = useFilters();
 
@@ -52,10 +52,17 @@ export const useDeployments = () => {
         .orderBy(({ deployment }) => deployment.createdAt, "desc")
         .limit(DEPLOYMENTS_DEFAULT_LIMIT);
     },
-    [projectId, appId, startTime, endTime, sinceMs],
+    [projectId, appId, startTime, endTime, sinceMs, enabled],
   );
 
   const deployments = useMemo(() => {
+    if (!enabled) {
+      return {
+        isLoading: false,
+        data: [] as { deployment: Deployment; environment?: Environment }[],
+      };
+    }
+
     const withEnvironments = result.data.map((deployment) => ({
       deployment,
       environment: environmentMap.get(deployment.environmentId),
@@ -104,7 +111,7 @@ export const useDeployments = () => {
     });
 
     return { isLoading: result.isLoading, data: filtered };
-  }, [result, filters, environmentMap]);
+  }, [result, filters, environmentMap, enabled]);
 
   return {
     deployments,

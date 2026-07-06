@@ -3,7 +3,7 @@ import {
   parseAsRelativeTime,
 } from "@/components/logs/validation/utils/nuqs-parsers";
 import { parseAsInteger, useQueryStates } from "nuqs";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type DeploymentListFilterField,
   type DeploymentListFilterOperator,
@@ -22,6 +22,7 @@ export const queryParamsPayload = {
   startTime: parseAsInteger,
   endTime: parseAsInteger,
   since: parseAsRelativeTime,
+  page: parseAsInteger.withDefault(1),
 } as const;
 
 const arrayFields = ["status", "environment", "branch"] as const;
@@ -76,6 +77,7 @@ export const useFilters = () => {
         ...arrayFields.map((field) => [field, null]),
         ...timeFields.map((field) => [field, null]),
       ]);
+      newParams.page = 1;
 
       const filterGroups = arrayFields.reduce(
         (acc, field) => {
@@ -128,10 +130,24 @@ export const useFilters = () => {
     [filters, updateFilters],
   );
 
+  const filterKey = useMemo(
+    () => filters.map((f) => `${f.field}:${f.operator}:${f.value}`).join("|"),
+    [filters],
+  );
+  const prevFilterKeyRef = useRef(filterKey);
+  useEffect(() => {
+    if (prevFilterKeyRef.current !== filterKey) {
+      prevFilterKeyRef.current = filterKey;
+      setSearchParams({ page: 1 });
+    }
+  }, [filterKey, setSearchParams]);
+
   return {
     filters,
     removeFilter,
     updateFilters,
     toggleArrayFilter,
+    page: searchParams.page,
+    setPage: (page: number) => setSearchParams({ page }),
   };
 };

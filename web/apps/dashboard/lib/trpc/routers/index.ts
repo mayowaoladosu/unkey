@@ -51,6 +51,7 @@ import { getById as getDeploymentById } from "./deploy/deployment/getById";
 import { getOpenApiDiff } from "./deploy/deployment/getOpenApiDiff";
 import { getDeploymentInstanceEvents } from "./deploy/deployment/instance-events";
 import { listDeployments } from "./deploy/deployment/list";
+import { listPaginatedDeployments } from "./deploy/deployment/listPaginated";
 import { searchDeployments } from "./deploy/deployment/llm-search";
 import { promote } from "./deploy/deployment/promote";
 import { redeploy } from "./deploy/deployment/redeploy";
@@ -539,6 +540,7 @@ export const router = t.router({
     }),
     deployment: t.router({
       list: listDeployments,
+      listPaginated: listPaginatedDeployments,
       getById: getDeploymentById,
       buildSteps: getDeploymentBuildSteps,
       runtimeLogs: getDeploymentRuntimeLogs,

@@ -33,23 +33,49 @@ export const DeploymentLayoutProvider = ({
   }
 
   const { getDeploymentById, isDeploymentsLoading, projectId } = useProjectData();
-  const deployment = getDeploymentById(deploymentId);
+  const fromCollection = getDeploymentById(deploymentId);
+  const needsFetch = fromCollection === undefined;
 
-  const { data: fetchedDeployment, isLoading: isFetchingById } =
-    trpc.deploy.deployment.getById.useQuery({ deploymentId, projectId }, { enabled: !deployment });
+  const fetchByIdQuery = trpc.deploy.deployment.getById.useQuery(
+    { deploymentId, projectId },
+    { enabled: needsFetch },
+  );
 
-  const parsed = fetchedDeployment ? deploymentSchema.safeParse(fetchedDeployment) : undefined;
-  const resolved = deployment ?? (parsed?.success ? parsed.data : undefined);
+  const parsed = fetchByIdQuery.data ? deploymentSchema.safeParse(fetchByIdQuery.data) : undefined;
+  const resolved = fromCollection ?? (parsed?.success ? parsed.data : undefined);
+
   if (!resolved) {
-    if (isDeploymentsLoading || isFetchingById) {
+    const isWaitingForCollection = isDeploymentsLoading;
+    const isWaitingForFetch = needsFetch && !fetchByIdQuery.isFetched;
+
+    if (isWaitingForCollection || isWaitingForFetch) {
       return (
         <div className="flex flex-col" style={{ height: `calc(100dvh - ${TOP_NAV_HEIGHT}px)` }}>
           <LoadingState message="Loading deployment..." />
         </div>
       );
     }
-    notFound();
+
+    if (needsFetch) {
+      if (fetchByIdQuery.error?.data?.code === "NOT_FOUND") {
+        notFound();
+      }
+      if (fetchByIdQuery.isError) {
+        throw fetchByIdQuery.error;
+      }
+      if (fetchByIdQuery.data && !parsed?.success) {
+        throw new Error(`Invalid deployment payload for ${deploymentId}`);
+      }
+      notFound();
+    }
+
+    return (
+      <div className="flex flex-col" style={{ height: `calc(100dvh - ${TOP_NAV_HEIGHT}px)` }}>
+        <LoadingState message="Loading deployment..." />
+      </div>
+    );
   }
+
   return (
     <DeploymentLayoutContext.Provider value={{ deployment: resolved }}>
       {children}
