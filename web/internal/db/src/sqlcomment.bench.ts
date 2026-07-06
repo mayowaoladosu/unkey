@@ -1,25 +1,24 @@
 import { bench, describe } from "vitest";
-import { annotateSql, staticTagsFromEnv, stripSqlcHeader } from "./sqlcomment";
+import { annotateSql, staticTagsFromEnv } from "./sqlcomment";
 
-const sqlcQuery = `-- name: FindKeyForVerification :one
-SELECT k.id FROM keys AS k WHERE k.hash = ? AND k.deleted = 0`;
+const drizzleSelect =
+  "select `keys`.`id`, `keys`.`name` from `keys` where `keys`.`workspace_id` = ? limit ?";
 
 const staticTags = staticTagsFromEnv("dashboard");
 
 describe("sqlcomment benchmarks", () => {
   bench("annotateSql disabled (no service)", () => {
-    annotateSql(sqlcQuery, { application: "unkey", service: "" });
+    annotateSql(drizzleSelect, { application: "unkey", service: "" });
   });
 
-  bench("annotateSql sqlc header", () => {
-    annotateSql(sqlcQuery, staticTags, {}, "rw");
+  bench("annotateSql drizzle select (static tags only)", () => {
+    annotateSql(drizzleSelect, staticTags);
   });
 
-  bench("annotateSql with route tag", () => {
-    annotateSql(sqlcQuery, staticTags, { route: "trpc.keys.create", source: "trpc" }, "rw");
-  });
-
-  bench("stripSqlcHeader", () => {
-    stripSqlcHeader(sqlcQuery);
+  bench("annotateSql drizzle select with tRPC tags", () => {
+    annotateSql(drizzleSelect, staticTags, {
+      route: "deploy.envVars.create",
+      source: "trpc",
+    });
   });
 });

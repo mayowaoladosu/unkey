@@ -24,10 +24,10 @@ Keep tag cardinality low. Insights indexes tag keys; high-cardinality values (us
 | `environment` | `UNKEY_ENVIRONMENT` | `staging`, `production` |
 | `region` | service config / `UNKEY_REGION` | `us-east-1` |
 | `release_sha` | build revision (7 chars) | `a1b2c3d` |
-| `operation` | sqlc `-- name:` header | `FindKeyForVerification` |
-| `mode` | connection role | `rw`, `ro` |
-| `route` | request context | `keys.verifyKey` (tRPC path) |
-| `source` | request context | `trpc`, `http` |
+| `operation` | sqlc `-- name:` header (Go only) | `FindKeyForVerification` |
+| `mode` | connection role (Go only) | `rw`, `ro` |
+| `route` | request context | `deploy.envVars.create` (tRPC path) |
+| `source` | request context | `trpc`, `webhook` |
 
 Example comment appended to SQL:
 
@@ -63,9 +63,16 @@ Package reference: [`pkg/sqlcomment`](../../../pkg/sqlcomment/doc.go).
 
 ## TypeScript apps
 
-Dashboard and portal use [`createCommentedPool`](../../../web/internal/db/src/commented-pool.ts) from `@unkey/db`. The pool proxy annotates `query` and `execute` calls before they reach mysql2.
+Dashboard and portal use Drizzle on top of [`createCommentedPool`](../../../web/internal/db/src/commented-pool.ts) from `@unkey/db`. The pool proxy annotates `query` and `execute` calls before they reach mysql2.
 
-Dashboard tRPC sets `route` and `source` through `runWithSqlCommentTags` in the base procedure middleware.
+Useful tags on the TypeScript side:
+
+- **Static** (per pool): `service`, `environment`, `region`, `release_sha`
+- **Dynamic** (per request): `route` (tRPC procedure path) and `source` (`trpc`, `webhook`, etc.)
+
+Dashboard tRPC sets `route` and `source` through `runWithSqlCommentTags` in the base procedure middleware. Non-tRPC entrypoints (Stripe webhooks, server actions) should wrap their handler with `runWithSqlCommentTags` and set `source` accordingly.
+
+TypeScript pools do not emit `mode`: mysql2 uses a single pool without the read/write split that Go services have, so a `mode` tag would be misleading.
 
 Static tags read `UNKEY_ENVIRONMENT`, `UNKEY_REGION` / `REGION`, and `UNKEY_GIT_COMMIT_SHA` / `GIT_COMMIT`.
 

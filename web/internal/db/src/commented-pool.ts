@@ -10,7 +10,7 @@ function wrapQueryable<T extends Queryable>(pool: T, staticTags: SqlCommentStati
     if (typeof sql !== "string") {
       return sql;
     }
-    return annotateSql(sql, staticTags, dynamicTagsFromStore(), "rw");
+    return annotateSql(sql, staticTags, dynamicTagsFromStore());
   };
 
   return new Proxy(pool, {

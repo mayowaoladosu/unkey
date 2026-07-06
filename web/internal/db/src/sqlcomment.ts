@@ -6,13 +6,13 @@ export type SqlCommentStaticTags = {
   releaseSha?: string;
 };
 
+/** Per-request tags set through AsyncLocalStorage (for example tRPC middleware). */
 export type SqlCommentDynamicTags = {
+  /** tRPC procedure path, webhook route, or other entrypoint identifier. */
   route?: string;
+  /** Call site family, for example `trpc`, `webhook`, or `server-action`. */
   source?: string;
-  operation?: string;
 };
-
-const sqlcNameLine = /^--\s*name:\s*(\S+).*?\n/s;
 
 function escapeTagValue(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
@@ -21,8 +21,6 @@ function escapeTagValue(value: string): string {
 function formatComment(
   staticTags: SqlCommentStaticTags,
   dynamicTags: SqlCommentDynamicTags,
-  mode?: string,
-  operation?: string,
 ): string {
   const entries: Array<[string, string | undefined]> = [
     ["application", staticTags.application],
@@ -30,10 +28,8 @@ function formatComment(
     ["environment", staticTags.environment],
     ["region", staticTags.region],
     ["release_sha", staticTags.releaseSha],
-    ["operation", operation ?? dynamicTags.operation],
     ["route", dynamicTags.route],
     ["source", dynamicTags.source],
-    ["mode", mode],
   ];
 
   const parts = entries
@@ -47,33 +43,21 @@ function formatComment(
   return `/*${parts.join(",")}*/`;
 }
 
-export function stripSqlcHeader(query: string): { body: string; operation?: string } {
-  const match = sqlcNameLine.exec(query);
-  if (!match) {
-    return { body: query };
-  }
-  return {
-    body: query.slice(match[0].length),
-    operation: match[1],
-  };
-}
-
+/** Appends SQLCommenter metadata to a Drizzle/mysql2 SQL string. */
 export function annotateSql(
   query: string,
   staticTags: SqlCommentStaticTags,
   dynamicTags: SqlCommentDynamicTags = {},
-  mode?: string,
 ): string {
   if (!staticTags.service) {
     return query;
   }
 
-  const { body, operation } = stripSqlcHeader(query);
-  const comment = formatComment(staticTags, dynamicTags, mode, operation);
+  const comment = formatComment(staticTags, dynamicTags);
   if (!comment) {
-    return body.trim();
+    return query.trim();
   }
-  return `${body.trim()} ${comment}`;
+  return `${query.trim()} ${comment}`;
 }
 
 export function staticTagsFromEnv(service: string): SqlCommentStaticTags {

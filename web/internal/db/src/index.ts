@@ -10,11 +10,7 @@ import * as schema from "./schema";
 export { schema };
 export * from "drizzle-orm";
 export { drizzle } from "drizzle-orm/mysql2";
-export {
-  annotateSql,
-  staticTagsFromEnv,
-  stripSqlcHeader,
-} from "./sqlcomment";
+export { annotateSql, staticTagsFromEnv } from "./sqlcomment";
 export type { SqlCommentDynamicTags, SqlCommentStaticTags } from "./sqlcomment";
 export { createCommentedPool, dynamicTagsFromStore, runWithSqlCommentTags } from "./commented-pool";
 
