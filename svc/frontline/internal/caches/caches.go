@@ -53,7 +53,7 @@ func New(config Config) (*Caches, error) {
 	}
 
 	frontlineRoute, err := cache.New(cache.Config[string, db.FindFrontlineRouteByFQDNRow]{
-		Fresh:    5 * time.Second,
+		Fresh:    30 * time.Second,
 		Stale:    5 * time.Minute,
 		MaxSize:  10_000,
 		Resource: "frontline_route",
