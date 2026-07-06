@@ -100,6 +100,18 @@ var (
 		[]string{"resource"},
 	)
 
+	// CacheRevalidationsDropped counts stale refreshes dropped because the
+	// revalidation queue was full or the key was already being refreshed.
+	CacheRevalidationsDropped = lazy.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "unkey",
+			Subsystem: "cache",
+			Name:      "revalidations_dropped_total",
+			Help:      "Stale cache revalidations dropped because the worker queue was full or the key was already refreshing.",
+		},
+		[]string{"resource"},
+	)
+
 	// CacheReadsErrorsTotal tracks the total number of cache read errors,
 	// labeled by resource type. Use this counter to monitor cache read error rates.
 	//

@@ -6,10 +6,13 @@ go_library(
         "cache.go",
         "doc.go",
         "entry.go",
+        "fetch_dedup.go",
         "interface.go",
         "middleware.go",
         "noop.go",
+        "revalidation.go",
         "scoped_key.go",
+        "timing_attrs.go",
     ],
     importpath = "github.com/unkeyed/unkey/pkg/cache",
     visibility = ["//visibility:public"],
@@ -23,6 +26,7 @@ go_library(
         "//pkg/repeat",
         "//pkg/timing",
         "@com_github_maypok86_otter//:otter",
+        "@com_github_prometheus_client_golang//prometheus",
     ],
 )
 

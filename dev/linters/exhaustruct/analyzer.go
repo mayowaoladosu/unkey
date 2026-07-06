@@ -75,6 +75,7 @@ var excludePatterns = []string{
 	// Unkey internal
 	`^github\.com/unkeyed/unkey/svc/api/openapi\.Meta$`,
 	`^github\.com/unkeyed/unkey/pkg/cli\.Command$`,
+	`^github\.com/unkeyed/unkey/pkg/cache\.Config`,
 
 	// Kubernetes
 	`^k8s\.io/api/core/v1.*$`,

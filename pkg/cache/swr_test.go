@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -151,4 +153,121 @@ func TestSWR_CacheHit(t *testing.T) {
 		require.Equal(t, "", value)
 		require.Equal(t, cache.Miss, hit)
 	})
+}
+
+func TestSWR_StaleDoesNotBlockWhenQueueFull(t *testing.T) {
+	ctx := context.Background()
+	mockClock := clock.NewTestClock()
+
+	c, err := cache.New(cache.Config[string, string]{
+		Fresh:                 time.Second,
+		Stale:                 5 * time.Minute,
+		MaxSize:               100,
+		Resource:              "test",
+		Clock:                 mockClock,
+		RevalidationQueueSize: 1,
+		RevalidationWorkers:   0,
+	})
+	require.NoError(t, err)
+
+	for _, key := range []string{"key1", "key2"} {
+		_, _, err := c.SWR(ctx, key, func(ctx context.Context) (string, error) {
+			return key + "-value", nil
+		}, func(err error) cache.Op {
+			return cache.WriteValue
+		})
+		require.NoError(t, err)
+	}
+
+	mockClock.Tick(2 * time.Second)
+
+	start := time.Now()
+	_, hit, err := c.SWR(ctx, "key1", func(ctx context.Context) (string, error) {
+		time.Sleep(500 * time.Millisecond)
+		return "updated", nil
+	}, func(err error) cache.Op {
+		return cache.WriteValue
+	})
+	require.NoError(t, err)
+	require.Equal(t, cache.Hit, hit)
+	require.Less(t, time.Since(start), 100*time.Millisecond)
+
+	start = time.Now()
+	_, hit, err = c.SWR(ctx, "key2", func(ctx context.Context) (string, error) {
+		time.Sleep(500 * time.Millisecond)
+		return "updated", nil
+	}, func(err error) cache.Op {
+		return cache.WriteValue
+	})
+	require.NoError(t, err)
+	require.Equal(t, cache.Hit, hit)
+	require.Less(t, time.Since(start), 100*time.Millisecond)
+}
+
+func TestSWR_FetchDeduped(t *testing.T) {
+	ctx := context.Background()
+
+	c, err := cache.New(cache.Config[string, string]{
+		Fresh:    time.Minute,
+		Stale:    5 * time.Minute,
+		MaxSize:  100,
+		Resource: "test",
+		Clock:    clock.New(),
+	})
+	require.NoError(t, err)
+
+	var calls atomic.Int32
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := c.SWR(ctx, "cold-key", func(ctx context.Context) (string, error) {
+				calls.Add(1)
+				time.Sleep(20 * time.Millisecond)
+				return "value", nil
+			}, func(err error) cache.Op {
+				return cache.WriteValue
+			})
+			require.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int32(1), calls.Load())
+}
+
+func TestSWRWithFallback_NegativeCaching(t *testing.T) {
+	ctx := context.Background()
+
+	c, err := cache.New(cache.Config[string, string]{
+		Fresh:    time.Minute,
+		Stale:    5 * time.Minute,
+		MaxSize:  100,
+		Resource: "test",
+		Clock:    clock.New(),
+	})
+	require.NoError(t, err)
+
+	candidates := []string{"missing.example.com", "*.example.com"}
+	op := func(err error) cache.Op {
+		if db.IsNotFound(err) {
+			return cache.WriteNull
+		}
+		return cache.Noop
+	}
+
+	_, hit, err := c.SWRWithFallback(ctx, candidates, func(ctx context.Context) (string, string, error) {
+		return "", "", sql.ErrNoRows
+	}, op)
+	require.Error(t, err)
+	require.Equal(t, cache.Null, hit)
+
+	var calls atomic.Int32
+	_, hit, err = c.SWRWithFallback(ctx, candidates, func(ctx context.Context) (string, string, error) {
+		calls.Add(1)
+		return "", "", sql.ErrNoRows
+	}, op)
+	require.NoError(t, err)
+	require.Equal(t, int32(0), calls.Load())
+	require.Equal(t, cache.Null, hit)
 }
