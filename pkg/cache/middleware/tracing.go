@@ -20,7 +20,9 @@ func WithTracing[K comparable, V any](c cache.Cache[K, V]) cache.Cache[K, V] {
 func (mw *tracingMiddleware[K, V]) Get(ctx context.Context, key K) (V, cache.CacheHit) {
 	ctx, span := tracing.Start(ctx, "cache.Get")
 	defer span.End()
-	span.SetAttributes(attribute.String("key", fmt.Sprintf("%+v", key)))
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String("key", fmt.Sprintf("%+v", key)))
+	}
 
 	value, hit := mw.next.Get(ctx, key)
 
@@ -57,7 +59,9 @@ func (mw *tracingMiddleware[K, V]) GetMany(ctx context.Context, keys []K) (map[K
 func (mw *tracingMiddleware[K, V]) Set(ctx context.Context, key K, value V) {
 	ctx, span := tracing.Start(ctx, "cache.Set")
 	defer span.End()
-	span.SetAttributes(attribute.String("key", fmt.Sprintf("%+v", key)))
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String("key", fmt.Sprintf("%+v", key)))
+	}
 
 	mw.next.Set(ctx, key, value)
 }
@@ -74,7 +78,9 @@ func (mw *tracingMiddleware[K, V]) SetNull(ctx context.Context, key K) {
 	ctx, span := tracing.Start(ctx, "cache.SetNull")
 	defer span.End()
 
-	span.SetAttributes(attribute.String("key", fmt.Sprintf("%+v", key)))
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String("key", fmt.Sprintf("%+v", key)))
+	}
 	mw.next.SetNull(ctx, key)
 }
 
@@ -89,10 +95,14 @@ func (mw *tracingMiddleware[K, V]) SetNullMany(ctx context.Context, keys []K) {
 func (mw *tracingMiddleware[K, V]) Remove(ctx context.Context, keys ...K) {
 	ctx, span := tracing.Start(ctx, "cache.Remove")
 	defer span.End()
-	span.SetAttributes(
-		attribute.String("keys", fmt.Sprintf("%+v", keys)),
-		attribute.Int("count", len(keys)),
-	)
+	if span.IsRecording() {
+		span.SetAttributes(
+			attribute.String("keys", fmt.Sprintf("%+v", keys)),
+			attribute.Int("count", len(keys)),
+		)
+	} else {
+		span.SetAttributes(attribute.Int("count", len(keys)))
+	}
 
 	mw.next.Remove(ctx, keys...)
 }
@@ -136,7 +146,9 @@ func (mw *tracingMiddleware[K, V]) Name() string {
 func (mw *tracingMiddleware[K, V]) SWR(ctx context.Context, key K, refreshFromOrigin func(ctx context.Context) (V, error), op func(err error) cache.Op) (V, cache.CacheHit, error) {
 	ctx, span := tracing.Start(ctx, "cache.SWR")
 	defer span.End()
-	span.SetAttributes(attribute.String("key", fmt.Sprintf("%v", key)))
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String("key", fmt.Sprintf("%v", key)))
+	}
 
 	value, hit, err := mw.next.SWR(ctx, key, func(innerCtx context.Context) (V, error) {
 		innerCtx, innerSpan := tracing.Start(innerCtx, "refreshFromOrigin")
