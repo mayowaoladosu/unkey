@@ -40,6 +40,7 @@ func TestValidationErrors(t *testing.T) {
 		body map[string]any
 	}{
 		{"image missing dockerImage", body(map[string]any{"image": map[string]any{}})},
+		{"image whitespace dockerImage", body(map[string]any{"image": map[string]any{"dockerImage": "   "}})},
 		{"git fork without commitSha", body(map[string]any{"git": map[string]any{"repository": "contributor/acme-api"}})},
 		{"git fork bad charset", body(map[string]any{"git": map[string]any{"commitSha": "abc123", "repository": "bad repo!"}})},
 		{"git fork path traversal", body(map[string]any{"git": map[string]any{"commitSha": "abc123", "repository": "../../etc/passwd"}})},

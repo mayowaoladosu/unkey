@@ -627,6 +627,7 @@ components:
                     "$ref": "#/components/schemas/DeploymentSourceImage"
                 deployment:
                     "$ref": "#/components/schemas/DeploymentSourceDeployment"
+            additionalProperties: false
             oneOf:
                 - required:
                     - image
@@ -653,7 +654,7 @@ components:
                 deploymentId:
                     "$ref": "#/components/schemas/ResourceIdentifier"
             additionalProperties: false
-            description: Retrieve a single deployment, including its build, rollout status, and git or image source.
+            description: Retrieve a single deployment, including its status and runtime configuration.
         V2DeploymentsGetDeploymentResponseBody:
             type: object
             required:
@@ -3645,6 +3646,7 @@ components:
                 dockerImage:
                     type: string
                     minLength: 1
+                    pattern: "\\S"
                     description: Docker image to deploy as-is.
                     example: "ghcr.io/acme/api:v1.2.3"
             description: Deploy a prebuilt Docker image as-is.
@@ -6625,7 +6627,7 @@ paths:
                 Retrieve a single deployment by its id.
 
                 Use this to check a deployment's status after creating it, or to inspect the
-                source, runtime configuration, and provenance of an existing deployment.
+                runtime configuration of an existing deployment.
 
                 **Required Permissions**
 

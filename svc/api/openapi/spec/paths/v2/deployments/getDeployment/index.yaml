@@ -6,7 +6,7 @@ post:
     Retrieve a single deployment by its id.
 
     Use this to check a deployment's status after creating it, or to inspect the
-    source, runtime configuration, and provenance of an existing deployment.
+    runtime configuration of an existing deployment.
 
     **Required Permissions**
 

@@ -1342,7 +1342,7 @@ type V2DeploymentsCreateDeploymentResponseData struct {
 	DeploymentId string `json:"deploymentId"`
 }
 
-// V2DeploymentsGetDeploymentRequestBody Retrieve a single deployment, including its build, rollout status, and git or image source.
+// V2DeploymentsGetDeploymentRequestBody Retrieve a single deployment, including its status and runtime configuration.
 type V2DeploymentsGetDeploymentRequestBody struct {
 	// DeploymentId Identifies a resource by either its unique ID or its slug.
 	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.

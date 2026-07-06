@@ -16,6 +16,7 @@ properties:
     "$ref": "./DeploymentSourceImage.yaml"
   deployment:
     "$ref": "./DeploymentSourceDeployment.yaml"
+additionalProperties: false
 oneOf:
   - required: [image]
   - required: [git]
