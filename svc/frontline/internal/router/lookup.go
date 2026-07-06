@@ -10,6 +10,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/mysql"
+	"github.com/unkeyed/unkey/svc/frontline/internal/caches"
 	"github.com/unkeyed/unkey/svc/frontline/internal/db"
 	"github.com/unkeyed/unkey/svc/frontline/internal/policies"
 )
@@ -64,17 +65,17 @@ func (s *service) getInstances(ctx context.Context, deploymentID string) ([]db.F
 // OpenAPI policies that carry no inline spec are hydrated from the scraped
 // spec in openapi_specs, keyed by deployment_id.
 func (s *service) getPolicies(ctx context.Context, route db.FindFrontlineRouteByFQDNRow) ([]*frontlinev1.Policy, error) {
-	pols, hit, err := s.policyCache.SWR(ctx, route.DeploymentID, func(ctx context.Context) ([]*frontlinev1.Policy, error) {
+	cached, hit, err := s.policyCache.SWR(ctx, route.DeploymentID, func(ctx context.Context) (caches.CachedPolicies, error) {
 		parsed, parseErr := policies.ParseMiddleware(route.SentinelConfig)
 		if parseErr != nil {
-			return nil, parseErr
+			return caches.CachedPolicies{Err: parseErr}, nil
 		}
 
 		if err := s.hydrateOpenapiSpecs(ctx, route.DeploymentID, parsed); err != nil {
-			return nil, err
+			return caches.CachedPolicies{}, err
 		}
 
-		return parsed, nil
+		return caches.CachedPolicies{Policies: parsed}, nil
 	}, func(err error) cache.Op {
 		if err != nil {
 			return cache.Noop
@@ -90,7 +91,11 @@ func (s *service) getPolicies(ctx context.Context, route db.FindFrontlineRouteBy
 		return nil, nil
 	}
 
-	return pols, nil
+	if cached.Err != nil {
+		return nil, cached.Err
+	}
+
+	return cached.Policies, nil
 }
 
 // hydrateOpenapiSpecs loads the spec from openapi_specs (keyed by deployment_id)

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	frontlinev1 "github.com/unkeyed/unkey/gen/proto/frontline/v1"
 	"github.com/unkeyed/unkey/pkg/cache"
+	"github.com/unkeyed/unkey/svc/frontline/internal/caches"
 	"github.com/unkeyed/unkey/svc/frontline/internal/db"
 )
 
@@ -17,7 +17,7 @@ type service struct {
 	db                         db.Querier
 	frontlineRouteCache        cache.Cache[string, db.FindFrontlineRouteByFQDNRow]
 	instancesByDeploymentCache cache.Cache[string, []db.FindInstancesByDeploymentIDRow]
-	policyCache                cache.Cache[string, []*frontlinev1.Policy]
+	policyCache                cache.Cache[string, caches.CachedPolicies]
 }
 
 var _ Service = (*service)(nil)

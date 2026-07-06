@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	frontlinev1 "github.com/unkeyed/unkey/gen/proto/frontline/v1"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/pkg/cache/middleware"
 	"github.com/unkeyed/unkey/pkg/clock"
@@ -24,7 +23,7 @@ type Caches struct {
 
 	// DeploymentID -> Parsed sentinel policies. Cached to avoid re-parsing
 	// the protojson SentinelConfig on every request.
-	Policies cache.Cache[string, []*frontlinev1.Policy]
+	Policies cache.Cache[string, CachedPolicies]
 
 	// HostName -> Certificate
 	TLSCertificates cache.Cache[string, tls.Certificate]
@@ -64,11 +63,11 @@ func New(config Config) (*Caches, error) {
 		return nil, fmt.Errorf("failed to create frontline route cache: %w", err)
 	}
 
-	policies, err := cache.New(cache.Config[string, []*frontlinev1.Policy]{
+	policies, err := cache.New(cache.Config[string, CachedPolicies]{
 		Fresh:    30 * time.Second,
 		Stale:    5 * time.Minute,
 		MaxSize:  policiesCacheByteBudget,
-		Cost:     policiesCost,
+		Cost:     cachedPoliciesCost,
 		Resource: "policies",
 		Clock:    config.Clock,
 	})

@@ -31,6 +31,13 @@ func policiesCost(policies []*frontlinev1.Policy) uint32 {
 	return n
 }
 
+func cachedPoliciesCost(entry CachedPolicies) uint32 {
+	if entry.Err != nil {
+		return 64
+	}
+	return policiesCost(entry.Policies)
+}
+
 func addUint32Clamped(a, b uint32) uint32 {
 	if a > math.MaxUint32-b {
 		return math.MaxUint32
