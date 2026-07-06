@@ -3,11 +3,6 @@ required:
   - deploymentId
 properties:
   deploymentId:
-    type: string
-    minLength: 1
-    maxLength: 256
-    description: |
-      The unique identifier of the deployment to retrieve.
-    example: dep_1234abcd
+    "$ref": "../../../../common/ResourceIdentifier.yaml"
 additionalProperties: false
-description: Retrieve a single deployment by its id.
+description: Retrieve a single deployment, including its build, rollout status, and git or image source.

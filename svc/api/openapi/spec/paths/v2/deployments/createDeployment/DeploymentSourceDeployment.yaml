@@ -1,10 +1,7 @@
 type: object
 required:
-  - deploymentId
+  - id
 properties:
-  deploymentId:
-    type: string
-    minLength: 1
-    description: Existing deployment to redeploy.
-    example: "d_abc123xyz"
+  id:
+    "$ref": "../../../../common/ResourceIdentifier.yaml"
 description: Re-run an existing deployment.

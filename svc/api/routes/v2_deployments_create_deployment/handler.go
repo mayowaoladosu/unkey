@@ -140,7 +140,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		}
 
 	case req.Deployment != nil:
-		gitCommit, dockerImage, err := h.resolveRedeploy(ctx, principal.WorkspaceID, environment.AppID, environment.ID, req.Deployment.DeploymentId)
+		gitCommit, dockerImage, err := h.resolveRedeploy(ctx, principal.WorkspaceID, environment.AppID, environment.ID, req.Deployment.Id)
 		if err != nil {
 			return err
 		}

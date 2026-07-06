@@ -9,9 +9,6 @@ import (
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// ToResponse builds the wire representation of a deployment, dropping
-// internal-only columns (pk, k8s name, sentinel config, encrypted env vars,
-// build/invocation ids). Nullable columns leave their fields at zero value.
 func ToResponse(d db.Deployment) openapi.Deployment {
 	command := []string(d.Command)
 	if command == nil {

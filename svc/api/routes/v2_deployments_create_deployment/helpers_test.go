@@ -46,7 +46,7 @@ func deploymentRequest(t *testing.T, project, app, env, deploymentID string) han
 		Project:         project,
 		App:             app,
 		EnvironmentSlug: env,
-		Deployment:      &openapi.DeploymentSourceDeployment{DeploymentId: deploymentID},
+		Deployment:      &openapi.DeploymentSourceDeployment{Id: deploymentID},
 	}
 }
 

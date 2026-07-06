@@ -253,8 +253,9 @@ type DeploymentRuntime struct {
 
 // DeploymentSourceDeployment Re-run an existing deployment.
 type DeploymentSourceDeployment struct {
-	// DeploymentId Existing deployment to redeploy.
-	DeploymentId string `json:"deploymentId"`
+	// Id Identifies a resource by either its unique ID or its slug.
+	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
+	Id ResourceIdentifier `json:"id"`
 }
 
 // DeploymentSourceGit Build from the app's connected GitHub repository.
@@ -265,7 +266,7 @@ type DeploymentSourceGit struct {
 	// CommitSha Commit to build (full or abbreviated SHA). Takes precedence over branch.
 	CommitSha *string `json:"commitSha,omitempty"`
 
-	// Repository Fork to build from instead of the app's connected repository, as "owner/repo". Requires commitSha.
+	// Repository Build from a fork instead of the app's connected repository, as "owner/repo". Requires commitSha.
 	Repository *string `json:"repository,omitempty"`
 }
 
@@ -1341,10 +1342,11 @@ type V2DeploymentsCreateDeploymentResponseData struct {
 	DeploymentId string `json:"deploymentId"`
 }
 
-// V2DeploymentsGetDeploymentRequestBody Retrieve a single deployment by its id.
+// V2DeploymentsGetDeploymentRequestBody Retrieve a single deployment, including its build, rollout status, and git or image source.
 type V2DeploymentsGetDeploymentRequestBody struct {
-	// DeploymentId The unique identifier of the deployment to retrieve.
-	DeploymentId string `json:"deploymentId"`
+	// DeploymentId Identifies a resource by either its unique ID or its slug.
+	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
+	DeploymentId ResourceIdentifier `json:"deploymentId"`
 }
 
 // V2DeploymentsGetDeploymentResponseBody defines model for V2DeploymentsGetDeploymentResponseBody.

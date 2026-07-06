@@ -28,7 +28,7 @@ post:
             summary: Retrieve by deployment ID
             description: Fetch a deployment using its unique identifier
             value:
-              deploymentId: dep_1234abcd
+              deploymentId: d_1234abcd
   responses:
     "200":
       description: |
@@ -45,7 +45,7 @@ post:
                 meta:
                   requestId: req_1234abcd
                 data:
-                  id: dep_1234abcd
+                  id: d_1234abcd
                   status: ready
                   runtime:
                     cpuMillicores: 250
