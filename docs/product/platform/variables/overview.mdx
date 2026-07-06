@@ -54,6 +54,15 @@ The toolbar above the variable list lets you:
 
 Click any variable row to open the inline editor. You can update the key, value, or note. Use the action menu on each row to delete a variable.
 
+### Rename or delete across every environment
+
+Variables with the same name in more than one environment are shown as a single group. The group's action menu lets you:
+
+- **Rename**: change the key across every environment where the variable exists in one step. Duplicate keys within the target environments are rejected up front.
+- **Delete all**: remove every occurrence of the variable across environments.
+
+Renames and deletes take effect on the next deployment, so trigger a redeploy to apply the change.
+
 <Frame>
   <img className="block dark:hidden" src="/platform/variables/edit-variable-light.png" alt="Edit variable inline editor" />
   <img className="hidden dark:block" src="/platform/variables/edit-variable-dark.png" alt="Edit variable inline editor" />

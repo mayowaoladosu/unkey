@@ -34,6 +34,7 @@ Most projects build with zero configuration. When you need to adjust where and h
 | ------------------ | -------------------------------------------------------- | --------------- |
 | **Root directory** | The directory your application is built from             | `.` (repo root) |
 | **Dockerfile**     | Optional path to a [Dockerfile](/builds/dockerfile) for full control over the image | Automatic       |
+| **Build command**  | Override the auto-detected build command for automatic builds (for example `pnpm build --filter api`). Ignored when a Dockerfile is configured. | Automatic       |
 
 In a monorepo, point the [root directory](/platform/apps/settings#root-directory) at the service you're deploying so detection picks up the right project. See [App settings](/platform/apps/settings#build-settings) for the full reference.
 

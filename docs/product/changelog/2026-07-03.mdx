@@ -1,0 +1,51 @@
+---
+title: "July 3, 2026"
+description: "Enforce key rate limits at the gateway, custom Railpack build commands, HTTP API endpoints for listing, updating, and deleting apps, one-time secure share links for key secrets, and portal audit logging."
+noindex: true
+---
+
+## New features
+
+### Enforce key rate limits at the gateway
+
+The [API key authentication](/platform/gateway/policies/api-key) policy can now enforce rate limits attached to the verified key, mirroring the `ratelimits` field of the verify key API. Reference an existing named limit on the key, override its `limit`, `duration`, or `cost` per policy, or define an inline limit that does not need to be pre-configured on the key. Auto-applied limits on the key and its identity are still evaluated on every request.
+
+### Custom build commands for automatic builds
+
+Automatic (Railpack) builds now support a custom **Build command** in [app settings](/platform/apps/settings#build-command). Use it to override the auto-detected command, for example `pnpm build --filter api` in a monorepo. Leave it empty to keep Unkey's detection. The setting is ignored when a Dockerfile is configured.
+
+### HTTP API for apps is now complete
+
+Following the create and get endpoints, the Unkey HTTP API now covers the full [app](/platform/apps/overview) lifecycle. New endpoints list, update, and delete apps within a project, so you can script multi-app project setup end to end alongside projects, keyspaces, and identities.
+
+### One-time secure share links for key secrets
+
+The dashboard's key-created dialog now includes **Share as a secure link**. The link vault-encrypts the secret and can be opened exactly once, after which it is destroyed. Links expire after 72 hours. Use it to hand off a newly created key to a teammate or customer without pasting the secret into chat, email, or a shared password manager.
+
+### Audit logging for portal actions
+
+Portal session actions on keys — create, delete, and reroll — are now written to the [audit log](/audit-log/introduction) with a dedicated portal-user actor. Filter the audit log by that actor to see exactly which portal users mutated which keys.
+
+### Portal analytics scoped by external ID
+
+[Portal](/quickstart/portal) sessions with `read_analytics` now automatically scope [verification analytics](/observability/overview) to the session's `externalId`. Portal users only see analytics for their own identity, even when using wildcard filters.
+
+## Updates
+
+### Bulk rename and delete for environment variables
+
+The **Environment Variables** tab now exposes a group-level action menu on each variable row. From the menu you can rename a variable across every environment in a single step, or delete every occurrence of a variable at once. Renames apply on the next deployment.
+
+### Key-related permissions on API handlers
+
+The `keys.createKey`, `keys.deleteKey`, and `keys.rerollKey` HTTP handlers now enforce the same fine-grained key permissions used by portal sessions. Root keys and portal sessions both honor per-API and per-key permission scopes on these routes.
+
+## Bug fixes
+
+- Closed a hijack path in the GitHub App installation flow.
+- Blocked a cross-tenant path in organization membership invitation mutations.
+- Fixed the query parser so `OR` and `NOT` no longer bypass injected tenant filters.
+- The **Create keyspace** button in the empty state now matches the size used elsewhere.
+- Deep-linked pages no longer reset the page number to `1` before data loads.
+- Prevented idle-tab request storms in the dashboard.
+- Error log rows render on the correct background again.

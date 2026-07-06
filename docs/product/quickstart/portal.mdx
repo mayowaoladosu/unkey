@@ -147,6 +147,16 @@ The portal will:
 2. Set an httpOnly cookie
 3. Redirect to the first visible tab based on permissions
 
+## Analytics scoping
+
+Sessions granted `read_analytics` see verification analytics scoped to the session's `externalId`. Wildcard filters are safe to use: the gateway automatically restricts every query to the session's identity, so a portal user only sees their own verifications even when the underlying dashboard could show more.
+
+Deleted keys are included so historical charts stay complete after a key is revoked.
+
+## Audit logging
+
+Key mutations initiated by a portal session — create, delete, and reroll — are recorded in the workspace [audit log](/audit-log/introduction). The actor is the portal user, identified by the session's `externalId`, which lets you attribute changes back to the end user who made them. Filter the audit log by actor type to see only portal-driven changes.
+
 ## Permissions and tabs
 
 Permissions use the RBAC tuple format `{resourceType}.{resourceId}.{action}`. Use `*` as the resourceId to grant access to all resources of that type.

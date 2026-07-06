@@ -55,6 +55,36 @@ Permission queries support `AND` and `OR` operators:
 - `api.read AND api.write` requires both permissions
 - `api.read OR api.write` requires either permission
 
+## Enforce key rate limits
+
+An API key authentication policy can enforce one or more [key rate limits](/platform/apis/features/ratelimiting/overview) in the same verification call, mirroring the `ratelimits` field of the [verify key API](/api-reference/overview). This is useful when you want to apply an expensive-endpoint limit only on a specific route (for example, `/generate`) without changing anything about the key itself.
+
+Each rate limit entry references a limit by `name`. You can either:
+
+- Reference a named limit that is already attached to the key — the key's configured limit and window apply.
+- Override the `limit`, `duration` (in milliseconds), or `cost` per entry. Supplying both `limit` and `duration` defines an inline limit that does not need to exist on the key.
+
+Auto-applied limits on the key or its identity are always enforced, so entries listed on the policy are additive.
+
+<Note>
+  If a policy references a named limit that is not configured on the key and does not supply an inline `limit` and `duration`, the request is rejected. Make sure the limit name matches a limit attached to the key or its identity.
+</Note>
+
+### Example
+
+A policy configured with the following rate limits enforces both an existing `expensive` limit on the key and an inline burst limit of 10 requests per second:
+
+```json
+{
+  "ratelimits": [
+    { "name": "expensive" },
+    { "name": "burst", "limit": 10, "duration": 1000 }
+  ]
+}
+```
+
+Rate limit response headers reflect the most restrictive limit that ran. See [Rate limiting](/platform/gateway/policies/rate-limiting#response-headers) for the header reference.
+
 ## Error responses
 
 | Scenario                          | Status | Description                       |

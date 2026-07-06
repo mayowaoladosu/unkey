@@ -33,6 +33,16 @@ By default this is set to **Automatic (no Dockerfile)**: Unkey detects your lang
 
 Unkey auto-detects Dockerfiles in your build context and offers them in the dropdown. If your Dockerfile has a non-standard name or location, enter a custom path relative to the root directory.
 
+### Build command
+
+Override the build command Unkey uses for [automatic builds](/builds/overview). Leave empty to let Unkey detect the command automatically. Useful for monorepos or when you need to build a specific package, for example:
+
+```bash
+pnpm build --filter api
+```
+
+The setting only applies to automatic builds. When a [Dockerfile](#dockerfile) is configured, the build follows the Dockerfile and this field is ignored. Changes take effect on the next deployment.
+
 ### Watch paths
 
 Glob patterns that control which file changes trigger a deployment. When configured, Unkey skips deployments if none of the changed files match any pattern.
