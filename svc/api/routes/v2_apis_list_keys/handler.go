@@ -9,7 +9,6 @@ import (
 	vaultv1 "github.com/unkeyed/unkey/gen/proto/vault/v1"
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/internal/services/caches"
-	authprincipal "github.com/unkeyed/unkey/pkg/auth/principal"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
@@ -46,8 +45,16 @@ func (h *Handler) Path() string {
 	return "/v2/apis.listKeys"
 }
 
-// Handle processes the HTTP request
+// Handle processes the HTTP request without identity scoping.
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
+	return h.Serve(ctx, s, "")
+}
+
+// Serve processes the HTTP request. When scopeExternalID is non-empty the
+// listing is restricted to keys owned by that external identity, regardless of
+// any externalId in the request body. The portal route passes the portal
+// session's external identity here; protected routes pass an empty string.
+func (h *Handler) Serve(ctx context.Context, s *zen.Session, scopeExternalID string) error {
 	principal, err := s.GetPrincipal()
 	if err != nil {
 		return err
@@ -189,25 +196,15 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		}
 	}
 
-	// Portal sessions are scoped to a single external identity. Override any
-	// user-supplied externalId filter so that the session can only list its own keys.
-	// Fail closed: if the externalId is empty, reject the request rather than
-	// returning unscoped keys.
+	// A scoped caller (the portal route) may only list keys owned by its own
+	// external identity. Override any user-supplied externalId filter so the
+	// caller can only see its own keys.
 	//
 	// Identity scoping is intentionally separate from the RBAC permission system.
 	// Permissions gate what operations a principal can perform; identity scoping
-	// gates what data is visible. Portal sessions carry a fixed externalId that
-	// restricts visibility regardless of what the request body says.
-	switch src := principal.Source.(type) {
-	case authprincipal.PortalSessionSource:
-		if src.ExternalID == "" {
-			return fault.New("portal session missing identity",
-				fault.Code(codes.App.Internal.UnexpectedError.URN()),
-				fault.Internal("portal session externalId is empty"),
-				fault.Public("An internal error occurred."),
-			)
-		}
-		req.ExternalId = &src.ExternalID
+	// gates what data is visible.
+	if scopeExternalID != "" {
+		req.ExternalId = &scopeExternalID
 	}
 
 	limit := ptr.SafeDeref(req.Limit, 100)

@@ -16,7 +16,6 @@ import (
 
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/pkg/auditlog"
-	authprincipal "github.com/unkeyed/unkey/pkg/auth/principal"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	dbtype "github.com/unkeyed/unkey/pkg/db/types"
@@ -54,8 +53,16 @@ func (h *Handler) Path() string {
 	return "/v2/keys.createKey"
 }
 
-// Handle processes the HTTP request
+// Handle processes the HTTP request without identity scoping.
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
+	return h.Serve(ctx, s, "")
+}
+
+// Serve processes the HTTP request. When scopeExternalID is non-empty the
+// created key is forced to belong to that external identity, regardless of any
+// externalId in the request body. The portal route passes the portal session's
+// external identity here; protected routes pass an empty string.
+func (h *Handler) Serve(ctx context.Context, s *zen.Session, scopeExternalID string) error {
 	// Mint a correlation ID for this user action so the dashboard can drill
 	// from any one of the audit events (key.create + N permission binds + N
 	// role binds) to the rest. Nested helpers that call Auditlogs.Insert
@@ -123,22 +130,13 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	// Portal sessions are scoped to a single external identity. Force the
-	// externalId on the request so the created key is always owned by the
-	// session's identity, regardless of what the client sends.
+	// A scoped caller (the portal route) forces the created key to belong to its
+	// own external identity, regardless of what the client sends.
 	//
 	// Portal-authenticated actions are attributed to a portalEndUser actor so
 	// customers can see end-user activity in their audit logs.
-	switch src := principal.Source.(type) {
-	case authprincipal.PortalSessionSource:
-		if src.ExternalID == "" {
-			return fault.New("portal session missing identity",
-				fault.Code(codes.App.Internal.UnexpectedError.URN()),
-				fault.Internal("portal session externalId is empty"),
-				fault.Public("An internal error occurred."),
-			)
-		}
-		req.ExternalId = &src.ExternalID
+	if scopeExternalID != "" {
+		req.ExternalId = &scopeExternalID
 	}
 	actor := auditactor.FromPrincipal(principal)
 

@@ -59,7 +59,12 @@ import (
 	v2AnalyticsGetVerifications "github.com/unkeyed/unkey/svc/api/routes/v2_analytics_get_verifications"
 
 	v2PortalCreateSession "github.com/unkeyed/unkey/svc/api/routes/v2_portal_create_session"
+	v2PortalCreateKey "github.com/unkeyed/unkey/svc/api/routes/v2_portal_create_key"
+	v2PortalDeleteKey "github.com/unkeyed/unkey/svc/api/routes/v2_portal_delete_key"
 	v2PortalExchangeSession "github.com/unkeyed/unkey/svc/api/routes/v2_portal_exchange_session"
+	v2PortalGetVerifications "github.com/unkeyed/unkey/svc/api/routes/v2_portal_get_verifications"
+	v2PortalListKeys "github.com/unkeyed/unkey/svc/api/routes/v2_portal_list_keys"
+	v2PortalRerollKey "github.com/unkeyed/unkey/svc/api/routes/v2_portal_reroll_key"
 
 	v2AppsCreateApp "github.com/unkeyed/unkey/svc/api/routes/v2_apps_create_app"
 	v2AppsDeleteApp "github.com/unkeyed/unkey/svc/api/routes/v2_apps_delete_app"
@@ -626,6 +631,72 @@ func Register(srv *zen.Server, svc *Services, info zen.InstanceInfo) {
 		&v2PortalExchangeSession.Handler{
 			DB:        svc.Database,
 			Auditlogs: svc.Auditlogs,
+		},
+	)
+
+	// Portal-scoped routes. These reuse the protected handlers' logic but run
+	// behind portalMiddlewares (portal-session auth only) and force scoping to
+	// the session's external identity.
+
+	// v2/portal.listKeys
+	srv.RegisterRoute(
+		portalMiddlewares,
+		&v2PortalListKeys.Handler{
+			Handler: &v2ApisListKeys.Handler{
+				DB:       svc.Database,
+				Vault:    svc.Vault,
+				ApiCache: svc.Caches.LiveApiByID,
+			},
+		},
+	)
+
+	// v2/portal.createKey
+	srv.RegisterRoute(
+		portalMiddlewares,
+		&v2PortalCreateKey.Handler{
+			Handler: &v2KeysCreateKey.Handler{
+				DB:        svc.Database,
+				Keys:      svc.Keys,
+				Auditlogs: svc.Auditlogs,
+				Vault:     svc.Vault,
+			},
+		},
+	)
+
+	// v2/portal.deleteKey
+	srv.RegisterRoute(
+		portalMiddlewares,
+		&v2PortalDeleteKey.Handler{
+			Handler: &v2KeysDeleteKey.Handler{
+				KeyCache:  svc.Caches.VerificationKeyByHash,
+				DB:        svc.Database,
+				Auditlogs: svc.Auditlogs,
+			},
+		},
+	)
+
+	// v2/portal.rerollKey
+	srv.RegisterRoute(
+		portalMiddlewares,
+		&v2PortalRerollKey.Handler{
+			Handler: &v2KeysRerollKey.Handler{
+				DB:        svc.Database,
+				Keys:      svc.Keys,
+				Auditlogs: svc.Auditlogs,
+				Vault:     svc.Vault,
+			},
+		},
+	)
+
+	// v2/portal.getVerifications
+	srv.RegisterRoute(
+		portalMiddlewares,
+		&v2PortalGetVerifications.Handler{
+			Handler: &v2AnalyticsGetVerifications.Handler{
+				DB:                         svc.Database,
+				AnalyticsConnectionManager: svc.AnalyticsConnectionManager,
+				Caches:                     svc.Caches,
+			},
 		},
 	)
 

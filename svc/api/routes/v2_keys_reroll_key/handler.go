@@ -15,7 +15,6 @@ import (
 
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/pkg/auditlog"
-	authprincipal "github.com/unkeyed/unkey/pkg/auth/principal"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
@@ -50,8 +49,17 @@ func (h *Handler) Path() string {
 	return "/v2/keys.rerollKey"
 }
 
-// Handle processes the HTTP request
+// Handle processes the HTTP request without identity scoping.
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
+	return h.Serve(ctx, s, "")
+}
+
+// Serve processes the HTTP request. When scopeExternalID is non-empty the
+// caller may only reroll a key owned by that external identity; any other key
+// returns 404 so the caller cannot probe for keys it does not own. The portal
+// route passes the portal session's external identity here; protected routes
+// pass an empty string.
+func (h *Handler) Serve(ctx context.Context, s *zen.Session, scopeExternalID string) error {
 	principal, err := s.GetPrincipal()
 	if err != nil {
 		return err
@@ -88,28 +96,18 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	// Portal sessions are scoped to a single external identity and may only
-	// reroll keys belonging to that identity. Mismatches return 404 so we never
-	// leak the existence of keys owned by another externalId.
+	// A scoped caller (the portal route) may only reroll keys belonging to its
+	// own external identity. Mismatches return 404 so we never leak the existence
+	// of keys owned by another externalId.
 	//
 	// Identity scoping is intentionally separate from the RBAC permission system.
 	// Permissions gate what operations a principal can perform; identity scoping
-	// gates which keys are reachable. Portal sessions carry a fixed externalId.
-	switch src := principal.Source.(type) {
-	case authprincipal.PortalSessionSource:
-		// Fail closed: a portal session without an externalId can't be scoped.
-		if src.ExternalID == "" {
-			return fault.New("portal session missing identity",
-				fault.Code(codes.App.Internal.UnexpectedError.URN()),
-				fault.Internal("portal session externalId is empty"),
-				fault.Public("An internal error occurred."),
-			)
-		}
-
-		if !key.IdentityExternalID.Valid || key.IdentityExternalID.String != src.ExternalID {
+	// gates which keys are reachable.
+	if scopeExternalID != "" {
+		if !key.IdentityExternalID.Valid || key.IdentityExternalID.String != scopeExternalID {
 			return fault.New("key not found",
 				fault.Code(codes.Data.Key.NotFound.URN()),
-				fault.Internal("key identity externalId does not match portal session"),
+				fault.Internal("key identity externalId does not match scoped externalId"),
 				fault.Public("The specified key was not found."),
 			)
 		}
