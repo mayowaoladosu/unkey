@@ -5,4 +5,4 @@ properties:
   deploymentId:
     "$ref": "../../../../common/ResourceIdentifier.yaml"
 additionalProperties: false
-description: Retrieve a single deployment, including its build, rollout status, and git or image source.
+description: Retrieve a single deployment, including its status and runtime configuration.
