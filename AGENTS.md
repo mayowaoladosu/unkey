@@ -155,6 +155,10 @@ notes below are the non-obvious caveats for running the stack.
  trailer is only attribution and does not affect signing. Whether GitHub shows
  "Verified" depends on the committer identity and its registered SSH signing
  key, not on the co-author trailer.
+- When rewriting history (e.g. fixing a trailer), re-sign with
+ `git rebase --gpg-sign <base>` (or amend with `-S`). `git filter-branch`
+ DROPS the SSH signature and leaves commits unsigned/Unverified, so never use it
+ alone for signed branches; follow it with a signing rebase.
 
 ### mise / PATH
 
