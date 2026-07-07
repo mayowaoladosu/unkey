@@ -253,9 +253,9 @@ type DeploymentRuntime struct {
 
 // DeploymentSourceDeployment Re-run an existing deployment.
 type DeploymentSourceDeployment struct {
-	// Id Identifies a resource by either its unique ID or its slug.
+	// DeploymentId Identifies a resource by either its unique ID or its slug.
 	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
-	Id ResourceIdentifier `json:"id"`
+	DeploymentId ResourceIdentifier `json:"deploymentId"`
 }
 
 // DeploymentSourceGit Build from the app's connected GitHub repository.
@@ -1303,9 +1303,9 @@ type V2DeploymentsCreateDeploymentRequestBody struct {
 	// Deployment Re-run an existing deployment.
 	Deployment *DeploymentSourceDeployment `json:"deployment,omitempty"`
 
-	// EnvironmentSlug Identifies a resource by either its unique ID or its slug.
+	// Environment Identifies a resource by either its unique ID or its slug.
 	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
-	EnvironmentSlug ResourceIdentifier `json:"environmentSlug"`
+	Environment ResourceIdentifier `json:"environment"`
 
 	// Git Build from the app's connected GitHub repository.
 	Git *DeploymentSourceGit `json:"git,omitempty"`
@@ -3705,9 +3705,9 @@ func (t V2DeploymentsCreateDeploymentRequestBody) MarshalJSON() ([]byte, error) 
 		}
 	}
 
-	object["environmentSlug"], err = json.Marshal(t.EnvironmentSlug)
+	object["environment"], err = json.Marshal(t.Environment)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'environmentSlug': %w", err)
+		return nil, fmt.Errorf("error marshaling 'environment': %w", err)
 	}
 
 	if t.Git != nil {
@@ -3758,10 +3758,10 @@ func (t *V2DeploymentsCreateDeploymentRequestBody) UnmarshalJSON(b []byte) error
 		}
 	}
 
-	if raw, found := object["environmentSlug"]; found {
-		err = json.Unmarshal(raw, &t.EnvironmentSlug)
+	if raw, found := object["environment"]; found {
+		err = json.Unmarshal(raw, &t.Environment)
 		if err != nil {
-			return fmt.Errorf("error reading 'environmentSlug': %w", err)
+			return fmt.Errorf("error reading 'environment': %w", err)
 		}
 	}
 

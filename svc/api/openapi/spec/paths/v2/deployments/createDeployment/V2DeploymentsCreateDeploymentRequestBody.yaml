@@ -2,13 +2,13 @@ type: object
 required:
   - project
   - app
-  - environmentSlug
+  - environment
 properties:
   project:
     "$ref": "../../../../common/ResourceIdentifier.yaml"
   app:
     "$ref": "../../../../common/ResourceIdentifier.yaml"
-  environmentSlug:
+  environment:
     "$ref": "../../../../common/ResourceIdentifier.yaml"
   git:
     "$ref": "./DeploymentSourceGit.yaml"

@@ -613,13 +613,13 @@ components:
             required:
                 - project
                 - app
-                - environmentSlug
+                - environment
             properties:
                 project:
                     "$ref": "#/components/schemas/ResourceIdentifier"
                 app:
                     "$ref": "#/components/schemas/ResourceIdentifier"
-                environmentSlug:
+                environment:
                     "$ref": "#/components/schemas/ResourceIdentifier"
                 git:
                     "$ref": "#/components/schemas/DeploymentSourceGit"
@@ -3653,9 +3653,9 @@ components:
         DeploymentSourceDeployment:
             type: object
             required:
-                - id
+                - deploymentId
             properties:
-                id:
+                deploymentId:
                     "$ref": "#/components/schemas/ResourceIdentifier"
             description: Re-run an existing deployment.
         V2DeploymentsCreateDeploymentResponseData:

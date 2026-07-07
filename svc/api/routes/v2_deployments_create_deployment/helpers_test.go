@@ -19,10 +19,10 @@ import (
 func imageRequest(t *testing.T, project, app, env, dockerImage string) handler.Request {
 	t.Helper()
 	return handler.Request{
-		Project:         project,
-		App:             app,
-		EnvironmentSlug: env,
-		Image:           &openapi.DeploymentSourceImage{DockerImage: dockerImage},
+		Project:     project,
+		App:         app,
+		Environment: env,
+		Image:       &openapi.DeploymentSourceImage{DockerImage: dockerImage},
 	}
 }
 
@@ -31,10 +31,10 @@ func imageRequest(t *testing.T, project, app, env, dockerImage string) handler.R
 func gitRequest(t *testing.T, project, app, env string, git openapi.DeploymentSourceGit) handler.Request {
 	t.Helper()
 	return handler.Request{
-		Project:         project,
-		App:             app,
-		EnvironmentSlug: env,
-		Git:             &git,
+		Project:     project,
+		App:         app,
+		Environment: env,
+		Git:         &git,
 	}
 }
 
@@ -43,10 +43,10 @@ func gitRequest(t *testing.T, project, app, env string, git openapi.DeploymentSo
 func deploymentRequest(t *testing.T, project, app, env, deploymentID string) handler.Request {
 	t.Helper()
 	return handler.Request{
-		Project:         project,
-		App:             app,
-		EnvironmentSlug: env,
-		Deployment:      &openapi.DeploymentSourceDeployment{Id: deploymentID},
+		Project:     project,
+		App:         app,
+		Environment: env,
+		Deployment:  &openapi.DeploymentSourceDeployment{DeploymentId: deploymentID},
 	}
 }
 

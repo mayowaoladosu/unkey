@@ -25,9 +25,9 @@ func TestValidationErrors(t *testing.T) {
 	// validation can be exercised directly.
 	body := func(fields map[string]any) map[string]any {
 		m := map[string]any{
-			"project":         setup.Project.Slug,
-			"app":             setup.App.Slug,
-			"environmentSlug": setup.Environment.Slug,
+			"project":     setup.Project.Slug,
+			"app":         setup.App.Slug,
+			"environment": setup.Environment.Slug,
 		}
 		for k, v := range fields {
 			m[k] = v
@@ -48,9 +48,9 @@ func TestValidationErrors(t *testing.T) {
 		{"no source", body(map[string]any{})},
 		{"multiple sources", body(map[string]any{"image": map[string]any{"dockerImage": "nginx:latest"}, "git": map[string]any{"branch": "main"}})},
 		{"missing project", map[string]any{
-			"app":             setup.App.Slug,
-			"environmentSlug": setup.Environment.Slug,
-			"image":           map[string]any{"dockerImage": "nginx:latest"},
+			"app":         setup.App.Slug,
+			"environment": setup.Environment.Slug,
+			"image":       map[string]any{"dockerImage": "nginx:latest"},
 		}},
 	}
 
