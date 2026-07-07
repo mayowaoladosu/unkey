@@ -1,0 +1,47 @@
+---
+title: Compute billing and spend budgets
+description: "How Compute usage is metered, how plan credits work, and how spend budgets alert or stop workloads."
+---
+
+## Compute billing
+
+Compute (Unkey Deploy) bills for CPU, memory, disk, egress, and active keys verified through the Deploy gateway. The plan fee includes usage credits equal to the fee amount. Usage beyond those credits is billed on top at the end of the month.
+
+The billing page shows:
+
+- **Usage this period**: month-to-date usage spend priced from ClickHouse (the same source the spend cap uses).
+- **Per-meter quantities**: CPU hours, memory GiB-hours, egress GiB, disk GiB-hours, and active keys.
+- **Spend budget** (optional): your chosen monthly usage-spend cap with alert thresholds.
+
+Usage credits refresh each billing period. Upgrading mid-period adds a prorated top-up; the dashboard and spend cap read the total credit Stripe granted for the period.
+
+## Spend budget
+
+Set a monthly spend budget under **Settings > Billing** on the Compute card.
+
+| Setting | Behavior |
+| --- | --- |
+| **Monthly budget** | Whole dollars. Leave empty for no budget. |
+| **Email alerts** | Sent at 50%, 75%, and 100% of the budget (net of included credits). |
+| **Stop workloads at the budget** | When enabled, all running Compute workloads stop once net-of-credit usage spend reaches the budget. |
+
+The spend budget meter shows net-of-credit usage spend: included plan credits are subtracted before comparing against your budget, matching what the backend enforces.
+
+### While compute is paused
+
+When the spend cap stops workloads, the billing page shows a **Compute paused** banner. Compute resumes automatically when you:
+
+- Raise the budget above current usage spend,
+- Remove the budget,
+- Turn off **Stop workloads at the budget**, or
+- Wait for the next billing period (usage resets).
+
+Resume typically happens within about a minute in local development, or within the next spend-check interval in production.
+
+### Before credits are known
+
+If you set a budget before your first paid invoice of the period, included credits may not be known yet. The spend budget meter explains this state. Alerts and stopping stay disabled until credits are persisted from Stripe.
+
+## Cancel Compute
+
+Canceling Compute stops deployments immediately and clears the plan. Usage incurred up to that point is still billed on the final invoice.
