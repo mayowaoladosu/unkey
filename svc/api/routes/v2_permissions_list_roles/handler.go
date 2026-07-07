@@ -9,6 +9,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/pagination"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 	"net/http"
 )
@@ -79,12 +80,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	var nextCursor *string
-	hasMore := len(roles) > limit
-	if hasMore {
-		nextCursor = ptr.P(roles[limit].ID)
-		roles = roles[:limit]
-	}
+	roles, pg := pagination.PaginateByID(roles, limit)
 
 	roleResponses := make([]openapi.Role, 0, len(roles))
 	for _, role := range roles {
@@ -118,10 +114,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		Meta: openapi.Meta{
 			RequestId: s.RequestID(),
 		},
-		Data: roleResponses,
-		Pagination: &openapi.Pagination{
-			Cursor:  nextCursor,
-			HasMore: hasMore,
-		},
+		Data:       roleResponses,
+		Pagination: pg,
 	})
 }

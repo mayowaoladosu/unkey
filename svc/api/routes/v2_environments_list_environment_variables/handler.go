@@ -12,6 +12,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/pagination"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
@@ -101,12 +102,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	hasMore := len(rows) > limit
-	var nextCursor *string
-	if hasMore {
-		nextCursor = ptr.P(rows[limit].ID)
-		rows = rows[:limit]
-	}
+	rows, pg := pagination.PaginateByID(rows, limit)
 
 	// Bulk-decrypt every recoverable variable in a single vault round-trip. The
 	// keyring is the environment id, matching how the set handler encrypts them.
@@ -174,6 +170,6 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	return s.JSON(http.StatusOK, Response{
 		Meta:       openapi.Meta{RequestId: s.RequestID()},
 		Data:       data,
-		Pagination: &openapi.Pagination{Cursor: nextCursor, HasMore: hasMore},
+		Pagination: pg,
 	})
 }

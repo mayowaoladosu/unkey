@@ -10,6 +10,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/pagination"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
@@ -97,12 +98,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	hasMore := len(rows) > limit
-	var nextCursor *string
-	if hasMore {
-		nextCursor = ptr.P(rows[limit].ID)
-		rows = rows[:limit]
-	}
+	rows, pg := pagination.PaginateByID(rows, limit)
 
 	data := make([]openapi.App, len(rows))
 	for i, row := range rows {
@@ -123,10 +119,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		Meta: openapi.Meta{
 			RequestId: s.RequestID(),
 		},
-		Data: data,
-		Pagination: &openapi.Pagination{
-			Cursor:  nextCursor,
-			HasMore: hasMore,
-		},
+		Data:       data,
+		Pagination: pg,
 	})
 }

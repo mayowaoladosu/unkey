@@ -225,6 +225,7 @@ go_library(
         "handle_err_no_rows.go",
         "horizontal_autoscaling_policy_insert.sql_generated.go",
         "horizontal_autoscaling_policy_update.sql_generated.go",
+        "identifiable.go",
         "identity_delete.sql_generated.go",
         "identity_delete_old_by_external_id.sql_generated.go",
         "identity_delete_old_with_ratelimits.sql_generated.go",

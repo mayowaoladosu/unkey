@@ -8,6 +8,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/pagination"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 	"net/http"
 )
@@ -98,22 +99,14 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	hasMore := len(overrides) > limit
-	var cursor *string
-	if hasMore {
-		cursor = ptr.P(overrides[limit].ID)
-		overrides = overrides[:limit]
-	}
+	overrides, pg := pagination.PaginateByID(overrides, limit)
 
 	responseBody := Response{
 		Meta: openapi.Meta{
 			RequestId: s.RequestID(),
 		},
-		Data: make([]openapi.RatelimitOverride, len(overrides)),
-		Pagination: &openapi.Pagination{
-			Cursor:  cursor,
-			HasMore: hasMore,
-		},
+		Data:       make([]openapi.RatelimitOverride, len(overrides)),
+		Pagination: pg,
 	}
 
 	for i, override := range overrides {

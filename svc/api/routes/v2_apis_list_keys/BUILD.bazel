@@ -21,6 +21,7 @@ go_library(
         "//pkg/urn",
         "//pkg/zen",
         "//svc/api/internal/errors",
+        "//svc/api/internal/pagination",
         "//svc/api/openapi",
         "@com_github_oapi_codegen_nullable//:nullable",
     ],

@@ -8,6 +8,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/pagination"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 	"net/http"
 )
@@ -77,13 +78,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	hasMore := len(permissions) > limit
-	var nextCursor *string
-
-	if hasMore {
-		nextCursor = ptr.P(permissions[limit].ID)
-		permissions = permissions[:limit]
-	}
+	permissions, pg := pagination.PaginateByID(permissions, limit)
 
 	responsePermissions := make([]openapi.Permission, 0, len(permissions))
 	for _, perm := range permissions {
@@ -102,10 +97,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		Meta: openapi.Meta{
 			RequestId: s.RequestID(),
 		},
-		Data: responsePermissions,
-		Pagination: &openapi.Pagination{
-			Cursor:  nextCursor,
-			HasMore: hasMore,
-		},
+		Data:       responsePermissions,
+		Pagination: pg,
 	})
 }

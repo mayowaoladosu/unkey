@@ -21,6 +21,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/urn"
 	"github.com/unkeyed/unkey/pkg/zen"
 	apierrors "github.com/unkeyed/unkey/svc/api/internal/errors"
+	"github.com/unkeyed/unkey/svc/api/internal/pagination"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
@@ -263,24 +264,15 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	// Handle pagination
-	hasMore := len(keyResults) > limit
-	var nextCursor *string
-	if hasMore {
-		nextCursor = ptr.P(keyResults[len(keyResults)-1].ID)
-		keyResults = keyResults[:limit]
-	}
+	keyResults, pg := pagination.PaginateByID(keyResults, limit)
 
 	if len(keyResults) == 0 {
 		return s.JSON(http.StatusOK, Response{
 			Meta: openapi.Meta{
 				RequestId: s.RequestID(),
 			},
-			Data: []openapi.KeyResponseData{},
-			Pagination: &openapi.Pagination{
-				Cursor:  nextCursor,
-				HasMore: hasMore,
-			},
+			Data:       []openapi.KeyResponseData{},
+			Pagination: pg,
 		})
 	}
 
@@ -298,11 +290,8 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		Meta: openapi.Meta{
 			RequestId: s.RequestID(),
 		},
-		Data: responseData,
-		Pagination: &openapi.Pagination{
-			Cursor:  nextCursor,
-			HasMore: hasMore,
-		},
+		Data:       responseData,
+		Pagination: pg,
 	})
 }
 

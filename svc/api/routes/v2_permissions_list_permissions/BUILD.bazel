@@ -12,6 +12,7 @@ go_library(
         "//pkg/ptr",
         "//pkg/rbac",
         "//pkg/zen",
+        "//svc/api/internal/pagination",
         "//svc/api/openapi",
     ],
 )
