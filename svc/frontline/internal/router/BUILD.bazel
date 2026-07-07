@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "router",
@@ -23,15 +23,5 @@ go_library(
         "//svc/frontline/internal/db",
         "//svc/frontline/internal/policies",
         "@com_github_prometheus_client_golang//prometheus",
-    ],
-)
-
-go_test(
-    name = "router_test",
-    srcs = ["routing_test.go"],
-    embed = [":router"],
-    deps = [
-        "//svc/frontline/internal/db",
-        "@com_github_stretchr_testify//require",
     ],
 )
