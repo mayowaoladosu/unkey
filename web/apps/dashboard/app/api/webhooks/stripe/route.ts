@@ -7,6 +7,7 @@ import { freeTierQuotas } from "@/lib/quotas";
 import { deployBillingConfig, findApiItem } from "@/lib/stripe/deployBilling";
 import { grantDeployCreditsForInvoice } from "@/lib/stripe/deployCredits";
 import { detectDeployPlan } from "@/lib/stripe/deployPlan";
+import { linkDeploySubscription } from "@/lib/stripe/linkDeploySubscription";
 import { isPaymentRecovery, isPaymentRecoveryUpdate } from "@/lib/stripe/paymentUtils";
 import { validateAndParseQuotas } from "@/lib/stripe/productUtils";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/lib/stripe/subscriptionUtils";
 import {
   alertIsCancellingSubscription,
+  alertOrphanedDeploySubscription,
   alertPaymentFailed,
   alertPaymentRecovered,
   alertSubscriptionCancelled,
@@ -39,6 +41,61 @@ async function mirrorDeployPlan(
   if (changed) {
     await db.update(schema.workspaces).set({ deployPlan }).where(eq(schema.workspaces.id, ws.id));
   }
+}
+
+/**
+ * Links a subscription-mode Compute checkout to its workspace via the shared
+ * linker, shared by the `checkout.session.completed` and
+ * `checkout.session.async_payment_succeeded` events (the latter fires when a
+ * delayed-notification payment clears after `completed` reported it unpaid).
+ *
+ * Returns 200 for anything a retry cannot fix (not a subscription checkout,
+ * missing workspace ref, or a linker rejection); lets transient Stripe/DB
+ * errors from the linker propagate so the caller returns 500 and Stripe
+ * retries. A `subscription_conflict` means a paid, live subscription exists
+ * that will never link (a race minted a duplicate) — it bills until an operator
+ * intervenes, so page a human rather than only logging.
+ */
+async function linkComputeCheckoutSession(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+  eventId: string,
+): Promise<Response> {
+  if (session.mode !== "subscription" || !session.subscription) {
+    return new Response("OK", { status: 200 });
+  }
+  if (!session.client_reference_id) {
+    console.error("Compute checkout link event missing client_reference_id", {
+      sessionId: session.id,
+      eventId,
+    });
+    return new Response("OK", { status: 200 });
+  }
+
+  const result = await linkDeploySubscription(stripe, {
+    sessionId: session.id,
+    expectedWorkspaceId: session.client_reference_id,
+    audit: { actor: { type: "system", id: "stripe" }, location: "", userAgent: undefined },
+  });
+
+  if (!result.ok) {
+    console.error("Failed to link Compute checkout subscription", {
+      sessionId: session.id,
+      eventId,
+      reason: result.reason,
+    });
+    if (result.reason === "subscription_conflict") {
+      const subscriptionId =
+        typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+      await alertOrphanedDeploySubscription({
+        workspaceId: session.client_reference_id,
+        subscriptionId,
+        sessionId: session.id,
+        reason: result.reason,
+      });
+    }
+  }
+  return new Response("OK", { status: 200 });
 }
 
 /**
@@ -143,7 +200,7 @@ export const POST = async (req: Request): Promise<Response> => {
   }
 
   const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: "2026-05-27.dahlia",
+    apiVersion: "2026-06-24.dahlia",
     typescript: true,
   });
 
@@ -498,6 +555,34 @@ export const POST = async (req: Request): Promise<Response> => {
         break;
       } catch (error) {
         console.error("Subscription creation webhook error:", {
+          error:
+            error instanceof Error
+              ? {
+                  message: error.message,
+                  stack: error.stack,
+                  name: error.name,
+                }
+              : error,
+          eventId: event.id,
+          eventType: event.type,
+        });
+        return new Response("Error", { status: 500 });
+      }
+    }
+
+    // Guaranteed server-side link for the no-card Compute flow: fires even if
+    // the user never returns to /success. `completed` covers the immediate
+    // (card) case; `async_payment_succeeded` covers delayed-notification
+    // methods that reported unpaid at `completed` and only clear later. Both
+    // route through the same idempotent linker, so a racing /success call or a
+    // Stripe redelivery cannot double-write.
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
+      try {
+        const session = event.data.object as Stripe.Checkout.Session;
+        return await linkComputeCheckoutSession(stripe, session, event.id);
+      } catch (error) {
+        console.error("Checkout session link webhook error:", {
           error:
             error instanceof Error
               ? {
