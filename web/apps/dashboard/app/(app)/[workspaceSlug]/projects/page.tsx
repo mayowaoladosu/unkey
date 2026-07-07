@@ -82,6 +82,10 @@ export default function ProjectsPage() {
  * path and the setup-mode fallback (workspace already has a subscription, so it
  * vaults a card and attaches Compute items on return). Params are stripped
  * after capture so a refresh doesn't re-fire, and a ref guards double-firing.
+ *
+ * The params must be read reactively, not captured at mount: the has-card path
+ * pushes ?pendingPlan&from while the user is ALREADY on the projects page (the
+ * gate dialog lives here), so there is no remount — only a searchParams change.
  */
 function usePendingSubscribe() {
   const router = useRouter();
@@ -91,24 +95,26 @@ function usePendingSubscribe() {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const [pending] = useState(() => {
-    const rawPlan = searchParams.get("pendingPlan");
-    const plan = DEPLOY_PLANS.find((known) => known === rawPlan);
-    if (!plan) {
-      return null;
-    }
-    return { plan, fromCreate: searchParams.get("from") === "create" };
-  });
-
-  const fired = useRef(false);
+  // The pendingPlan+from pair currently being subscribed, so re-renders (and
+  // strict-mode double effects) don't re-fire it. Cleared when the params are
+  // gone so a later hand-off (subscribe → cancel → subscribe again) runs fresh.
+  const firedFor = useRef<string | null>(null);
 
   const subscribe = trpc.stripe.subscribeDeploy.useMutation();
 
   useEffect(() => {
-    if (!pending || fired.current) {
+    const rawPlan = searchParams.get("pendingPlan");
+    const plan = DEPLOY_PLANS.find((known) => known === rawPlan);
+    if (!plan) {
+      firedFor.current = null;
       return;
     }
-    fired.current = true;
+    const pending = { plan, fromCreate: searchParams.get("from") === "create" };
+    const key = `${pending.plan}:${pending.fromCreate}`;
+    if (firedFor.current === key) {
+      return;
+    }
+    firedFor.current = key;
 
     router.replace(routes.projects.list({ workspaceSlug: workspace.slug }));
 
@@ -185,7 +191,7 @@ function usePendingSubscribe() {
       }
       attempt();
     })();
-  }, [pending, router, workspace.slug, subscribe, trpcUtils]);
+  }, [searchParams, router, workspace.slug, subscribe, trpcUtils]);
 
   return { createDialogOpen, setCreateDialogOpen };
 }
