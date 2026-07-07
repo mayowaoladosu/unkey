@@ -6689,23 +6689,6 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/UnauthorizedErrorResponse'
                     description: Unauthorized
-                "403":
-                    content:
-                        application/json:
-                            examples:
-                                missingPermission:
-                                    summary: Missing required permission
-                                    value:
-                                        error:
-                                            detail: Your root key requires the 'environment.*.read_deployment' permission to perform this operation
-                                            status: 403
-                                            title: Forbidden
-                                            type: forbidden
-                                        meta:
-                                            requestId: req_1234abcd
-                            schema:
-                                $ref: '#/components/schemas/ForbiddenErrorResponse'
-                    description: Forbidden - Insufficient permissions (requires `environment.*.read_deployment`)
                 "404":
                     content:
                         application/json:
