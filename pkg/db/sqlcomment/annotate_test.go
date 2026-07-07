@@ -81,3 +81,17 @@ where expires_at > ?`
 	require.True(t, strings.HasPrefix(got, "select workspace_id"))
 	require.Contains(t, got, "operation='GlobalCountersImported'")
 }
+
+func TestAnnotate_cachesDynamicTags(t *testing.T) {
+	t.Parallel()
+
+	static := ForService("api", "us-east-1")
+	query := "select 1"
+	dynamic := Dynamic{Route: "POST /v2/keys.verifyKey", Source: "http"}
+
+	first := Annotate(query, static, "ro", dynamic)
+	second := Annotate(query, static, "ro", dynamic)
+	require.Equal(t, first, second)
+	require.Contains(t, first, `route='POST%20%2Fv2%2Fkeys.verifyKey'`)
+	require.Contains(t, first, `source='http'`)
+}
