@@ -5,9 +5,10 @@ import (
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// Identifiable is any row that exposes its cursor id via GetID. The v2 db row
-// types satisfy this through hand-written methods in pkg/db (sqlc emits id as a
-// field, not a method).
+// Identifiable constrains PaginateByID to types that expose their cursor id via
+// GetID (not a plain .ID field) because Go generics cannot read a struct field
+// off a type parameter. Row types implement GetID in [pkg/db/identifiable.go];
+// add new list-query row types there.
 type Identifiable interface {
 	GetID() string
 }
