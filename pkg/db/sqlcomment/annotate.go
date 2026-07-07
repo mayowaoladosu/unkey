@@ -6,14 +6,16 @@ import (
 	"sync"
 )
 
-// annotateCache memoizes annotated queries when dynamic tags are empty. sqlc
-// emits a fixed query string per operation, so repeated calls reuse the result.
+// annotateCache memoizes annotated queries keyed by query text, static tags,
+// mode, and dynamic tags. sqlc emits a fixed query string per operation, so
+// repeated calls with the same tags reuse the result.
 var annotateCache sync.Map
 
 type annotateCacheKey struct {
-	query  string
-	mode   string
-	static Static
+	query   string
+	mode    string
+	static  Static
+	dynamic Dynamic
 }
 
 // Annotate rewrites query for PlanetScale Insights:
@@ -26,20 +28,13 @@ func Annotate(query string, static Static, mode string, dynamic Dynamic) string 
 		return query
 	}
 
-	if dynamic.Route == "" && dynamic.Source == "" {
-		key := annotateCacheKey{query: query, mode: mode, static: static}
-		if cached, ok := annotateCache.Load(key); ok {
-			return cached.(string)
-		}
+	key := annotateCacheKey{query: query, mode: mode, static: static, dynamic: dynamic}
+	if cached, ok := annotateCache.Load(key); ok {
+		return cached.(string)
 	}
 
 	annotated := buildAnnotatedQuery(query, static, mode, dynamic)
-
-	if dynamic.Route == "" && dynamic.Source == "" {
-		key := annotateCacheKey{query: query, mode: mode, static: static}
-		annotateCache.Store(key, annotated)
-	}
-
+	annotateCache.Store(key, annotated)
 	return annotated
 }
 
