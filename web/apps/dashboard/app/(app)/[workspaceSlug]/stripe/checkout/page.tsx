@@ -5,6 +5,7 @@ import { formatDollars } from "@/lib/fmt";
 import { routes } from "@/lib/navigation/routes";
 import { getStripeClient } from "@/lib/stripe";
 import { deployBillingConfig, deployCheckoutLineItems } from "@/lib/stripe/deployBilling";
+import { DEPLOY_PLANS } from "@/lib/stripe/deployPlan";
 import { isDeadSubscription } from "@/lib/stripe/subscriptionUtils";
 import { getBaseUrl } from "@/lib/utils";
 import { Code, Empty } from "@unkey/ui";
@@ -24,7 +25,6 @@ export const dynamic = "force-dynamic";
  * and subscribe there.
  */
 const CHECKOUT_INTENTS = ["compute", "api", "payment", "deploy"] as const;
-const DEPLOY_PLANS = ["starter", "pro", "business"] as const;
 const DEPLOY_ORIGINS = ["create", "banner", "billing"] as const;
 
 export default async function StripeRedirect(props: {
