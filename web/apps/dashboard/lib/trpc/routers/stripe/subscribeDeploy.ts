@@ -138,20 +138,45 @@ export const subscribeDeploy = workspaceProcedure
         }
       }
 
+      const createParams: Stripe.SubscriptionCreateParams = {
+        customer: ctx.workspace.stripeCustomerId,
+        items,
+        ...(defaultPaymentMethod ? { default_payment_method: defaultPaymentMethod } : {}),
+        billing_cycle_anchor_config: { day_of_month: 1 },
+        // Pin classic billing mode (clover defaults new subscriptions to
+        // "flexible", which itemizes prorations differently); see the same
+        // pin in createSubscription.
+        billing_mode: { type: "classic" },
+        proration_behavior: "always_invoice",
+        payment_behavior: "error_if_incomplete",
+      };
+
       let sub: Stripe.Subscription;
       try {
-        sub = await stripe.subscriptions.create({
-          customer: ctx.workspace.stripeCustomerId,
-          items,
-          ...(defaultPaymentMethod ? { default_payment_method: defaultPaymentMethod } : {}),
-          billing_cycle_anchor_config: { day_of_month: 1 },
-          // Pin classic billing mode (clover defaults new subscriptions to
-          // "flexible", which itemizes prorations differently); see the same
-          // pin in createSubscription.
-          billing_mode: { type: "classic" },
-          proration_behavior: "always_invoice",
-          payment_behavior: "error_if_incomplete",
-        });
+        // Deterministic idempotency key: if Stripe created (and charged) the
+        // subscription but the workspace write below failed, a retry replays
+        // the SAME subscription instead of charging a second one. Unlike the
+        // checkout-session path there is no webhook backstop for this create —
+        // customer.subscription.created resolves the workspace by
+        // stripeSubscriptionId, which was never written.
+        //
+        // Stripe's idempotency layer replays the CREATION-TIME response, so
+        // after a full subscribe→cancel cycle inside the key window a replay
+        // hands back the canceled subscription still claiming to be active.
+        // Re-retrieve the live status and, on a corpse, chain a fresh key off
+        // its id and mint a new subscription (a retry of THIS request replays
+        // that same fresh subscription) — mirroring stripe/checkout/page.tsx.
+        let idempotencyKey = `deploy-subscribe:${ctx.workspace.id}:${input.plan}`;
+        sub = await stripe.subscriptions.create(createParams, { idempotencyKey });
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const live = await stripe.subscriptions.retrieve(sub.id);
+          if (!isDeadSubscription(live)) {
+            sub = live;
+            break;
+          }
+          idempotencyKey = `${idempotencyKey}:${live.id}`;
+          sub = await stripe.subscriptions.create(createParams, { idempotencyKey });
+        }
       } catch (err) {
         throw toBillingError(err);
       }

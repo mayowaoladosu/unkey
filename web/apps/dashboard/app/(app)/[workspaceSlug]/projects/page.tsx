@@ -3,7 +3,7 @@
 import { NewNavigationBanner } from "@/components/navigation/new-navigation-banner";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { collection } from "@/lib/collections";
-import { routes } from "@/lib/navigation/routes";
+import { type DeployCheckoutOrigin, routes } from "@/lib/navigation/routes";
 import { DEPLOY_PLANS } from "@/lib/stripe/deployPlan";
 import { trpc } from "@/lib/trpc/client";
 import { useLiveQuery } from "@tanstack/react-db";
@@ -105,8 +105,12 @@ function usePendingSubscribe() {
       firedFor.current = null;
       return;
     }
-    const pending = { plan, fromCreate: searchParams.get("from") === "create" };
-    const key = `${pending.plan}:${pending.fromCreate}`;
+    // Carry the raw origin (not a boolean) so a card-decline retry preserves
+    // it verbatim instead of rewriting e.g. "billing" to "banner".
+    const rawFrom = searchParams.get("from");
+    const from = DEPLOY_ORIGINS.find((known) => known === rawFrom) ?? "banner";
+    const pending = { plan, from };
+    const key = `${pending.plan}:${pending.from}`;
     if (firedFor.current === key) {
       return;
     }
@@ -121,7 +125,7 @@ function usePendingSubscribe() {
         trpcUtils.stripe.getDeploySubscription.invalidate(),
         trpcUtils.workspace.getCurrent.invalidate(),
       ]);
-      if (pending.fromCreate) {
+      if (pending.from === "create") {
         setCreateDialogOpen(true);
       }
     };
@@ -162,7 +166,7 @@ function usePendingSubscribe() {
                   workspaceSlug: workspace.slug,
                   intent: "deploy",
                   plan: pending.plan,
-                  from: pending.fromCreate ? "create" : "banner",
+                  from: pending.from,
                 }),
               );
               return;
@@ -191,6 +195,8 @@ function usePendingSubscribe() {
 
   return { createDialogOpen, setCreateDialogOpen };
 }
+
+const DEPLOY_ORIGINS: readonly DeployCheckoutOrigin[] = ["create", "banner", "billing"];
 
 function planLabel(plan: string): string {
   return plan.charAt(0).toUpperCase() + plan.slice(1);

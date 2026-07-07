@@ -10,7 +10,7 @@ import { getBaseUrl } from "@/lib/utils";
 import { Code, Empty } from "@unkey/ui";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -116,8 +116,19 @@ export default async function StripeRedirect(props: {
   // null when Compute billing is unconfigured, which also falls back.
   let hasLiveSubscription = false;
   if (intent === "deploy" && plan && ws.stripeSubscriptionId) {
-    const recorded = await stripe.subscriptions.retrieve(ws.stripeSubscriptionId);
-    hasLiveSubscription = !isDeadSubscription(recorded);
+    // A recorded subscription that no longer exists on Stripe is the same
+    // "dead recorded subscription counts as absent" case, not a 500; mirrors
+    // linkDeploySubscription. Anything else propagates — a transient failure
+    // must not silently downgrade a live subscription to "absent".
+    const recorded = await stripe.subscriptions
+      .retrieve(ws.stripeSubscriptionId)
+      .catch((err: unknown) => {
+        if (err instanceof Stripe.errors.StripeError && err.code === "resource_missing") {
+          return null;
+        }
+        throw err;
+      });
+    hasLiveSubscription = recorded !== null && !isDeadSubscription(recorded);
   }
   const deployConfig =
     intent === "deploy" && plan && !hasLiveSubscription ? await deployBillingConfig() : null;
