@@ -56,13 +56,13 @@ const RegionTags = ({
   unschedulableRegions?: Set<string>;
 }) => (
   <TooltipProvider>
-    <div className="w-full flex flex-wrap gap-1.5 py-0.5">
+    <div className="flex min-w-0 w-full flex-wrap gap-1.5 py-0.5 pr-1">
       {regions.map((r) => {
         const isUnschedulable = unschedulableRegions?.has(r);
         const tag = (
           <span
             key={r}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs ${
+            className={`flex min-w-0 max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-xs ${
               isUnschedulable
                 ? "bg-warning-3 border border-warning-6 text-warning-11"
                 : "bg-grayA-3 border border-grayA-4 text-accent-12"
@@ -74,7 +74,7 @@ const RegionTags = ({
               shape="circle"
               className="[&_img]:size-3"
             />
-            {r}
+            <span className="min-w-0 truncate">{r}</span>
             {canRemove && (
               //biome-ignore lint/a11y/useKeyWithClickEvents: we can't use button here otherwise we'll nest two buttons
               <span
@@ -242,6 +242,7 @@ const RegionsSingle = () => {
           value=""
           onSelect={addRegion}
           closeOnSelect={false}
+          className={regionComboboxClassName}
           placeholder={
             currentRegions.length === 0 ? (
               <span className="text-grayA-8 w-full text-left">Select a region</span>
@@ -454,6 +455,7 @@ const RegionsDualInner = ({ production, preview }: RegionsDualInnerProps) => {
             value=""
             onSelect={addProdRegion}
             closeOnSelect={false}
+            className={regionComboboxClassName}
             placeholder={
               currentProdRegions.length === 0 ? (
                 <span className="text-grayA-8 w-full text-left">Select a region</span>
@@ -477,6 +479,7 @@ const RegionsDualInner = ({ production, preview }: RegionsDualInnerProps) => {
             value=""
             onSelect={addPreviewRegion}
             closeOnSelect={false}
+            className={regionComboboxClassName}
             placeholder={
               currentPreviewRegions.length === 0 ? (
                 <span className="text-grayA-8 w-full text-left">Select a region</span>
@@ -516,3 +519,5 @@ const EnvironmentDisplayValue = ({ label, regions }: { label: string; regions: s
     ))}
   </div>
 );
+
+const regionComboboxClassName = "h-auto min-h-9 items-start py-1.5";
