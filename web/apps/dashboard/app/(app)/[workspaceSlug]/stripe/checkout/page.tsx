@@ -182,14 +182,36 @@ export default async function StripeRedirect(props: {
       // re-opens the gate (stripeSubscriptionId still null). Keyed by workspace
       // + plan + origin, since success_url varies by `from` and a differing
       // param under the same key would trip an idempotency mismatch.
+      //
+      // Stripe's idempotency layer replays the CREATION-TIME response, so a
+      // replayed session always reads status "open" with a working-looking url
+      // even if it has since been paid or expired — redirecting to it then
+      // shows Stripe's "this checkout session has timed out" dead end. So
+      // re-retrieve for the live status and branch:
+      //  - open:     the normal redirect below.
+      //  - complete with a LIVE subscription: it was PAID (the
+      //    abandon-before-link race) — hand off to /success for this session,
+      //    which links the subscription instead of charging a second time.
+      //  - expired, or complete with a dead subscription (a finished
+      //    subscribe→cancel cycle): nothing to resume; chain a new
+      //    deterministic key off the stale session id and mint a fresh session
+      //    (a retry of THIS request replays the same fresh session rather than
+      //    double-creating).
       let idempotencyKey = `deploy-checkout:${ws.id}:${plan}:${from ?? ""}`;
       session = await stripe.checkout.sessions.create(sessionParams, { idempotencyKey });
-      // The replayed session can be one an earlier subscribe→cancel cycle
-      // already consumed (same workspace/plan/origin inside the 24h window). A
-      // non-open session cannot be paid again, so chain a new deterministic key
-      // off the stale session id — a retry of THIS request replays the same
-      // fresh session rather than double-creating.
-      for (let attempt = 0; session.status !== "open" && attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const live = await stripe.checkout.sessions.retrieve(session.id);
+        if (live.status === "open") {
+          break;
+        }
+        if (live.status === "complete") {
+          const paidSubId =
+            typeof live.subscription === "string" ? live.subscription : live.subscription?.id;
+          const paidSub = paidSubId ? await stripe.subscriptions.retrieve(paidSubId) : null;
+          if (paidSub && !isDeadSubscription(paidSub)) {
+            return redirect(successUrl.replace("{CHECKOUT_SESSION_ID}", live.id) as Route);
+          }
+        }
         idempotencyKey = `${idempotencyKey}:${session.id}`;
         session = await stripe.checkout.sessions.create(sessionParams, { idempotencyKey });
       }
