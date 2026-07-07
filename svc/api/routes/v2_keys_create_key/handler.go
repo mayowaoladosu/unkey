@@ -53,16 +53,19 @@ func (h *Handler) Path() string {
 	return "/v2/keys.createKey"
 }
 
-// Handle processes the HTTP request without identity scoping.
+// Handle processes the HTTP request.
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
-	return h.Serve(ctx, s, "")
+	req, err := zen.BindBody[Request](s)
+	if err != nil {
+		return err
+	}
+
+	return h.CreateKey(ctx, s, req)
 }
 
-// Serve processes the HTTP request. When scopeExternalID is non-empty the
-// created key is forced to belong to that external identity, regardless of any
-// externalId in the request body. The portal route passes the portal session's
-// external identity here; protected routes pass an empty string.
-func (h *Handler) Serve(ctx context.Context, s *zen.Session, scopeExternalID string) error {
+// CreateKey creates a key from an already-bound request. Portal routes may call
+// this after replacing the request externalId with the portal session identity.
+func (h *Handler) CreateKey(ctx context.Context, s *zen.Session, req Request) error {
 	// Mint a correlation ID for this user action so the dashboard can drill
 	// from any one of the audit events (key.create + N permission binds + N
 	// role binds) to the rest. Nested helpers that call Auditlogs.Insert
@@ -71,12 +74,6 @@ func (h *Handler) Serve(ctx context.Context, s *zen.Session, scopeExternalID str
 
 	// 1. Authentication
 	principal, err := s.GetPrincipal()
-	if err != nil {
-		return err
-	}
-
-	// 2. Request validation
-	req, err := zen.BindBody[Request](s)
 	if err != nil {
 		return err
 	}
@@ -130,14 +127,8 @@ func (h *Handler) Serve(ctx context.Context, s *zen.Session, scopeExternalID str
 		)
 	}
 
-	// A scoped caller (the portal route) forces the created key to belong to its
-	// own external identity, regardless of what the client sends.
-	//
 	// Portal-authenticated actions are attributed to a portalEndUser actor so
 	// customers can see end-user activity in their audit logs.
-	if scopeExternalID != "" {
-		req.ExternalId = &scopeExternalID
-	}
 	actor := auditactor.FromPrincipal(principal)
 
 	keySpace, err := db.Query.FindKeySpaceByID(ctx, h.DB.RO(), api.KeyAuthID.String)
