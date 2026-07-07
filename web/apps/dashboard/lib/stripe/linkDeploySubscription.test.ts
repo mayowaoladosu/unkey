@@ -49,11 +49,18 @@ function subscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subs
   } as unknown as Stripe.Subscription;
 }
 
+const customersUpdate = vi.fn(async () => ({}));
+
 function stubStripe(opts: {
   session?: Stripe.Checkout.Session;
   sub?: Stripe.Subscription;
   /** Per-id overrides for subscriptions.retrieve; an Error value is thrown. */
   subsById?: Record<string, Stripe.Subscription | Error>;
+  customer?: {
+    deleted?: boolean;
+    invoice_settings?: { default_payment_method?: string | null };
+    default_source?: string | null;
+  };
   sessionError?: unknown;
 }): Stripe {
   return {
@@ -76,6 +83,17 @@ function stubStripe(opts: {
         return byId ?? opts.sub ?? subscription();
       }),
     },
+    customers: {
+      retrieve: vi.fn(
+        async () =>
+          opts.customer ?? {
+            deleted: false,
+            invoice_settings: { default_payment_method: null },
+            default_source: null,
+          },
+      ),
+      update: customersUpdate,
+    },
   } as unknown as Stripe;
 }
 
@@ -93,6 +111,7 @@ describe("linkDeploySubscription", () => {
     h.transaction.mockClear();
     h.insertAuditLogs.mockClear();
     h.update.mockClear();
+    customersUpdate.mockClear();
   });
 
   it("rejects a session belonging to another workspace, without writing", async () => {
@@ -247,6 +266,51 @@ describe("linkDeploySubscription", () => {
       stripeSubscriptionId: "sub_1",
       deployPlan: "starter",
     });
+  });
+
+  it("mirrors the checkout card onto a customer with no default payment method", async () => {
+    h.findFirst.mockResolvedValue({
+      id: WORKSPACE_ID,
+      orgId: "org_1",
+      stripeSubscriptionId: null,
+      deployPlan: null,
+    });
+    const stripe = stubStripe({
+      sub: subscription({ default_payment_method: "pm_1" } as Partial<Stripe.Subscription>),
+    });
+    const result = await linkDeploySubscription(stripe, {
+      sessionId: "cs_1",
+      expectedWorkspaceId: WORKSPACE_ID,
+      audit: AUDIT,
+    });
+    expect(result).toEqual({ ok: true, plan: "starter", alreadyLinked: false });
+    expect(customersUpdate).toHaveBeenCalledWith("cus_1", {
+      invoice_settings: { default_payment_method: "pm_1" },
+    });
+  });
+
+  it("leaves an existing customer default payment method untouched", async () => {
+    h.findFirst.mockResolvedValue({
+      id: WORKSPACE_ID,
+      orgId: "org_1",
+      stripeSubscriptionId: null,
+      deployPlan: null,
+    });
+    const stripe = stubStripe({
+      sub: subscription({ default_payment_method: "pm_1" } as Partial<Stripe.Subscription>),
+      customer: {
+        deleted: false,
+        invoice_settings: { default_payment_method: "pm_existing" },
+        default_source: null,
+      },
+    });
+    const result = await linkDeploySubscription(stripe, {
+      sessionId: "cs_1",
+      expectedWorkspaceId: WORKSPACE_ID,
+      audit: AUDIT,
+    });
+    expect(result).toEqual({ ok: true, plan: "starter", alreadyLinked: false });
+    expect(customersUpdate).not.toHaveBeenCalled();
   });
 
   it("repoints when the recorded subscription no longer exists on Stripe", async () => {

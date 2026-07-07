@@ -169,5 +169,35 @@ export async function linkDeploySubscription(
     });
   });
 
+  // Checkout attaches the card to the customer but records it as the
+  // SUBSCRIPTION's default payment method, not the customer's. Later flows
+  // that create a fresh subscription (cancel-then-resubscribe, the API plan)
+  // only consult the customer default, so mirror it over — best-effort and
+  // only when the customer has none, because the link above is already
+  // committed and must not fail on this.
+  const paymentMethod =
+    typeof sub.default_payment_method === "string"
+      ? sub.default_payment_method
+      : sub.default_payment_method?.id;
+  if (paymentMethod) {
+    try {
+      const customer = await stripe.customers.retrieve(stripeCustomerId);
+      if (
+        !customer.deleted &&
+        !customer.invoice_settings?.default_payment_method &&
+        !customer.default_source
+      ) {
+        await stripe.customers.update(stripeCustomerId, {
+          invoice_settings: { default_payment_method: paymentMethod },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to set customer default payment method after Compute link", {
+        workspaceId: ws.id,
+        error: err instanceof Error ? err.message : err,
+      });
+    }
+  }
+
   return { ok: true, plan, alreadyLinked: false };
 }

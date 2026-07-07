@@ -111,11 +111,39 @@ export const subscribeDeploy = workspaceProcedure
     } else {
       // Free tier: create a subscription whose initial items are the Deploy set.
       // error_if_incomplete keeps us off a half-paid state if the card declines.
+      //
+      // subscriptions.create only consults the customer's DEFAULT payment
+      // method, and a card that arrived via subscription-mode Checkout is
+      // attached but recorded as the (now possibly cancelled) subscription's
+      // default, not the customer's — so a cancel-then-resubscribe would die
+      // with "no attached payment source". Resolve one explicitly: use the
+      // customer default when set, else the most recently attached method.
+      let defaultPaymentMethod: string | undefined;
+      const customer = await stripe.customers.retrieve(ctx.workspace.stripeCustomerId);
+      const hasCustomerDefault =
+        !customer.deleted &&
+        Boolean(customer.invoice_settings?.default_payment_method || customer.default_source);
+      if (!hasCustomerDefault) {
+        const attached = await stripe.customers.listPaymentMethods(ctx.workspace.stripeCustomerId, {
+          limit: 1,
+        });
+        defaultPaymentMethod = attached.data[0]?.id;
+        if (!defaultPaymentMethod) {
+          // BAD_REQUEST on purpose: the projects-landing subscriber treats it
+          // as "card problem" and routes the user to Stripe checkout to add one.
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No payment method on file. Add one to subscribe.",
+          });
+        }
+      }
+
       let sub: Stripe.Subscription;
       try {
         sub = await stripe.subscriptions.create({
           customer: ctx.workspace.stripeCustomerId,
           items,
+          ...(defaultPaymentMethod ? { default_payment_method: defaultPaymentMethod } : {}),
           billing_cycle_anchor_config: { day_of_month: 1 },
           // Pin classic billing mode (clover defaults new subscriptions to
           // "flexible", which itemizes prorations differently); see the same
