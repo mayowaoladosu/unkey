@@ -1,13 +1,13 @@
 "use client";
 
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
-import { routes } from "@/lib/navigation/routes";
+import { type DeployCheckoutOrigin, routes } from "@/lib/navigation/routes";
 import type { DeployPlan } from "@/lib/stripe/deployPlan";
 import { trpc } from "@/lib/trpc/client";
 import type { DeployPlanOption } from "@/lib/trpc/routers/stripe/getDeployPlans";
-import { toast } from "@unkey/ui";
 import type { Route } from "next";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ComputePlanDialog,
   ComputePlanFeatures,
@@ -95,13 +95,20 @@ export function DeployPlanGateDialogView({
 type Props = {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Where the dialog was opened from, carried through the round-trip. */
+  from: DeployCheckoutOrigin;
 };
 
 /**
- * The Compute paywall on the projects page. Confirming a plan is not wired up
- * yet: subscribe (card on file) / Stripe checkout (no card) land here later.
+ * The Compute paywall on the projects page. Selecting a plan routes it to
+ * payment rather than subscribing inline: with a card on file it hands off to
+ * the projects landing (?pendingPlan&from), where usePendingSubscribe runs
+ * subscribeDeploy; without one it sends the user to Stripe checkout first,
+ * and /success returns them to the same landing. ctrl-api remains the real
+ * gate, so the non-admin lockout here is UX only.
  */
-export function DeployPlanGateDialog({ isOpen, onOpenChange }: Props) {
+export function DeployPlanGateDialog({ isOpen, onOpenChange, from }: Props) {
+  const router = useRouter();
   const workspace = useWorkspaceNavigation();
 
   const { data: plansData, isLoading: plansLoading } = trpc.stripe.getDeployPlans.useQuery(
@@ -111,6 +118,25 @@ export function DeployPlanGateDialog({ isOpen, onOpenChange }: Props) {
   const { data: currentUser } = trpc.user.getCurrentUser.useQuery();
   const isAdmin = currentUser?.role === "admin";
   const plans = plansData?.plans ?? [];
+  const hasPaymentMethod = Boolean(workspace.stripeCustomerId);
+
+  const handleSelect = (plan: DeployPlan) => {
+    onOpenChange(false);
+
+    if (hasPaymentMethod) {
+      // Card on file: skip Stripe and subscribe on the projects landing.
+      router.push(routes.projects.pendingSubscribe({ workspaceSlug: workspace.slug, plan, from }));
+    } else {
+      router.push(
+        routes.settings.stripe.checkout({
+          workspaceSlug: workspace.slug,
+          intent: "deploy",
+          plan,
+          from,
+        }),
+      );
+    }
+  };
 
   return (
     <DeployPlanGateDialogView
@@ -120,12 +146,7 @@ export function DeployPlanGateDialog({ isOpen, onOpenChange }: Props) {
       plansLoading={plansLoading}
       isAdmin={isAdmin}
       billingHref={routes.settings.billing({ workspaceSlug: workspace.slug })}
-      onSelect={() => {
-        // TODO(deploy-billing): route the chosen plan to Stripe checkout (no
-        // card) or subscribe (card on file), then unlock project creation.
-        onOpenChange(false);
-        toast.info("Subscribing isn't wired up yet.");
-      }}
+      onSelect={handleSelect}
     />
   );
 }

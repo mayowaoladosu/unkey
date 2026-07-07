@@ -65,7 +65,7 @@ export const ProjectsList = () => {
           </Button>
         </div>
       ) : null}
-      <DeployPlanGateDialog isOpen={isPlanOpen} onOpenChange={setIsPlanOpen} />
+      <DeployPlanGateDialog isOpen={isPlanOpen} onOpenChange={setIsPlanOpen} from="banner" />
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {projects.data.map((project) => (
           <ProximityPrefetch distance={300} debounceDelay={150} key={project.id}>

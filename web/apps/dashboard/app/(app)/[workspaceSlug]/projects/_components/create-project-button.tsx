@@ -31,7 +31,7 @@ export function CreateProjectButton({ defaultOpen, workspaceSlug }: Props) {
       </Button>
 
       <CreateProjectDialog isOpen={isOpen} onOpenChange={setIsOpen} workspaceSlug={workspaceSlug} />
-      <DeployPlanGateDialog isOpen={isPlanOpen} onOpenChange={setIsPlanOpen} />
+      <DeployPlanGateDialog isOpen={isPlanOpen} onOpenChange={setIsPlanOpen} from="create" />
     </>
   );
 }

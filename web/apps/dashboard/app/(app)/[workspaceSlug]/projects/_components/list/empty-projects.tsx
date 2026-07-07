@@ -103,7 +103,7 @@ export function EmptyProjects() {
         onOpenChange={setIsDialogOpen}
         workspaceSlug={workspace.slug}
       />
-      <DeployPlanGateDialog isOpen={isPlanOpen} onOpenChange={setIsPlanOpen} />
+      <DeployPlanGateDialog isOpen={isPlanOpen} onOpenChange={setIsPlanOpen} from="create" />
     </div>
   );
 }

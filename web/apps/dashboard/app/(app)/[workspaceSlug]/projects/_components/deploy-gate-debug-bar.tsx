@@ -118,7 +118,9 @@ function DebugBar() {
         </button>
       </div>
 
-      {scenario === "live" ? <DeployPlanGateDialog isOpen onOpenChange={close} /> : null}
+      {scenario === "live" ? (
+        <DeployPlanGateDialog isOpen onOpenChange={close} from="banner" />
+      ) : null}
       {scenario === "plans" ? <DeployPlanGateDialogView isOpen {...viewProps} /> : null}
       {scenario === "loading" ? (
         <DeployPlanGateDialogView isOpen {...viewProps} plans={[]} plansLoading />
