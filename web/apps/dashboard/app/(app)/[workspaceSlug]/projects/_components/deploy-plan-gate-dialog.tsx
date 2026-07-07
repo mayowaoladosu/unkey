@@ -25,11 +25,8 @@ type ViewProps = {
   onSelect: (plan: DeployPlan) => void;
 };
 
-/**
- * Presentational layer of the paywall, also driven with mock states by the
- * dev-only DeployGateDebugBar.
- */
-export function DeployPlanGateDialogView({
+/** Presentational layer of the paywall. */
+function DeployPlanGateDialogView({
   isOpen,
   onOpenChange,
   plans,

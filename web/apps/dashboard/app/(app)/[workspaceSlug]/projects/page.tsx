@@ -20,7 +20,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CreateProjectButton } from "./_components/create-project-button";
 import { CreateProjectDialog } from "./_components/create-project-dialog";
-import { DeployGateDebugBar } from "./_components/deploy-gate-debug-bar";
 import { ProjectsList } from "./_components/list";
 import { EmptyProjects } from "./_components/list/empty-projects";
 
@@ -32,9 +31,7 @@ export default function ProjectsPage() {
 
   const { createDialogOpen, setCreateDialogOpen } = usePendingSubscribe();
 
-  const debugNoProjects =
-    process.env.NODE_ENV === "development" && searchParams.get("debug") === "no-projects";
-  const isEmpty = debugNoProjects || (!projects.isLoading && projects.data.length === 0);
+  const isEmpty = !projects.isLoading && projects.data.length === 0;
 
   return (
     <>
@@ -61,7 +58,6 @@ export default function ProjectsPage() {
         onOpenChange={setCreateDialogOpen}
         workspaceSlug={workspace.slug}
       />
-      <DeployGateDebugBar />
     </>
   );
 }
