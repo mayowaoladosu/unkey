@@ -7,6 +7,7 @@ import {
   findDeployItems,
 } from "@/lib/stripe/deployBilling";
 import { DEPLOY_PLANS } from "@/lib/stripe/deployPlan";
+import { isDeadSubscription } from "@/lib/stripe/subscriptionUtils";
 import { TRPCError } from "@trpc/server";
 import Stripe from "stripe";
 import { z } from "zod";
@@ -65,10 +66,24 @@ export const subscribeDeploy = workspaceProcedure
     // derives the same value from the subscription we just mutated).
     let workspaceUpdate: { deployPlan: string; stripeSubscriptionId?: string };
 
+    // The recorded subscription can be a corpse (cancelDeploy cancels a
+    // Compute-only subscription outright, and the deleted-webhook that clears
+    // the column may not have landed yet). A dead one still carries its old
+    // Compute items, so without this check a mid-month resubscribe dies on the
+    // "already has Compute items" guard below. Treat it as absent and create a
+    // fresh subscription instead.
+    let existingSub: Stripe.Subscription | null = null;
     if (ctx.workspace.stripeSubscriptionId) {
+      const recorded = await stripe.subscriptions.retrieve(ctx.workspace.stripeSubscriptionId);
+      if (!isDeadSubscription(recorded)) {
+        existingSub = recorded;
+      }
+    }
+
+    if (existingSub) {
       // Existing subscription (e.g. a paid API plan): append the Deploy items.
       // Items not listed here are left untouched, so API items are preserved.
-      const sub = await stripe.subscriptions.retrieve(ctx.workspace.stripeSubscriptionId);
+      const sub = existingSub;
 
       if (findDeployItems(config, sub.items.data).length > 0) {
         throw new TRPCError({

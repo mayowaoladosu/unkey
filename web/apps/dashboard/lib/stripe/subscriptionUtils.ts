@@ -164,3 +164,15 @@ export function isCardUpdateOnly(
 }
 
 export type { PreviousAttributes };
+
+/**
+ * A subscription that is over and can never bill again. workspaces.
+ * stripe_subscription_id can point at one of these: cancelDeploy cancels a
+ * Compute-only subscription outright, and the customer.subscription.deleted
+ * webhook that clears the column may lag or be missed. Callers that gate on
+ * "workspace already has a subscription" must treat a dead one as absent, or
+ * a workspace that cancels mid-month can never subscribe again.
+ */
+export function isDeadSubscription(sub: Stripe.Subscription): boolean {
+  return sub.status === "canceled" || sub.status === "incomplete_expired";
+}

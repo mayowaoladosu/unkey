@@ -2,6 +2,7 @@ import { insertAuditLogs } from "@/lib/audit";
 import { db, eq, schema } from "@/lib/db";
 import Stripe from "stripe";
 import { type DeployPlan, detectDeployPlan } from "./deployPlan";
+import { isDeadSubscription } from "./subscriptionUtils";
 
 /**
  * Audit provenance for the write. The tRPC caller passes the acting user; the
@@ -125,18 +126,32 @@ export async function linkDeploySubscription(
   }
 
   // Idempotency + conflict: re-entry (webhook + /success, refresh, redelivery)
-  // for the same subscription is a success no-op; a *different* existing
+  // for the same subscription is a success no-op; a *different* LIVE existing
   // subscription is a hard failure so we never orphan a live one by repointing.
+  // A dead recorded subscription (cancelDeploy cancels a Compute-only
+  // subscription outright, and the deleted-webhook that clears the column may
+  // lag) is safe to repoint away from — refusing would strand this checkout's
+  // paid subscription instead.
   if (ws.stripeSubscriptionId === subscriptionId) {
     if (ws.deployPlan === plan) {
       return { ok: true, plan, alreadyLinked: true };
     }
   } else if (ws.stripeSubscriptionId) {
-    return {
-      ok: false,
-      reason: "subscription_conflict",
-      message: "Workspace already has a different subscription.",
-    };
+    const recorded = await stripe.subscriptions
+      .retrieve(ws.stripeSubscriptionId)
+      .catch((err: unknown) => {
+        if (err instanceof Stripe.errors.StripeError && err.code === "resource_missing") {
+          return null;
+        }
+        throw err;
+      });
+    if (recorded && !isDeadSubscription(recorded)) {
+      return {
+        ok: false,
+        reason: "subscription_conflict",
+        message: "Workspace already has a different subscription.",
+      };
+    }
   }
 
   await db.transaction(async (tx) => {

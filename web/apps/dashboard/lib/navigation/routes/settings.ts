@@ -38,7 +38,7 @@ export const settingsRoutes = {
 
   stripe: {
     portal({ workspaceSlug }: WorkspaceScope): Route {
-      return buildRoute("/[workspaceSlug]/settings/billing/stripe/portal", { workspaceSlug });
+      return buildRoute("/[workspaceSlug]/stripe/portal", { workspaceSlug });
     },
 
     checkout({
@@ -55,11 +55,7 @@ export const settingsRoutes = {
         intent || plan || from
           ? { ...(intent ? { intent } : {}), ...(plan ? { plan } : {}), ...(from ? { from } : {}) }
           : undefined;
-      return buildRoute(
-        "/[workspaceSlug]/settings/billing/stripe/checkout",
-        { workspaceSlug },
-        query,
-      );
+      return buildRoute("/[workspaceSlug]/stripe/checkout", { workspaceSlug }, query);
     },
   },
 };

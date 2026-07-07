@@ -5,6 +5,7 @@ import { formatDollars } from "@/lib/fmt";
 import { routes } from "@/lib/navigation/routes";
 import { getStripeClient } from "@/lib/stripe";
 import { deployBillingConfig, deployCheckoutLineItems } from "@/lib/stripe/deployBilling";
+import { isDeadSubscription } from "@/lib/stripe/subscriptionUtils";
 import { getBaseUrl } from "@/lib/utils";
 import { Code, Empty } from "@unkey/ui";
 import type { Route } from "next";
@@ -107,11 +108,19 @@ export default async function StripeRedirect(props: {
   // For the Compute-plan gate's no-card path, create the subscription in
   // Checkout itself (mode: "subscription") so Stripe shows the plan name and
   // monthly price and charges at checkout. Every other intent — and a
-  // workspace that already has a subscription, to avoid creating a second one
-  // — falls through to the card-vault setup session below. deployBillingConfig
-  // returns null when Compute billing is unconfigured, which also falls back.
+  // workspace that already has a LIVE subscription, to avoid creating a second
+  // one — falls through to the card-vault setup session below. A dead recorded
+  // subscription (cancelDeploy cancels a Compute-only subscription outright,
+  // and the deleted-webhook that clears the column may lag) counts as absent,
+  // or a mid-month cancel could never resubscribe. deployBillingConfig returns
+  // null when Compute billing is unconfigured, which also falls back.
+  let hasLiveSubscription = false;
+  if (intent === "deploy" && plan && ws.stripeSubscriptionId) {
+    const recorded = await stripe.subscriptions.retrieve(ws.stripeSubscriptionId);
+    hasLiveSubscription = !isDeadSubscription(recorded);
+  }
   const deployConfig =
-    intent === "deploy" && plan && !ws.stripeSubscriptionId ? await deployBillingConfig() : null;
+    intent === "deploy" && plan && !hasLiveSubscription ? await deployBillingConfig() : null;
 
   let session: Stripe.Checkout.Session;
   if (deployConfig && plan) {
@@ -138,41 +147,53 @@ export default async function StripeRedirect(props: {
     // 2026-06-24.dahlia or later, which is the version getStripeClient pins
     // (stripe-node types the constructor apiVersion as exactly the bundled
     // version, so the whole client is on 2026-06-24.dahlia).
-    session = await stripe.checkout.sessions.create(
-      {
-        client_reference_id: ws.id,
-        billing_address_collection: "auto",
-        mode: "subscription",
-        line_items: deployCheckoutLineItems(deployConfig, plan),
-        subscription_data: {
-          // Match subscribeDeploy's shape so a Checkout-created Compute
-          // subscription is the same as one it creates: day-1 anchor and classic
-          // billing mode. subscribeDeploy pins proration_behavior "always_invoice",
-          // which Checkout does not accept; "create_prorations" is the closest
-          // Checkout-valid behavior and still collects the prorated partial period
-          // on the first invoice at checkout.
-          billing_cycle_anchor_config: { day_of_month: 1 },
-          billing_mode: { type: "classic" },
-          proration_behavior: "create_prorations",
-        },
-        ...(submitMessage ? { custom_text: { submit: { message: submitMessage } } } : {}),
-        // Subscription mode always creates a customer (so customer_creation is
-        // invalid here) and infers currency from the line-item prices.
-        ...(devClockedCustomerId ? { customer: devClockedCustomerId } : {}),
-        success_url: successUrl,
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      client_reference_id: ws.id,
+      billing_address_collection: "auto",
+      mode: "subscription",
+      line_items: deployCheckoutLineItems(deployConfig, plan),
+      subscription_data: {
+        // Match subscribeDeploy's shape so a Checkout-created Compute
+        // subscription is the same as one it creates: day-1 anchor and classic
+        // billing mode. subscribeDeploy pins proration_behavior "always_invoice",
+        // which Checkout does not accept; "create_prorations" is the closest
+        // Checkout-valid behavior and still collects the prorated partial period
+        // on the first invoice at checkout.
+        billing_cycle_anchor_config: { day_of_month: 1 },
+        billing_mode: { type: "classic" },
+        proration_behavior: "create_prorations",
       },
+      ...(submitMessage ? { custom_text: { submit: { message: submitMessage } } } : {}),
+      // Subscription mode always creates a customer (so customer_creation is
+      // invalid here) and infers currency from the line-item prices.
+      ...(devClockedCustomerId ? { customer: devClockedCustomerId } : {}),
+      success_url: successUrl,
+    };
+
+    if (devClockedCustomerId) {
+      // No idempotency key under the dev test clock, which mints a fresh
+      // customer per request (params differ every time and the key would
+      // conflict).
+      session = await stripe.checkout.sessions.create(sessionParams);
+    } else {
       // Idempotency key so a retry within Stripe's window returns the SAME
       // session instead of creating a second live, charged subscription — the
       // race where the user pays, abandons before the link is written, then
       // re-opens the gate (stripeSubscriptionId still null). Keyed by workspace
       // + plan + origin, since success_url varies by `from` and a differing
-      // param under the same key would trip an idempotency mismatch. Omitted
-      // under the dev test clock, which mints a fresh customer per request (so
-      // params differ every time and the key would conflict).
-      devClockedCustomerId
-        ? undefined
-        : { idempotencyKey: `deploy-checkout:${ws.id}:${plan}:${from ?? ""}` },
-    );
+      // param under the same key would trip an idempotency mismatch.
+      let idempotencyKey = `deploy-checkout:${ws.id}:${plan}:${from ?? ""}`;
+      session = await stripe.checkout.sessions.create(sessionParams, { idempotencyKey });
+      // The replayed session can be one an earlier subscribe→cancel cycle
+      // already consumed (same workspace/plan/origin inside the 24h window). A
+      // non-open session cannot be paid again, so chain a new deterministic key
+      // off the stale session id — a retry of THIS request replays the same
+      // fresh session rather than double-creating.
+      for (let attempt = 0; session.status !== "open" && attempt < 3; attempt++) {
+        idempotencyKey = `${idempotencyKey}:${session.id}`;
+        session = await stripe.checkout.sessions.create(sessionParams, { idempotencyKey });
+      }
+    }
   } else {
     session = await stripe.checkout.sessions.create({
       client_reference_id: ws.id,

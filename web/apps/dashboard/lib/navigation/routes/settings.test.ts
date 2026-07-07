@@ -14,8 +14,8 @@ describe("settings-scoped paths", () => {
 
   it("builds the stripe redirect paths", () => {
     const scope = { workspaceSlug: ws };
-    expect(routes.settings.stripe.portal(scope)).toBe("/acme/settings/billing/stripe/portal");
-    expect(routes.settings.stripe.checkout(scope)).toBe("/acme/settings/billing/stripe/checkout");
+    expect(routes.settings.stripe.portal(scope)).toBe("/acme/stripe/portal");
+    expect(routes.settings.stripe.checkout(scope)).toBe("/acme/stripe/checkout");
   });
 
   it("carries the deploy checkout round-trip params", () => {
@@ -26,7 +26,7 @@ describe("settings-scoped paths", () => {
         plan: "pro",
         from: "create",
       }),
-    ).toBe("/acme/settings/billing/stripe/checkout?intent=deploy&plan=pro&from=create");
+    ).toBe("/acme/stripe/checkout?intent=deploy&plan=pro&from=create");
     expect(
       routes.projects.pendingSubscribe({ workspaceSlug: ws, plan: "starter", from: "banner" }),
     ).toBe("/acme/projects?pendingPlan=starter&from=banner");

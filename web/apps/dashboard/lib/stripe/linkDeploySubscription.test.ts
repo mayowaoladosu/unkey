@@ -52,6 +52,8 @@ function subscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subs
 function stubStripe(opts: {
   session?: Stripe.Checkout.Session;
   sub?: Stripe.Subscription;
+  /** Per-id overrides for subscriptions.retrieve; an Error value is thrown. */
+  subsById?: Record<string, Stripe.Subscription | Error>;
   sessionError?: unknown;
 }): Stripe {
   return {
@@ -65,7 +67,15 @@ function stubStripe(opts: {
         }),
       },
     },
-    subscriptions: { retrieve: vi.fn(async () => opts.sub ?? subscription()) },
+    subscriptions: {
+      retrieve: vi.fn(async (id: string) => {
+        const byId = opts.subsById?.[id];
+        if (byId instanceof Error) {
+          throw byId;
+        }
+        return byId ?? opts.sub ?? subscription();
+      }),
+    },
   } as unknown as Stripe;
 }
 
@@ -197,13 +207,15 @@ describe("linkDeploySubscription", () => {
     expect(h.transaction).not.toHaveBeenCalled();
   });
 
-  it("hard-fails rather than repoint a workspace with a different subscription", async () => {
+  it("hard-fails rather than repoint a workspace with a different LIVE subscription", async () => {
     h.findFirst.mockResolvedValue({
       id: WORKSPACE_ID,
       orgId: "org_1",
       stripeSubscriptionId: "sub_other",
       deployPlan: "pro",
     });
+    // The default stub returns an active subscription for any id, so the
+    // recorded sub_other reads as live.
     const stripe = stubStripe({});
     const result = await linkDeploySubscription(stripe, {
       sessionId: "cs_1",
@@ -212,5 +224,45 @@ describe("linkDeploySubscription", () => {
     });
     expect(result).toMatchObject({ ok: false, reason: "subscription_conflict" });
     expect(h.transaction).not.toHaveBeenCalled();
+  });
+
+  it("repoints a workspace whose recorded subscription is dead (cancel-then-resubscribe)", async () => {
+    h.findFirst.mockResolvedValue({
+      id: WORKSPACE_ID,
+      orgId: "org_1",
+      stripeSubscriptionId: "sub_dead",
+      deployPlan: null,
+    });
+    const stripe = stubStripe({
+      subsById: { sub_dead: subscription({ id: "sub_dead", status: "canceled" }) },
+    });
+    const result = await linkDeploySubscription(stripe, {
+      sessionId: "cs_1",
+      expectedWorkspaceId: WORKSPACE_ID,
+      audit: AUDIT,
+    });
+    expect(result).toEqual({ ok: true, plan: "starter", alreadyLinked: false });
+    expect(h.set).toHaveBeenCalledWith({
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+      deployPlan: "starter",
+    });
+  });
+
+  it("repoints when the recorded subscription no longer exists on Stripe", async () => {
+    h.findFirst.mockResolvedValue({
+      id: WORKSPACE_ID,
+      orgId: "org_1",
+      stripeSubscriptionId: "sub_gone",
+      deployPlan: null,
+    });
+    const stripe = stubStripe({ subsById: { sub_gone: RESOURCE_MISSING } });
+    const result = await linkDeploySubscription(stripe, {
+      sessionId: "cs_1",
+      expectedWorkspaceId: WORKSPACE_ID,
+      audit: AUDIT,
+    });
+    expect(result).toEqual({ ok: true, plan: "starter", alreadyLinked: false });
+    expect(h.transaction).toHaveBeenCalledOnce();
   });
 });
