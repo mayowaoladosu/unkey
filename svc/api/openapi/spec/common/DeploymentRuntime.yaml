@@ -1,6 +1,6 @@
 type: object
 required:
-  - cpuMillicores
+  - vCpus
   - memoryMib
   - storageMib
   - port
@@ -8,11 +8,12 @@ required:
   - shutdownSignal
   - upstreamProtocol
 properties:
-  cpuMillicores:
-    type: integer
+  vCpus:
+    type: number
+    format: double
     description: |
-      CPU allocation in millicores (1000 = one vCPU).
-    example: 250
+      CPU allocation in vCPUs (1 = one vCPU, 0.5 = half a vCPU).
+    example: 0.25
   memoryMib:
     type: integer
     description: |

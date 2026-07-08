@@ -158,10 +158,8 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 
 	ctrlResp, err := h.CtrlClient.CreateDeployment(ctx, ctrlReq)
 	if err != nil {
-		// ctrl may report a precondition failure; HandleError would turn it into
-		// a 500, so surface a 412 instead. Don't forward ctrl's message: it can
-		// carry upstream detail and lets callers probe internal state. Log it,
-		// return a fixed reason.
+		// Map ctrl's precondition failure to a 412 instead of a 500. Keep its
+		// message in the internal error but return a fixed public reason so callers can't probe upstream state.
 		var connectErr *connect.Error
 		if errors.As(err, &connectErr) && connectErr.Code() == connect.CodeFailedPrecondition {
 			return fault.Wrap(

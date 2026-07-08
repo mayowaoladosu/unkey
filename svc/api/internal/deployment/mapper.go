@@ -31,7 +31,7 @@ func ToResponse(d db.Deployment) openapi.Deployment {
 		Id:     d.ID,
 		Status: openapi.DeploymentStatus(d.Status),
 		Runtime: openapi.DeploymentRuntime{
-			CpuMillicores:    int(d.CpuMillicores),
+			VCpus:            float64(d.CpuMillicores) / 1000,
 			MemoryMib:        int(d.MemoryMib),
 			StorageMib:       int(d.StorageMib),
 			Port:             int(d.Port),

@@ -229,11 +229,8 @@ type Deployment struct {
 // DeploymentRuntime defines model for DeploymentRuntime.
 type DeploymentRuntime struct {
 	// Command Container entrypoint command override. Empty when none is set.
-	Command []string `json:"command"`
-
-	// CpuMillicores CPU allocation in millicores (1000 = one vCPU).
-	CpuMillicores int                     `json:"cpuMillicores"`
-	Healthcheck   *EnvironmentHealthcheck `json:"healthcheck,omitempty"`
+	Command     []string                `json:"command"`
+	Healthcheck *EnvironmentHealthcheck `json:"healthcheck,omitempty"`
 
 	// MemoryMib Memory allocation in mebibytes.
 	MemoryMib int `json:"memoryMib"`
@@ -249,6 +246,9 @@ type DeploymentRuntime struct {
 
 	// UpstreamProtocol Protocol used to reach the container.
 	UpstreamProtocol EnvironmentUpstreamProtocol `json:"upstreamProtocol"`
+
+	// VCpus CPU allocation in vCPUs (1 = one vCPU, 0.5 = half a vCPU).
+	VCpus float64 `json:"vCpus"`
 }
 
 // DeploymentSourceDeployment Re-run an existing deployment.
@@ -378,11 +378,8 @@ type EnvironmentRegion struct {
 // Omitted until the environment has runtime settings.
 type EnvironmentRuntime struct {
 	// Command Container entrypoint command override.
-	Command []string `json:"command"`
-
-	// CpuMillicores CPU allocation in millicores (1000 = one vCPU).
-	CpuMillicores int                     `json:"cpuMillicores"`
-	Healthcheck   *EnvironmentHealthcheck `json:"healthcheck,omitempty"`
+	Command     []string                `json:"command"`
+	Healthcheck *EnvironmentHealthcheck `json:"healthcheck,omitempty"`
 
 	// MemoryMib Memory allocation in mebibytes.
 	MemoryMib int `json:"memoryMib"`
@@ -401,6 +398,9 @@ type EnvironmentRuntime struct {
 
 	// UpstreamProtocol Protocol used to reach the container.
 	UpstreamProtocol EnvironmentUpstreamProtocol `json:"upstreamProtocol"`
+
+	// VCpus CPU allocation in vCPUs (1 = one vCPU, 0.5 = half a vCPU).
+	VCpus float64 `json:"vCpus"`
 }
 
 // EnvironmentShutdownSignal Signal sent to the container on shutdown.
@@ -1530,11 +1530,6 @@ type V2EnvironmentsUpdateSettingsRequestBody struct {
 	// Omit to leave unchanged.
 	Command *[]string `json:"command,omitempty"`
 
-	// CpuMillicores CPU allocation in millicores. Minimum 250 (1/4 vCPU), in steps of 250.
-	// The upper bound is your workspace's per-instance quota; exceeding it returns 400.
-	// Omit to leave unchanged.
-	CpuMillicores *int `json:"cpuMillicores,omitempty"`
-
 	// Dockerfile Path to the Dockerfile used for builds.
 	// Omit to leave unchanged; set null to clear and fall back to Railpack.
 	Dockerfile nullable.Nullable[string] `json:"dockerfile,omitempty"`
@@ -1585,6 +1580,11 @@ type V2EnvironmentsUpdateSettingsRequestBody struct {
 
 	// UpstreamProtocol Protocol used to reach the container.
 	UpstreamProtocol *EnvironmentUpstreamProtocol `json:"upstreamProtocol,omitempty"`
+
+	// VCpus CPU allocation in vCPUs. Minimum 0.25 (1/4 vCPU), in steps of 0.25.
+	// The upper bound is your workspace's per-instance quota; exceeding it returns 400.
+	// Omit to leave unchanged.
+	VCpus *float64 `json:"vCpus,omitempty"`
 
 	// WatchPaths Glob paths that trigger auto-deploys when changed.
 	// Omit to leave unchanged.

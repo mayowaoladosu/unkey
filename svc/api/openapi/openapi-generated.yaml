@@ -925,15 +925,16 @@ components:
                         Container port the app listens on.
                         Omit to leave unchanged.
                     example: 8080
-                cpuMillicores:
-                    type: integer
-                    minimum: 250
-                    multipleOf: 250
+                vCpus:
+                    type: number
+                    format: double
+                    minimum: 0.25
+                    multipleOf: 0.25
                     description: |
-                        CPU allocation in millicores. Minimum 250 (1/4 vCPU), in steps of 250.
+                        CPU allocation in vCPUs. Minimum 0.25 (1/4 vCPU), in steps of 0.25.
                         The upper bound is your workspace's per-instance quota; exceeding it returns 400.
                         Omit to leave unchanged.
-                    example: 1000
+                    example: 1
                 memoryMib:
                     type: integer
                     minimum: 256
@@ -3742,7 +3743,7 @@ components:
         DeploymentRuntime:
             type: object
             required:
-                - cpuMillicores
+                - vCpus
                 - memoryMib
                 - storageMib
                 - port
@@ -3750,11 +3751,12 @@ components:
                 - shutdownSignal
                 - upstreamProtocol
             properties:
-                cpuMillicores:
-                    type: integer
+                vCpus:
+                    type: number
+                    format: double
                     description: |
-                        CPU allocation in millicores (1000 = one vCPU).
-                    example: 250
+                        CPU allocation in vCPUs (1 = one vCPU, 0.5 = half a vCPU).
+                    example: 0.25
                 memoryMib:
                     type: integer
                     description: |
@@ -3924,7 +3926,7 @@ components:
                 Omitted until the environment has runtime settings.
             required:
                 - port
-                - cpuMillicores
+                - vCpus
                 - memoryMib
                 - storageMib
                 - command
@@ -3936,11 +3938,12 @@ components:
                     description: |
                         Port the container listens on.
                     example: 8080
-                cpuMillicores:
-                    type: integer
+                vCpus:
+                    type: number
+                    format: double
                     description: |
-                        CPU allocation in millicores (1000 = one vCPU).
-                    example: 250
+                        CPU allocation in vCPUs (1 = one vCPU, 0.5 = half a vCPU).
+                    example: 0.25
                 memoryMib:
                     type: integer
                     description: |
@@ -6663,12 +6666,12 @@ paths:
                                                 command:
                                                     - node
                                                     - server.js
-                                                cpuMillicores: 250
                                                 memoryMib: 256
                                                 port: 8080
                                                 shutdownSignal: SIGTERM
                                                 storageMib: 0
                                                 upstreamProtocol: http1
+                                                vCpus: 0.25
                                             status: ready
                                             updatedAt: 1704153600000
                                         meta:
@@ -6788,12 +6791,12 @@ paths:
                                                 command:
                                                     - node
                                                     - server.js
-                                                cpuMillicores: 250
                                                 memoryMib: 256
                                                 port: 8080
                                                 shutdownSignal: SIGTERM
                                                 storageMib: 0
                                                 upstreamProtocol: http1
+                                                vCpus: 0.25
                                             slug: production
                                             updatedAt: 1704153600000
                                         meta:
@@ -7003,12 +7006,12 @@ paths:
                                                 command:
                                                     - node
                                                     - server.js
-                                                cpuMillicores: 250
                                                 memoryMib: 256
                                                 port: 8080
                                                 shutdownSignal: SIGTERM
                                                 storageMib: 0
                                                 upstreamProtocol: http1
+                                                vCpus: 0.25
                                               slug: production
                                               updatedAt: 1704153600000
                                             - build:
@@ -7025,12 +7028,12 @@ paths:
                                                 command:
                                                     - node
                                                     - server.js
-                                                cpuMillicores: 250
                                                 memoryMib: 256
                                                 port: 8080
                                                 shutdownSignal: SIGTERM
                                                 storageMib: 0
                                                 upstreamProtocol: http1
+                                                vCpus: 0.25
                                               slug: staging
                                         meta:
                                             requestId: req_1234abcd
@@ -7369,10 +7372,10 @@ paths:
                                 summary: Update runtime resources
                                 value:
                                     app: payments-api
-                                    cpuMillicores: 2000
                                     environment: production
                                     memoryMib: 1024
                                     project: payments
+                                    vCpus: 2
                         schema:
                             $ref: '#/components/schemas/V2EnvironmentsUpdateSettingsRequestBody'
                 required: true

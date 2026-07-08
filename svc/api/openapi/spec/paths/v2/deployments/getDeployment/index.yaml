@@ -48,7 +48,7 @@ post:
                   id: d_1234abcd
                   status: ready
                   runtime:
-                    cpuMillicores: 250
+                    vCpus: 0.25
                     memoryMib: 256
                     storageMib: 0
                     port: 8080
