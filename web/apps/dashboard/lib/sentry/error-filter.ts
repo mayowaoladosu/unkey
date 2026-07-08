@@ -16,7 +16,7 @@ import {
 } from "../logging/structured-logger";
 import type { Router } from "../trpc/routers";
 import { classifyError } from "../utils/error-classification";
-import { scrubEventPii } from "./pii-scrubber";
+import { isSensitiveKey, redactTokenLike, scrubEventPii } from "./pii-scrubber";
 
 /**
  * Type definitions for Sentry event processing
@@ -25,14 +25,23 @@ export type BeforeSendHook = Parameters<typeof Sentry.init>[0]["beforeSend"];
 
 /**
  * Input field names that may carry plaintext secrets and must never be sent to
- * Sentry. The tRPC Sentry middleware attaches the raw procedure input to
- * `event.contexts.trpc.input` (via `attachRpcInput: true`), which would
- * otherwise exfiltrate env-var secret values (`value`, `variables[].value`,
- * `items[].value`) or one-time share payloads (`secret`) when an unexpected
+ * Sentry, beyond the shared `isSensitiveKey` list in pii-scrubber.ts (which
+ * already covers `secret`, `code`, `token`, `password`, etc.). The tRPC Sentry
+ * middleware attaches the raw procedure input to `event.contexts.trpc.input`
+ * (via `attachRpcInput: true`), which would otherwise exfiltrate env-var secret
+ * values (`value`, `variables[].value`, `items[].value`) when an unexpected
  * error is forwarded. `sendDefaultPii: false` does not scrub custom contexts,
- * so we redact these explicitly.
+ * so we redact these explicitly. Matched case-insensitively.
  */
-const SENSITIVE_INPUT_KEYS = new Set(["value", "secret"]);
+const SENSITIVE_INPUT_KEYS = new Set(["value"]);
+
+/**
+ * Whether a tRPC input field name must be redacted: the shared sensitive-name
+ * list plus input-specific names.
+ */
+function isSensitiveInputKey(key: string): boolean {
+  return SENSITIVE_INPUT_KEYS.has(key.toLowerCase()) || isSensitiveKey(key);
+}
 
 /**
  * Dotted paths of the `share` router's procedures, derived from the app router
@@ -58,9 +67,16 @@ const REDACTED = "[REDACTED]";
 /**
  * Recursively replaces the values of sensitive keys with a redaction marker.
  * Walks nested objects and arrays so secrets nested under `variables`/`items`
- * are also scrubbed. Returns a new structure and never mutates the input.
+ * are also scrubbed, and redacts token-like substrings from the remaining
+ * string values as a fail-closed fallback for secrets under field names the
+ * key list doesn't anticipate. Returns a new structure and never mutates the
+ * input.
  */
 function redactSensitiveValues(value: unknown): unknown {
+  if (typeof value === "string") {
+    return redactTokenLike(value);
+  }
+
   if (Array.isArray(value)) {
     return value.map(redactSensitiveValues);
   }
@@ -68,7 +84,7 @@ function redactSensitiveValues(value: unknown): unknown {
   if (value && typeof value === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      result[key] = SENSITIVE_INPUT_KEYS.has(key) ? REDACTED : redactSensitiveValues(nested);
+      result[key] = isSensitiveInputKey(key) ? REDACTED : redactSensitiveValues(nested);
     }
     return result;
   }
