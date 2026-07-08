@@ -8,25 +8,34 @@ jobs:
     name: Build and Test
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 30
+    env:
+      RASK_CACHE_DIR: /mnt/depot-cache/rask
+      RASK_REMOTE_CACHE_BUCKET: rask
+      RASK_REMOTE_CACHE_PREFIX: ""
+      RASK_REMOTE_CACHE_REGION: auto
+      RASK_REMOTE_CACHE_ENDPOINT: ${{ secrets.RASK_REMOTE_CACHE_ENDPOINT }}
+      RASK_REMOTE_CACHE_ACCESS_KEY_ID: ${{ secrets.RASK_REMOTE_CACHE_ACCESS_KEY_ID }}
+      RASK_REMOTE_CACHE_SECRET_ACCESS_KEY: ${{ secrets.RASK_REMOTE_CACHE_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      - uses: ./.depot/actions/setup-bazel
+      - name: Mount Rask cache disk
+        uses: depot/cache-mount@v1
         with:
-          cache_auth: ${{ secrets.DEPOT_BAZEL_CACHE_AUTHORIZATION }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-        with:
-          install: true
-      - name: Build
-        run: bazel build //...
-      - name: Run tests
-        # UNKEY_TEST_CONTAINER_SCOPE must be forwarded via --test_env: Bazel
-        # does not pass host env vars into test sandboxes. Without it, every
-        # container-backed test target falls back to TEST_SRCDIR (unique per
-        # target) for its container scope, so each one starts its own
-        # MySQL/ClickHouse/etc pair that never gets cleaned up. Across the
-        # full suite that piles up dozens of container pairs and OOMs the
-        # runner. See .mise/tasks/test, which does the same for local runs.
+          name: unkey-rask-cache
+          path: /mnt/depot-cache
+          write-lock: /mnt/depot-cache/rask
+      - name: Install mise
         run: |
-          export UNKEY_TEST_CONTAINER_SCOPE="${GITHUB_WORKSPACE}"
-          bazel test --config=ci --test_env=UNKEY_TEST_CONTAINER_SCOPE //... --test_output=errors
+          ./dev/install-mise
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install toolchain
+        run: mise install --locked --yes
+      - name: Verify Rask remote cache
+        run: |
+          output="$(RASK_CACHE_DIR="${RUNNER_TEMP:-/tmp}/rask-remote-smoke" mise exec -- rask --no-cache ./pkg/codes 2>&1)"
+          printf '%s\n' "$output"
+          grep -Eq 'remote: [0-9]+ reads, [1-9][0-9]* writes' <<<"$output"
+      - name: Build
+        run: mise run build
+      - name: Run tests
+        run: mise run test
