@@ -14,6 +14,7 @@ import {
   logOperation,
   logTRPCError,
 } from "../logging/structured-logger";
+import type { Router } from "../trpc/routers";
 import { classifyError } from "../utils/error-classification";
 import { scrubEventPii } from "./pii-scrubber";
 
@@ -32,6 +33,25 @@ export type BeforeSendHook = Parameters<typeof Sentry.init>[0]["beforeSend"];
  * so we redact these explicitly.
  */
 const SENSITIVE_INPUT_KEYS = new Set(["value", "secret"]);
+
+/**
+ * Dotted paths of the `share` router's procedures, derived from the app router
+ * type (type-only import, erased at runtime). Typing the set below against
+ * this union makes a procedure rename a compile error instead of a silently
+ * disabled redaction.
+ */
+type ShareProcedurePath = `share.${Extract<keyof Router["share"]["_def"]["record"], string>}`;
+
+/**
+ * Procedures whose input is itself a bearer credential, so key-based scrubbing
+ * is not enough and the entire input must be redacted. `share.reveal` takes
+ * `{ id }` where the id is the one-time share credential: an unexpected error
+ * (e.g. a vault outage, which rolls back the transaction and leaves the row
+ * un-consumed) would otherwise store a still-valid credential in Sentry.
+ */
+const CREDENTIAL_INPUT_PROCEDURES: ReadonlySet<string> = new Set<ShareProcedurePath>([
+  "share.reveal",
+]);
 
 const REDACTED = "[REDACTED]";
 
@@ -63,9 +83,17 @@ function redactSensitiveValues(value: unknown): unknown {
  */
 function scrubTrpcInput(event: Sentry.ErrorEvent): void {
   const trpcContext = event.contexts?.trpc;
-  if (trpcContext && "input" in trpcContext) {
-    trpcContext.input = redactSensitiveValues(trpcContext.input);
+  if (!trpcContext || !("input" in trpcContext)) {
+    return;
   }
+
+  const procedurePath = trpcContext.procedure_path;
+  if (typeof procedurePath === "string" && CREDENTIAL_INPUT_PROCEDURES.has(procedurePath)) {
+    trpcContext.input = REDACTED;
+    return;
+  }
+
+  trpcContext.input = redactSensitiveValues(trpcContext.input);
 }
 
 /**
