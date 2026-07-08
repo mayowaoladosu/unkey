@@ -48,12 +48,15 @@ async function mirrorDeployPlan(
  * Completes a scheduled API-plan cancellation: when cancelSubscription phases
  * the API items off a mixed subscription, the phase boundary arrives as a
  * subscription.updated whose items no longer include an API plan. Mirror the
- * customer.subscription.deleted downgrade (tier, quotas, member deactivation)
- * but keep the subscription linked — Compute continues to bill on it.
+ * customer.subscription.deleted downgrade (tier, quotas) but keep the
+ * subscription linked — Compute continues to bill on it.
  *
- * Everything else with no API item is a no-op: Compute-only subscriptions are
- * already on the Free tier, and an unmarked schedule (or none) means the item
- * disappeared some other way we must not react to.
+ * Team access follows ANY active paid subscription, so while the surviving
+ * Compute plan is live the members stay active and the team quota stays on;
+ * they only go when the last paid plan does (the whole-subscription deleted
+ * handler). Everything else with no API item is a no-op: Compute-only
+ * subscriptions are already on the Free tier, and an unmarked schedule (or
+ * none) means the item disappeared some other way we must not react to.
  */
 async function downgradeAfterScheduledApiCancel(
   stripe: Stripe,
@@ -69,30 +72,40 @@ async function downgradeAfterScheduledApiCancel(
     return new Response("OK", { status: 200 });
   }
 
+  // Read the surviving Compute plan off the event's subscription rather than
+  // the workspace row: mirrorDeployPlan already reconciled the DB, but the
+  // in-memory row predates it.
+  const keepsTeam = detectDeployPlan(sub) !== null;
+  const downgradedQuotas = keepsTeam ? { ...freeTierQuotas, team: true } : freeTierQuotas;
+
   await db.update(schema.workspaces).set({ tier: "Free" }).where(eq(schema.workspaces.id, ws.id));
 
   await db
     .insert(schema.quotas)
     .values({
       workspaceId: ws.id,
-      ...freeTierQuotas,
+      ...downgradedQuotas,
     })
     .onDuplicateKeyUpdate({
-      set: freeTierQuotas,
+      set: downgradedQuotas,
     });
 
   await insertAuditLogs(db, {
     workspaceId: ws.id,
     actor: { type: "system", id: "stripe" },
     event: "workspace.update",
-    description: "Scheduled API plan cancellation took effect; downgraded to Free.",
+    description: keepsTeam
+      ? "Scheduled API plan cancellation took effect; downgraded to Free (team retained via active Compute plan)."
+      : "Scheduled API plan cancellation took effect; downgraded to Free.",
     resources: [],
     context: { location: "", userAgent: undefined },
   });
 
-  // Free tier doesn't include team access — deactivate all members except the
-  // original creator, same as a whole-subscription cancellation.
-  await deactivateNonCreatorMemberships(ws.orgId);
+  if (!keepsTeam) {
+    // Free tier doesn't include team access — deactivate all members except
+    // the original creator, same as a whole-subscription cancellation.
+    await deactivateNonCreatorMemberships(ws.orgId);
+  }
 
   return new Response("OK", { status: 200 });
 }
