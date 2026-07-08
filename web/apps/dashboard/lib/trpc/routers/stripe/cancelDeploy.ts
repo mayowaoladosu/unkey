@@ -2,7 +2,11 @@ import { insertAuditLogs } from "@/lib/audit";
 import { db, eq, schema } from "@/lib/db";
 import { getStripeClient } from "@/lib/stripe";
 import { deployBillingConfig, findDeployItems } from "@/lib/stripe/deployBilling";
-import { isDeadSubscription } from "@/lib/stripe/subscriptionUtils";
+import {
+  getApiCancelSchedule,
+  isDeadSubscription,
+  isPendingSchedule,
+} from "@/lib/stripe/subscriptionUtils";
 import { TRPCError } from "@trpc/server";
 import { requireWorkspaceAdmin, workspaceProcedure } from "../../trpc";
 
@@ -66,6 +70,18 @@ export const cancelDeploy = workspaceProcedure
         });
       }
 
+      // A pending API-plan cancellation is a schedule whose next phase
+      // snapshots the current Compute items — left in place, it would re-add
+      // the items we're about to remove at the period boundary and resume
+      // billing them. Release it first; the API cancellation is re-applied as
+      // a plain cancel_at_period_end below, which is exactly what it means on
+      // the API-only subscription this cancel leaves behind.
+      const apiCancelSchedule = await getApiCancelSchedule(stripe, sub);
+      const pendingApiCancel = apiCancelSchedule !== null && isPendingSchedule(apiCancelSchedule);
+      if (pendingApiCancel && apiCancelSchedule) {
+        await stripe.subscriptionSchedules.release(apiCancelSchedule.id);
+      }
+
       if (deployItems.length === sub.items.data.length) {
         // Deploy-only subscription: can't delete the last item, so cancel the
         // whole subscription now. prorate:false = no plan-fee refund; invoice_now
@@ -85,6 +101,11 @@ export const cancelDeploy = workspaceProcedure
           items: deployItems.map((item) => ({ id: item.id, deleted: true })),
           proration_behavior: "none",
         });
+
+        if (pendingApiCancel) {
+          // Preserve the API cancellation the released schedule was carrying.
+          await stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
+        }
       }
     }
 

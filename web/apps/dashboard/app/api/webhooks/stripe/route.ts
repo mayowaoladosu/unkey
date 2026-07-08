@@ -11,6 +11,7 @@ import { linkDeploySubscription } from "@/lib/stripe/linkDeploySubscription";
 import { isPaymentRecovery, isPaymentRecoveryUpdate } from "@/lib/stripe/paymentUtils";
 import { validateAndParseQuotas } from "@/lib/stripe/productUtils";
 import {
+  getApiCancelSchedule,
   isAutomatedBillingRenewal,
   isCardUpdateOnly,
   isPaymentFailureRelatedUpdate,
@@ -41,6 +42,59 @@ async function mirrorDeployPlan(
   if (changed) {
     await db.update(schema.workspaces).set({ deployPlan }).where(eq(schema.workspaces.id, ws.id));
   }
+}
+
+/**
+ * Completes a scheduled API-plan cancellation: when cancelSubscription phases
+ * the API items off a mixed subscription, the phase boundary arrives as a
+ * subscription.updated whose items no longer include an API plan. Mirror the
+ * customer.subscription.deleted downgrade (tier, quotas, member deactivation)
+ * but keep the subscription linked — Compute continues to bill on it.
+ *
+ * Everything else with no API item is a no-op: Compute-only subscriptions are
+ * already on the Free tier, and an unmarked schedule (or none) means the item
+ * disappeared some other way we must not react to.
+ */
+async function downgradeAfterScheduledApiCancel(
+  stripe: Stripe,
+  ws: { id: string; orgId: string; tier: string | null },
+  sub: Stripe.Subscription,
+): Promise<Response> {
+  if (ws.tier === "Free") {
+    // Compute-only subscriptions and webhook redeliveries land here.
+    return new Response("OK", { status: 200 });
+  }
+  const schedule = await getApiCancelSchedule(stripe, sub);
+  if (!schedule) {
+    return new Response("OK", { status: 200 });
+  }
+
+  await db.update(schema.workspaces).set({ tier: "Free" }).where(eq(schema.workspaces.id, ws.id));
+
+  await db
+    .insert(schema.quotas)
+    .values({
+      workspaceId: ws.id,
+      ...freeTierQuotas,
+    })
+    .onDuplicateKeyUpdate({
+      set: freeTierQuotas,
+    });
+
+  await insertAuditLogs(db, {
+    workspaceId: ws.id,
+    actor: { type: "system", id: "stripe" },
+    event: "workspace.update",
+    description: "Scheduled API plan cancellation took effect; downgraded to Free.",
+    resources: [],
+    context: { location: "", userAgent: undefined },
+  });
+
+  // Free tier doesn't include team access — deactivate all members except the
+  // original creator, same as a whole-subscription cancellation.
+  await deactivateNonCreatorMemberships(ws.orgId);
+
+  return new Response("OK", { status: 200 });
 }
 
 /**
@@ -270,10 +324,13 @@ export const POST = async (req: Request): Promise<Response> => {
         }
 
         // Reconcile tier/quotas from the API plan item (the Deploy signal is
-        // mirrored above). Nothing to reconcile on a Compute-only subscription.
+        // mirrored above). No API item either means a Compute-only
+        // subscription (no-op) or a scheduled API-plan cancellation whose
+        // phase boundary just hit — downgradeAfterScheduledApiCancel tells
+        // them apart and downgrades the workspace for the latter.
         const apiContext = await resolveApiSubscriptionContext(stripe, sub);
         if (!apiContext) {
-          return new Response("OK");
+          return await downgradeAfterScheduledApiCancel(stripe, ws, sub);
         }
         const { unitAmount, customer, product } = apiContext;
 
