@@ -551,13 +551,28 @@ func Run(ctx context.Context, cfg Config) error {
 		restate.WithMaxAttempts(5),
 		restate.KillOnMaxAttempts(),
 	)
+	// DeployBillingPush is the hourly month-to-date push orchestrator, keyed by
+	// billing period (YYYY-MM) so every hourly tick shares one VO. Its own reads
+	// (list workspaces, the ClickHouse scan) can fail non-terminally, and without
+	// a cap that invocation retries forever on the period VO while later ticks
+	// queue behind it. The push is idempotent (absolute month-to-date total,
+	// Stripe aggregates with "last"), so kill on exhaustion and let the next tick
+	// retry from a clean slate.
+	cronDeployBillingPushRetry := restate.WithInvocationRetryPolicy(
+		restate.WithInitialInterval(100*time.Millisecond),
+		restate.WithExponentiationFactor(2.0),
+		restate.WithMaxInterval(5*time.Second),
+		restate.WithMaxAttempts(5),
+		restate.KillOnMaxAttempts(),
+	)
 	restateSrv.Bind(hydrav1.NewCronServiceServer(cronSvc).
 		ConfigureHandler("RunKeyLastUsedSync", cronKeyLastUsedRetry).
 		ConfigureHandler("RunRatelimitGlobalCountersCleanup", cronRatelimitGCCRetry).
 		ConfigureHandler("RunAuditLogOutboxCleanup", cronAuditLogCleanupRetry).
 		ConfigureHandler("RunAuditLogExport", restate.WithJournalRetention(1*time.Hour)).
 		ConfigureHandler("RunDeployBillingClose", cronDeployBillingCloseRetry).
-		ConfigureHandler("CloseDeployBillingWorkspace", cronDeployBillingCloseRetry))
+		ConfigureHandler("CloseDeployBillingWorkspace", cronDeployBillingCloseRetry).
+		ConfigureHandler("RunDeployBillingPush", cronDeployBillingPushRetry))
 	logger.Info("CronService enabled")
 
 	// KeyLastUsedPartitionService is the per-partition VO fanned out from
@@ -571,6 +586,11 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	restateSrv.Bind(hydrav1.NewKeyLastUsedPartitionServiceServer(keyLastUsedPartitionSvc, cronKeyLastUsedRetry))
 	logger.Info("KeyLastUsedPartitionService enabled")
+
+	// DeployBillingPushService is the per-workspace push VO fanned out from the
+	// deploy billing orchestrator. Standalone, not cron-triggered.
+	restateSrv.Bind(hydrav1.NewDeployBillingPushServiceServer(cronSvc.DeployBillingPushServer()))
+	logger.Info("DeployBillingPushService enabled")
 
 	// Get the Restate handler and mount it on a mux with health endpoint
 	restateHandler, err := restateSrv.Handler()
