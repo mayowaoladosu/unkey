@@ -1,3 +1,19 @@
+// Package pagination implements the cursor pagination idiom shared by the v2
+// list endpoints:
+//
+//	p := pagination.Parse(req.Limit, req.Cursor, 100)
+//
+//	rows, err := db.Query.ListX(ctx, h.DB.RO(), db.ListXParams{
+//		IDCursor: p.Cursor,
+//		Limit:    p.FetchLimit(),
+//	})
+//
+//	rows, pg := pagination.Paginate(rows, p, func(r db.ListXRow) string { return r.ID })
+//
+// Queries over-fetch one row beyond the requested page size so the extra row
+// can reveal whether a next page exists and serve as its cursor. Pairs with
+// the inclusive `id >= cursor` / `ORDER BY id ASC` convention of the v2 list
+// queries: the returned cursor is the first row of the next page.
 package pagination
 
 import (
@@ -5,33 +21,40 @@ import (
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// Identifiable constrains PaginateByID to types that expose their cursor id via
-// GetID (not a plain .ID field) because Go generics cannot read a struct field
-// off a type parameter. Row types implement GetID in [pkg/db/identifiable.go];
-// add new list-query row types there.
-type Identifiable interface {
-	GetID() string
+// Params carries the parsed pagination inputs of a list request so the same
+// limit drives both the over-fetch (FetchLimit) and the trim (Paginate).
+type Params struct {
+	Limit  int
+	Cursor string
 }
 
-func PaginateByID[T Identifiable](rows []T, limit int) ([]T, *openapi.Pagination) {
-	return Paginate(rows, limit, T.GetID)
+// Parse applies defaults to the optional pagination fields of a list request.
+// Range bounds are already enforced by the OpenAPI request validation.
+func Parse(limit *int, cursor *string, defaultLimit int) Params {
+	return Params{
+		Limit:  ptr.SafeDeref(limit, defaultLimit),
+		Cursor: ptr.SafeDeref(cursor, ""),
+	}
 }
 
-// Paginate trims an over-fetched result set to limit and builds the cursor
-// pagination response. Callers must query limit+1 rows so the extra row can
-// serve as the next cursor. Pairs with the inclusive `id >= cursor` /
-// `ORDER BY id ASC` convention used by the v2 list queries: the returned cursor
-// is the first row of the next page.
-func Paginate[T any](rows []T, limit int, id func(T) string) ([]T, *openapi.Pagination) {
-	hasMore := len(rows) > limit
-	var cursor *string
+// FetchLimit returns the query limit including the extra look-ahead row.
+func (p Params) FetchLimit() int32 {
+	return int32(p.Limit + 1) // nolint:gosec // request validation bounds Limit far below int32 max
+}
+
+// Paginate trims rows over-fetched with FetchLimit back to the requested page
+// size and builds the response pagination. cursor extracts the value the next
+// page's query resumes from.
+func Paginate[T any](rows []T, p Params, cursor func(T) string) ([]T, *openapi.Pagination) {
+	hasMore := len(rows) > p.Limit
+	var next *string
 	if hasMore {
-		cursor = ptr.P(id(rows[limit]))
-		rows = rows[:limit]
+		next = ptr.P(cursor(rows[p.Limit]))
+		rows = rows[:p.Limit]
 	}
 
 	return rows, &openapi.Pagination{
-		Cursor:  cursor,
+		Cursor:  next,
 		HasMore: hasMore,
 	}
 }

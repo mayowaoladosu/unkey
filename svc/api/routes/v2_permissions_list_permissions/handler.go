@@ -5,7 +5,6 @@ import (
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
 	"github.com/unkeyed/unkey/svc/api/internal/pagination"
@@ -47,8 +46,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	cursor := ptr.SafeDeref(req.Cursor, "")
-	limit := ptr.SafeDeref(req.Limit, 100)
+	p := pagination.Parse(req.Limit, req.Cursor, 100)
 
 	err = principal.Authorize(rbac.Or(
 		rbac.T(rbac.Tuple{
@@ -66,9 +64,8 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		h.DB.RO(),
 		db.ListPermissionsParams{
 			WorkspaceID: principal.WorkspaceID,
-			IDCursor:    cursor,
-			//nolint:gosec
-			Limit: int32(limit) + 1,
+			IDCursor:    p.Cursor,
+			Limit:       p.FetchLimit(),
 		},
 	)
 	if err != nil {
@@ -78,7 +75,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	permissions, pg := pagination.PaginateByID(permissions, limit)
+	permissions, pg := pagination.Paginate(permissions, p, func(r db.Permission) string { return r.ID })
 
 	responsePermissions := make([]openapi.Permission, 0, len(permissions))
 	for _, perm := range permissions {

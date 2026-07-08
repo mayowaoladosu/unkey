@@ -15,5 +15,8 @@ go_test(
     name = "pagination_test",
     srcs = ["pagination_test.go"],
     embed = [":pagination"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//pkg/ptr",
+        "@com_github_stretchr_testify//require",
+    ],
 )

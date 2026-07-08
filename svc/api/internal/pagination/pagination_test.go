@@ -4,13 +4,28 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/unkeyed/unkey/pkg/ptr"
 )
 
 type row struct {
 	ID string
 }
 
-func (r row) GetID() string { return r.ID }
+func TestParse(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		p := Parse(nil, nil, 100)
+		require.Equal(t, Params{Limit: 100, Cursor: ""}, p)
+	})
+
+	t.Run("explicit values", func(t *testing.T) {
+		p := Parse(ptr.P(20), ptr.P("KEBAP"), 100)
+		require.Equal(t, Params{Limit: 20, Cursor: "KEBAP"}, p)
+	})
+}
+
+func TestFetchLimit(t *testing.T) {
+	require.Equal(t, int32(51), Params{Limit: 50}.FetchLimit())
+}
 
 func TestPaginate(t *testing.T) {
 	id := func(r row) string { return r.ID }
@@ -52,7 +67,7 @@ func TestPaginate(t *testing.T) {
 			rows:        []row{{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "KEBAP"}},
 			limit:       3,
 			wantIDs:     []string{"a", "b", "c"},
-			wantCursor:  ptrOf("KEBAP"),
+			wantCursor:  ptr.P("KEBAP"),
 			wantHasMore: true,
 		},
 		{
@@ -60,14 +75,14 @@ func TestPaginate(t *testing.T) {
 			rows:        []row{{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "d"}, {ID: "e"}, {ID: "f"}},
 			limit:       3,
 			wantIDs:     []string{"a", "b", "c"},
-			wantCursor:  ptrOf("d"),
+			wantCursor:  ptr.P("d"),
 			wantHasMore: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			items, pg := Paginate(tt.rows, tt.limit, id)
+			items, pg := Paginate(tt.rows, Params{Limit: tt.limit}, id)
 
 			gotIDs := make([]string, len(items))
 			for i, r := range items {
@@ -78,18 +93,4 @@ func TestPaginate(t *testing.T) {
 			require.Equal(t, tt.wantCursor, pg.Cursor)
 		})
 	}
-}
-
-func TestPaginateByID(t *testing.T) {
-	rows := []row{{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "KEBAP"}}
-
-	items, pg := PaginateByID(rows, 3)
-
-	require.Equal(t, []row{{ID: "a"}, {ID: "b"}, {ID: "c"}}, items)
-	require.True(t, pg.HasMore)
-	require.Equal(t, ptrOf("KEBAP"), pg.Cursor)
-}
-
-func ptrOf(s string) *string {
-	return &s
 }

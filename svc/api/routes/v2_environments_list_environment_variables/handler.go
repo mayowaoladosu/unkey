@@ -9,7 +9,6 @@ import (
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
 	"github.com/unkeyed/unkey/svc/api/internal/pagination"
@@ -84,14 +83,13 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	limit := ptr.SafeDeref(req.Limit, 100)
-	cursor := ptr.SafeDeref(req.Cursor, "")
+	p := pagination.Parse(req.Limit, req.Cursor, 100)
 
 	rows, err := db.Query.ListAppEnvVarsByAppAndEnv(ctx, h.DB.RO(), db.ListAppEnvVarsByAppAndEnvParams{
 		AppID:         env.AppID,
 		EnvironmentID: env.ID,
-		IDCursor:      cursor,
-		Limit:         int32(limit + 1), // nolint:gosec // limit is bounded [1,100]
+		IDCursor:      p.Cursor,
+		Limit:         p.FetchLimit(),
 	})
 	if err != nil {
 		return fault.Wrap(
@@ -102,7 +100,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	rows, pg := pagination.PaginateByID(rows, limit)
+	rows, pg := pagination.Paginate(rows, p, func(r db.ListAppEnvVarsByAppAndEnvRow) string { return r.ID })
 
 	// Bulk-decrypt every recoverable variable in a single vault round-trip. The
 	// keyring is the environment id, matching how the set handler encrypts them.

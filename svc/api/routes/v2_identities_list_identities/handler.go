@@ -5,7 +5,6 @@ import (
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/logger"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
 	"github.com/unkeyed/unkey/svc/api/internal/pagination"
@@ -46,15 +45,13 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	limit := ptr.SafeDeref(req.Limit, 100)
-	cursor := ptr.SafeDeref(req.Cursor)
+	p := pagination.Parse(req.Limit, req.Cursor, 100)
 
-	// Query one extra record to check if there are more results
 	identities, err := db.Query.ListIdentities(ctx, h.DB.RO(), db.ListIdentitiesParams{
 		WorkspaceID: principal.WorkspaceID,
 		Deleted:     false,
-		IDCursor:    cursor,
-		Limit:       int32(limit + 1), // nolint:gosec
+		IDCursor:    p.Cursor,
+		Limit:       p.FetchLimit(),
 	})
 	if err != nil {
 		return fault.Wrap(err,
@@ -62,7 +59,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
-	identities, pg := pagination.PaginateByID(identities, limit)
+	identities, pg := pagination.Paginate(identities, p, func(r db.ListIdentitiesRow) string { return r.ID })
 
 	// Check permissions for all identities before processing
 	for _, id := range identities {
