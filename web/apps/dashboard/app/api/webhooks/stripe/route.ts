@@ -76,7 +76,19 @@ async function downgradeAfterScheduledApiCancel(
   // the workspace row: mirrorDeployPlan already reconciled the DB, but the
   // in-memory row predates it.
   const keepsTeam = detectDeployPlan(sub) !== null;
-  const downgradedQuotas = keepsTeam ? { ...freeTierQuotas, team: true } : freeTierQuotas;
+
+  // When a Compute plan survives, reset only the API-scoped quota fields:
+  // the Compute resource ceilings belong to the surviving plan, so spreading
+  // all of freeTierQuotas would clamp them to Free the moment Compute tiers
+  // diverge from the Free defaults.
+  const apiFreeQuotas = {
+    requestsPerMonth: freeTierQuotas.requestsPerMonth,
+    logsRetentionDays: freeTierQuotas.logsRetentionDays,
+    auditLogsRetentionDays: freeTierQuotas.auditLogsRetentionDays,
+    ratelimitApiLimit: freeTierQuotas.ratelimitApiLimit,
+    ratelimitApiDuration: freeTierQuotas.ratelimitApiDuration,
+  };
+  const downgradedQuotas = keepsTeam ? { ...apiFreeQuotas, team: true } : freeTierQuotas;
 
   await db.update(schema.workspaces).set({ tier: "Free" }).where(eq(schema.workspaces.id, ws.id));
 

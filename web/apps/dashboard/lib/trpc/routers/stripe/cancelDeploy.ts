@@ -104,7 +104,18 @@ export const cancelDeploy = workspaceProcedure
 
         if (pendingApiCancel) {
           // Preserve the API cancellation the released schedule was carrying.
-          await stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
+          // Best-effort: the Deploy items are already removed, so a throw here
+          // would skip clearing deploy_plan below; losing the flag means the
+          // API plan keeps billing until the user cancels again, not a wrong
+          // charge.
+          try {
+            await stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
+          } catch (reapplyErr) {
+            console.error("Failed to reapply pending API cancellation after Compute cancel", {
+              subscriptionId: sub.id,
+              error: reapplyErr instanceof Error ? reapplyErr.message : reapplyErr,
+            });
+          }
         }
       }
     }

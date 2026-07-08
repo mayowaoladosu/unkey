@@ -132,7 +132,19 @@ export const changeDeployPlan = workspaceProcedure
     }
 
     if (pendingApiCancel) {
-      await restoreApiCancel();
+      // The plan change already went through, so a throw here would skip the
+      // DB write below and a same-plan retry would short-circuit before ever
+      // recreating the schedule. Best-effort instead: losing the pending
+      // cancellation means the API plan keeps billing until the user cancels
+      // again, not a wrong charge.
+      try {
+        await restoreApiCancel();
+      } catch (restoreErr) {
+        console.error("Failed to restore pending API cancellation after plan change", {
+          subscriptionId: sub.id,
+          error: restoreErr instanceof Error ? restoreErr.message : restoreErr,
+        });
+      }
     }
 
     // One transaction so the plan write and its audit log commit together; a
