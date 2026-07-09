@@ -197,7 +197,11 @@ export const DiffViewerContent: React.FC<DiffViewerContentProps> = ({
         </Select>
         <Select
           value={filters.operation}
-          onValueChange={(value) => setFilters((p) => ({ ...p, operation: value }))}
+          onValueChange={(value) => {
+            if (value !== null) {
+              setFilters((p) => ({ ...p, operation: value }));
+            }
+          }}
         >
           <SelectTrigger wrapperClassName="w-[150px] rounded-md" className="h-9 rounded-md">
             <SelectValue placeholder="All methods" />

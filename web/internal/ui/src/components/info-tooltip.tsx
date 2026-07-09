@@ -40,12 +40,18 @@ const InfoTooltip = ({
   className?: string;
   triggerClassName?: string;
 }>) => {
+  // Keep `open` always controlled (a boolean) so Base UI never sees it switch
+  // between controlled and uncontrolled when `disabled` toggles. When disabled,
+  // force closed; otherwise track hover/focus via internal state.
+  const [open, setOpen] = React.useState(false);
   return (
-    <TooltipProvider delayDuration={delayDuration ?? undefined}>
-      <Tooltip open={disabled ? false : undefined}>
-        <TooltipTrigger asChild={asChild} className={triggerClassName}>
-          {children}
-        </TooltipTrigger>
+    <TooltipProvider delay={delayDuration ?? undefined}>
+      <Tooltip open={disabled ? false : open} onOpenChange={setOpen}>
+        {asChild ? (
+          <TooltipTrigger className={triggerClassName} render={children as React.ReactElement} />
+        ) : (
+          <TooltipTrigger className={triggerClassName}>{children}</TooltipTrigger>
+        )}
         <TooltipContent
           className={cn(baseVariant, variants[variant], className)}
           side={position?.side || "right"}

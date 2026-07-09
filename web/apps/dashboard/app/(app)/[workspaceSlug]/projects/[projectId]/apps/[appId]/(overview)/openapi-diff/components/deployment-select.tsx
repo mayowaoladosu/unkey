@@ -126,7 +126,11 @@ export function DeploymentSelect({
   return (
     <Select
       value={value}
-      onValueChange={onValueChange}
+      onValueChange={(newValue) => {
+        if (newValue !== null) {
+          onValueChange(newValue);
+        }
+      }}
       disabled={disabled || isLoading || deployments.length === 0}
     >
       <SelectTrigger id={id} className="rounded-md" title={getTriggerTitle()}>

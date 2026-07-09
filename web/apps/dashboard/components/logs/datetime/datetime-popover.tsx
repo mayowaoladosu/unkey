@@ -265,9 +265,10 @@ export const DatetimePopover = ({
         </Drawer.Root>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <div className="flex flex-row items-center">{children}</div>
-          </PopoverTrigger>
+          <PopoverTrigger
+            nativeButton={false}
+            render={<div className="flex flex-row items-center">{children}</div>}
+          />
           <PopoverContent
             className="flex w-full bg-gray-1 dark:bg-black shadow-2xl p-0 m-0 border-gray-6 rounded-lg"
             align={align}

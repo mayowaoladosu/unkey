@@ -59,9 +59,7 @@ export const HelpButton: React.FC = () => {
           </DropdownMenuItem>
           <DropdownMenuSeparator className="my-1" />
           <DropdownMenuLabel>Platform status</DropdownMenuLabel>
-          <DropdownMenuItem asChild className="cursor-pointer w-full">
-            <StatusWidget />
-          </DropdownMenuItem>
+          <DropdownMenuItem render={<StatusWidget />} className="cursor-pointer w-full" />
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

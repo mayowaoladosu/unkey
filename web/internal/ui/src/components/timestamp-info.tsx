@@ -142,15 +142,17 @@ const TimestampInfo: React.FC<{
       {externalTriggerRef ? (
         // If external trigger is provided, use a span and the external trigger
         <>
-          <TooltipTrigger asChild>
-            <span className={cn("text-xs", className)}>{getDisplayValue()}</span>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={<span className={cn("text-xs", className)}>{getDisplayValue()}</span>}
+          />
         </>
       ) : (
-        // Otherwise use the internal trigger ref for the button
-        <TooltipTrigger ref={internalTriggerRef} className={cn("text-xs", className)}>
-          <span>{getDisplayValue()}</span>
-        </TooltipTrigger>
+        // Render the trigger as a <span> (not a native <button>) so it is safe to
+        // nest inside interactive elements (e.g. a clickable row button).
+        <TooltipTrigger
+          ref={internalTriggerRef}
+          render={<span className={cn("text-xs", className)}>{getDisplayValue()}</span>}
+        />
       )}
       <TooltipContent
         align={alignProp ?? align}

@@ -62,7 +62,11 @@ export const RoleSwitcher = memo<RoleSwitcherProps>(
           <Select
             value={role}
             disabled={isCurrentUser || updateMember.isLoading}
-            onValueChange={handleRoleUpdate}
+            onValueChange={(newRole) => {
+              if (newRole !== null) {
+                handleRoleUpdate(newRole);
+              }
+            }}
           >
             <SelectTrigger className="w-[180px] max-sm:w-36">
               {updateMember.isLoading ? <Loading /> : <SelectValue />}

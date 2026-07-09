@@ -61,7 +61,15 @@ function FormSelect({
         htmlFor={selectId}
         tooltipContent={descriptionAsTooltip ? description : undefined}
       />
-      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+      <Select
+        value={value}
+        onValueChange={(newValue) => {
+          if (newValue !== null) {
+            onValueChange(newValue);
+          }
+        }}
+        disabled={disabled}
+      >
         <SelectTrigger
           id={selectId}
           variant={selectVariant}

@@ -75,7 +75,7 @@ export const NamespaceListDateTime = () => {
           variant="ghost"
           size="md"
           className={cn(
-            "group-data-[state=open]:bg-gray-4 px-2 rounded-lg",
+            "group-data-popup-open:bg-gray-4 px-2 rounded-lg",
             displayTitle === "Loading..." ? "opacity-50" : "",
             displayTitle !== "Last 12 hours" ? "bg-gray-4" : "",
           )}

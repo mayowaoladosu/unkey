@@ -31,7 +31,14 @@ export function EnvironmentSelect() {
   };
 
   return (
-    <Select value={currentValue} onValueChange={handleChange}>
+    <Select
+      value={currentValue}
+      onValueChange={(newValue) => {
+        if (newValue !== null) {
+          handleChange(newValue);
+        }
+      }}
+    >
       <SelectTrigger
         className="h-9 w-full bg-gray-1"
         leftIcon={<Layers3 iconSize="md-medium" className="text-gray-9" />}

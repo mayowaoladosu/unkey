@@ -22,15 +22,17 @@ export const EmptyState = ({ content }: EmptyStateProps) => {
               Ready to get started? Check our documentation for a step-by-step guide.
             </Empty.Description>
             <Empty.Actions className="mt-4 justify-start">
-              <Button asChild>
-                <a
-                  href="https://www.unkey.com/docs/introduction"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <BookBookmark />
-                  Documentation
-                </a>
+              <Button
+                render={
+                  <a
+                    href="https://www.unkey.com/docs/introduction"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
+              >
+                <BookBookmark />
+                Documentation
               </Button>
             </Empty.Actions>
           </Empty>

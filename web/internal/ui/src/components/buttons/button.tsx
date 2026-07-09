@@ -1,5 +1,5 @@
 "use client";
-import { Slot } from "@radix-ui/react-slot";
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 import { cn } from "../../lib/utils";
@@ -38,9 +38,9 @@ export type DocumentedButtonProps = VariantProps<typeof buttonVariants> & {
   };
 
   /**
-   * Allows you to use your own component as a button
+   * Render your own element/component as the button (replaces the former `asChild`)
    */
-  asChild?: boolean;
+  render?: React.ComponentProps<typeof ButtonPrimitive>["render"];
 
   /**
    * Optional label for screen readers when in loading state
@@ -256,7 +256,10 @@ export type ButtonProps = VariantProps<typeof buttonVariants> &
        */
       callback: (e: KeyboardEvent) => void | Promise<void>;
     };
-    asChild?: boolean;
+    /**
+     * Render your own element/component as the button (replaces the former `asChild`)
+     */
+    render?: React.ComponentProps<typeof ButtonPrimitive>["render"];
     /**
      * Optional label for screen readers when in loading state
      */
@@ -300,7 +303,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       variant,
       color = "default",
       size,
-      asChild = false,
+      render,
       loading,
       disabled,
       loadingLabel = "Loading, please wait",
@@ -351,14 +354,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       document.addEventListener("keydown", down);
       return () => document.removeEventListener("keydown", down);
     }, [props.keyboard, isClickDisabled]);
-    const Comp = asChild ? Slot : "button";
 
-    // When asChild is true, Slot expects exactly one React element child.
-    // Rendering multiple children (e.g. {false} and <div>) causes
-    // React.Children.count > 1 in React 19, which makes Slot throw.
-    if (asChild) {
+    // When `render` is provided (custom element/component), render only the
+    // children — the loading spinner and keyboard hint are omitted, matching
+    // the previous `asChild` behavior.
+    if (render) {
       return (
-        <Comp
+        <ButtonPrimitive
+          render={render}
+          // `render` targets are typically non-button elements (e.g. a Next.js
+          // <Link>/<a>), so tell Base UI not to assume native button semantics.
+          nativeButton={false}
           className={cn(
             buttonVariants({
               variant: mappedVariant,
@@ -375,12 +381,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           {...props}
         >
           {props.children}
-        </Comp>
+        </ButtonPrimitive>
       );
     }
 
     return (
-      <Comp
+      <ButtonPrimitive
         className={cn(
           buttonVariants({
             variant: mappedVariant,
@@ -428,7 +434,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             </kbd>
           ) : null}{" "}
         </div>
-      </Comp>
+      </ButtonPrimitive>
     );
   },
 );

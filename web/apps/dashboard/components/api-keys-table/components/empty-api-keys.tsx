@@ -12,15 +12,18 @@ export const EmptyApiKeys = () => {
           started.
         </Empty.Description>
         <Empty.Actions className="mt-4 justify-start">
-          <Button asChild size="md">
-            <a
-              href="https://www.unkey.com/docs/introduction"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <BookBookmark />
-              Learn about Keys
-            </a>
+          <Button
+            size="md"
+            render={
+              <a
+                href="https://www.unkey.com/docs/introduction"
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            }
+          >
+            <BookBookmark />
+            Learn about Keys
           </Button>
         </Empty.Actions>
       </Empty>

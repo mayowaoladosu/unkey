@@ -189,7 +189,15 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({ organizations, lastOrg
               >
                 Workspace
               </label>
-              <Select value={selectedOrgId} onValueChange={setSelectedOrgId} disabled={isLoading}>
+              <Select
+                value={selectedOrgId}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setSelectedOrgId(value);
+                  }
+                }}
+                disabled={isLoading}
+              >
                 <SelectTrigger
                   id="workspace-selector"
                   className="dark bg-black text-gray-400 border border-gray-500/30 focus:outline-none! focus:ring-0 focus:border-gray-400"

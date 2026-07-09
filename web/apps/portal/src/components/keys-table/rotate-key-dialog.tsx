@@ -126,7 +126,11 @@ function ConfigureCard({ grace, onGraceChange, onCancel, onRotate }: ConfigureCa
       <DialogBody className="px-5 pt-2 pb-5">
         <Field>
           <FieldLabel htmlFor="rotate-key-grace">Grace period</FieldLabel>
-          <Select value={grace} onValueChange={onGraceChange}>
+          <Select
+            items={GRACE_PERIODS.map((p) => ({ value: p.value, label: p.label }))}
+            value={grace}
+            onValueChange={(value) => value !== null && onGraceChange(value)}
+          >
             <SelectTrigger id="rotate-key-grace">
               <SelectValue placeholder="Select a grace period" />
             </SelectTrigger>

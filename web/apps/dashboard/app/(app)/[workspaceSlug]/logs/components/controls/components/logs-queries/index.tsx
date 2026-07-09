@@ -19,7 +19,7 @@ export const LogsQueries = () => {
         <Button
           variant="ghost"
           size="md"
-          className={cn("group-data-[state=open]:bg-gray-4 px-2 rounded-lg")}
+          className={cn("group-data-popup-open:bg-gray-4 px-2 rounded-lg")}
           aria-label="Audit log queries"
           aria-haspopup="true"
           title="Press 'Q' to toggle queries"
