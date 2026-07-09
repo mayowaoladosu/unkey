@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	clickhousePort     = 9000
 	clickhouseUser     = "default"
 	clickhousePassword = "password"
 )
@@ -33,7 +34,7 @@ func ClickHouse(t testing.TB) ClickHouseConfig {
 
 	c := startService(t, "clickhouse")
 	dsn := fmt.Sprintf("clickhouse://%s:%s@%s:%d?secure=false&skip_verify=true&dial_timeout=10s",
-		clickhouseUser, clickhousePassword, "localhost", c.HostPort)
+		clickhouseUser, clickhousePassword, "localhost", c.Port(t, clickhousePort))
 
 	// Connect and apply schema
 	clickhouseOpts, err := ch.ParseDSN(dsn)

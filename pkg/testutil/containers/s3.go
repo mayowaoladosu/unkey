@@ -6,6 +6,8 @@ import (
 )
 
 const (
+	minioPort = 9000
+
 	// Default MinIO credentials used for the test container.
 	minioAccessKey = "minioadmin"
 	minioSecretKey = "minioadmin"
@@ -50,7 +52,7 @@ func S3(t testing.TB) S3Config {
 	c := startService(t, "s3")
 
 	return S3Config{
-		URL:             fmt.Sprintf("http://%s", c.Addr()),
+		URL:             fmt.Sprintf("http://%s", c.Addr(t, minioPort)),
 		AccessKeyID:     minioAccessKey,
 		SecretAccessKey: minioSecretKey,
 	}

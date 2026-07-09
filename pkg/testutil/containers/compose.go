@@ -19,44 +19,26 @@ import (
 
 const composeProjectEnv = "UNKEY_TEST_COMPOSE_PROJECT"
 
-var defaultServicePorts = map[string]int{
-	"clickhouse": 9000,
-	"mysql":      3306,
-	"redis":      6379,
-	"restate":    8080,
-	"s3":         9000,
-}
-
 // Container describes a Docker Compose service container started for tests.
 type Container struct {
 	// Name is the Docker Compose service name.
 	Name string
-
-	// HostPort is the host port mapped to the container's default service port.
-	HostPort int
-
-	// ContainerPort is the default service port inside the container.
-	ContainerPort int
 }
 
-// Addr returns the localhost address for the container's default service port.
-func (c Container) Addr() string {
-	return fmt.Sprintf("localhost:%d", c.HostPort)
+// Addr returns the localhost address mapped to a container port.
+func (c Container) Addr(t testing.TB, containerPort int) string {
+	t.Helper()
+	return fmt.Sprintf("localhost:%d", c.Port(t, containerPort))
 }
 
-// Port returns the host port mapped to another container port on this service.
+// Port returns the host port mapped to a container port on this service.
 func (c Container) Port(t testing.TB, containerPort int) int {
 	t.Helper()
-	if containerPort == c.ContainerPort {
-		return c.HostPort
-	}
 	return composeServicePort(t, c.Name, containerPort)
 }
 
 func startService(t testing.TB, service string) Container {
 	t.Helper()
-	containerPort, ok := defaultServicePorts[service]
-	require.True(t, ok, "unknown test service %q", service)
 
 	compose := filepath.Join(sourceRepoRoot(), "pkg", "testutil", "docker-compose.test.yaml")
 	upArgs := []string{"-f", compose, "-p", composeProjectName(), "up", "-d", "--wait", "--wait-timeout", "60", service}
@@ -70,9 +52,7 @@ func startService(t testing.TB, service string) Container {
 		cancel()
 		if err == nil {
 			return Container{
-				Name:          service,
-				HostPort:      composeServicePort(t, service, containerPort),
-				ContainerPort: containerPort,
+				Name: service,
 			}
 		}
 		if time.Now().After(deadline) {

@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	mysqlPort              = 3306
 	mysqlUser              = "unkey"
 	mysqlPassword          = "password"
 	mysqlDatabase          = "unkey"
@@ -47,7 +48,7 @@ func MySQL(t testing.TB) MySQLConfig {
 	dsnCfg.User = mysqlUser
 	dsnCfg.Passwd = mysqlPassword
 	dsnCfg.Net = "tcp"
-	dsnCfg.Addr = c.Addr()
+	dsnCfg.Addr = c.Addr(t, mysqlPort)
 	dsnCfg.DBName = mysqlDatabase
 	dsnCfg.ParseTime = true
 	dsnCfg.MultiStatements = true

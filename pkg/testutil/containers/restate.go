@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	restatePort      = 8080
 	restateAdminPort = 9070
 )
 
@@ -26,7 +27,7 @@ func Restate(t testing.TB) RestateConfig {
 	c := startService(t, "restate")
 
 	return RestateConfig{
-		IngressURL: fmt.Sprintf("http://%s", c.Addr()),
+		IngressURL: fmt.Sprintf("http://%s", c.Addr(t, restatePort)),
 		AdminURL:   fmt.Sprintf("http://localhost:%d", c.Port(t, restateAdminPort)),
 	}
 }
