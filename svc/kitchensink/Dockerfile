@@ -35,4 +35,5 @@ EXPOSE 8080
 LABEL org.opencontainers.image.source=https://github.com/unkeyed/unkey
 LABEL org.opencontainers.image.description="Kitchensink — stdlib HTTP server for testing platform features"
 
+USER nonroot:nonroot
 ENTRYPOINT ["/kitchensink"]

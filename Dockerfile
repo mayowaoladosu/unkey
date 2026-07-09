@@ -15,4 +15,5 @@ FROM gcr.io/distroless/static-debian12@sha256:9c346e4be81b5ca7ff31a0d89eaeade58b
 
 COPY --from=builder /out/unkey /unkey
 LABEL org.opencontainers.image.source=https://github.com/unkeyed/unkey
+USER nonroot:nonroot
 ENTRYPOINT ["/unkey"]
