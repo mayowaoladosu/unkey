@@ -13,10 +13,8 @@ COPY . .
 
 RUN go build -o /out/unkey ${PACKAGE}
 
-FROM gcr.io/distroless/static-debian12@sha256:9c346e4be81b5ca7ff31a0d89eaeade58b0f95cfd3baed1f36083ddb47ca3160
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:b7bb25d9f7c31d2bdd1982feb4dafcaf137703c7075dbe2febb41c24212b946f
 
 COPY --from=builder /out/unkey /unkey
 LABEL org.opencontainers.image.source=https://github.com/unkeyed/unkey
-# Distroless nonroot UID/GID.
-USER 65532:65532
 ENTRYPOINT ["/unkey"]
