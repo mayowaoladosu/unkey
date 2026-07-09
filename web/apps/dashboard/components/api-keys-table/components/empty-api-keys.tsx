@@ -15,6 +15,7 @@ export const EmptyApiKeys = () => {
           <Button
             size="md"
             render={
+              // biome-ignore lint/a11y/useAnchorContent: link content is supplied by the Button's children via Base UI's render prop
               <a
                 href="https://www.unkey.com/docs/introduction"
                 target="_blank"

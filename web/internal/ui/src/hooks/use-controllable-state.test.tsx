@@ -6,8 +6,7 @@ describe("useControllableState", () => {
   it("uses the controlled prop as the value and lets it win over internal state", () => {
     const onChange = vi.fn();
     const { result, rerender } = renderHook(
-      ({ prop }: { prop: boolean }) =>
-        useControllableState({ prop, defaultProp: false, onChange }),
+      ({ prop }: { prop: boolean }) => useControllableState({ prop, defaultProp: false, onChange }),
       { initialProps: { prop: true } },
     );
 

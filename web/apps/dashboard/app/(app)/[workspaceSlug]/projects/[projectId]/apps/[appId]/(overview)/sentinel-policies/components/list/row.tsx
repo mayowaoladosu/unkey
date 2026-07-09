@@ -118,6 +118,7 @@ export function SentinelPolicyRow({
       className={cn(!isLast && "border-b border-grayA-4", isDragOver && "bg-grayA-3")}
     >
       <div className={cn(!isActiveAnywhere && "opacity-55")}>
+        {/* biome-ignore lint/a11y/useSemanticElements: intentionally a div (not a native button) so the nested drag-handle and action buttons remain valid HTML */}
         <div
           role="button"
           tabIndex={0}

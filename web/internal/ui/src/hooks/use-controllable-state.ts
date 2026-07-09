@@ -52,15 +52,13 @@ export function useControllableState<T>({
   const setValue = React.useCallback<React.Dispatch<React.SetStateAction<T>>>(
     (next) => {
       if (isControlled) {
-        const nextValue =
-          typeof next === "function" ? (next as SetStateFn<T>)(prop as T) : next;
+        const nextValue = typeof next === "function" ? (next as SetStateFn<T>)(prop as T) : next;
         if (!Object.is(nextValue, prop)) {
           onChangeRef.current?.(nextValue);
         }
       } else {
         setUncontrolledState((prevState) => {
-          const nextValue =
-            typeof next === "function" ? (next as SetStateFn<T>)(prevState) : next;
+          const nextValue = typeof next === "function" ? (next as SetStateFn<T>)(prevState) : next;
           if (!Object.is(nextValue, prevState)) {
             onChangeRef.current?.(nextValue);
           }
