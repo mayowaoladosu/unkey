@@ -6,6 +6,8 @@ import (
 
 	restate "github.com/restatedev/sdk-go"
 	"github.com/stretchr/testify/require"
+	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	githubclient "github.com/unkeyed/unkey/svc/ctrl/worker/github"
 )
 
@@ -142,6 +144,61 @@ func TestValidateGitBuildParams(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGitBuildParamsFromSourceUsesRepoConnectionIdentity(t *testing.T) {
+	deployment := &db.Deployment{
+		ID:                            "dep_123",
+		ProjectID:                     "proj_123",
+		AppID:                         "app_123",
+		WorkspaceID:                   "ws_123",
+		EnvironmentID:                 "env_123",
+		EncryptedEnvironmentVariables: []byte(`{"secrets":[]}`),
+	}
+	repoConn := db.GithubRepoConnection{
+		InstallationID:     42,
+		RepositoryFullName: "trusted/app",
+	}
+	source := &hydrav1.GitSource{
+		InstallationId: 999,
+		Repository:     "attacker/app",
+		ForkRepository: "contributor/app",
+		CommitSha:      "deadbeef",
+		ContextPath:    "services/api",
+		DockerfilePath: " Dockerfile ",
+		BuildCommand:   " pnpm build ",
+		PrNumber:       7,
+	}
+
+	params, err := gitBuildParamsFromSource(source, deployment, repoConn)
+
+	require.NoError(t, err)
+	require.Equal(t, int64(42), params.InstallationID)
+	require.Equal(t, "trusted/app", params.Repository)
+	require.Equal(t, "contributor/app", params.ForkRepository)
+	require.Equal(t, "deadbeef", params.CommitSHA)
+	require.Equal(t, "services/api", params.ContextPath)
+	require.Equal(t, "Dockerfile", params.DockerfilePath)
+	require.Equal(t, "pnpm build", params.BuildCommand)
+	require.Equal(t, int64(7), params.PrNumber)
+	require.Equal(t, "proj_123", params.ProjectID)
+	require.Equal(t, "app_123", params.AppID)
+	require.Equal(t, "dep_123", params.DeploymentID)
+	require.Equal(t, "ws_123", params.WorkspaceID)
+	require.Equal(t, "env_123", params.EnvironmentID)
+}
+
+func TestGitBuildParamsFromSourceRequiresResolvedCommit(t *testing.T) {
+	deployment := &db.Deployment{ID: "dep_123"}
+	repoConn := db.GithubRepoConnection{
+		InstallationID:     42,
+		RepositoryFullName: "trusted/app",
+	}
+
+	_, err := gitBuildParamsFromSource(&hydrav1.GitSource{}, deployment, repoConn)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dep_123")
 }
 
 // TestBuildGitSolverOptions_EnvSecretGating proves env vars only become a

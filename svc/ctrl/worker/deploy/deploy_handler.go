@@ -393,34 +393,29 @@ func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequ
 	case *hydrav1.DeployRequest_DockerImage:
 		dockerImage = source.DockerImage.GetImage()
 	case *hydrav1.DeployRequest_Git:
-		commitSHA := source.Git.GetCommitSha()
-		forkRepo := source.Git.GetForkRepository()
-
-		if commitSHA == "" {
-			return fault.Wrap(
-				restate.TerminalError(fmt.Errorf("git source missing commit SHA for deployment %q", deployment.ID)),
-				fault.Public("Deployment has no resolved commit; cannot build."),
-			)
+		repoConn, repoErr := restate.Run(ctx, func(runCtx restate.RunContext) (db.GithubRepoConnection, error) {
+			found, findErr := w.db.FindGithubRepoConnectionByAppId(runCtx, deployment.AppID)
+			if findErr != nil {
+				if db.IsNotFound(findErr) {
+					return db.GithubRepoConnection{}, fault.Wrap(
+						restate.TerminalError(fmt.Errorf("github repo connection not found for app %q", deployment.AppID)),
+						fault.Public("This app is not connected to a GitHub repository."),
+					) //nolint:exhaustruct
+				}
+				return db.GithubRepoConnection{}, findErr //nolint:exhaustruct
+			}
+			return found, nil
+		}, restate.WithName("find github repo connection for build"), restate.WithMaxRetryAttempts(runMaxAttempts))
+		if repoErr != nil {
+			return fault.Wrap(repoErr, fault.Public("Failed to read GitHub repository settings."))
 		}
 
-		params := gitBuildParams{
-			InstallationID: source.Git.GetInstallationId(),
-			Repository:     source.Git.GetRepository(),
-			ForkRepository: forkRepo,
-			CommitSHA:      commitSHA,
-			ContextPath:    source.Git.GetContextPath(),
-			// Normalized here because the value routes the build method below:
-			// a whitespace-only setting must mean "no Dockerfile configured".
-			DockerfilePath: strings.TrimSpace(source.Git.GetDockerfilePath()),
-			// Trimmed so a whitespace-only setting means "let Railpack auto-detect".
-			BuildCommand:                  strings.TrimSpace(source.Git.GetBuildCommand()),
-			ProjectID:                     deployment.ProjectID,
-			AppID:                         deployment.AppID,
-			DeploymentID:                  deployment.ID,
-			WorkspaceID:                   deployment.WorkspaceID,
-			PrNumber:                      source.Git.GetPrNumber(),
-			EncryptedEnvironmentVariables: deployment.EncryptedEnvironmentVariables,
-			EnvironmentID:                 deployment.EnvironmentID,
+		params, paramsErr := gitBuildParamsFromSource(source.Git, deployment, repoConn)
+		if paramsErr != nil {
+			return fault.Wrap(
+				restate.TerminalError(paramsErr),
+				fault.Public("Deployment has no resolved commit; cannot build."),
+			)
 		}
 
 		// The configured Dockerfile path decides the build method: when the
@@ -487,6 +482,33 @@ func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequ
 	}
 
 	return nil
+}
+
+func gitBuildParamsFromSource(source *hydrav1.GitSource, deployment *db.Deployment, repoConn db.GithubRepoConnection) (gitBuildParams, error) {
+	commitSHA := source.GetCommitSha()
+	if commitSHA == "" {
+		return gitBuildParams{}, fmt.Errorf("git source missing commit SHA for deployment %q", deployment.ID) //nolint:exhaustruct
+	}
+
+	return gitBuildParams{
+		InstallationID: repoConn.InstallationID,
+		Repository:     repoConn.RepositoryFullName,
+		ForkRepository: source.GetForkRepository(),
+		CommitSHA:      commitSHA,
+		ContextPath:    source.GetContextPath(),
+		// Normalized here because the value routes the build method below:
+		// a whitespace-only setting must mean "no Dockerfile configured".
+		DockerfilePath: strings.TrimSpace(source.GetDockerfilePath()),
+		// Trimmed so a whitespace-only setting means "let Railpack auto-detect".
+		BuildCommand:                  strings.TrimSpace(source.GetBuildCommand()),
+		ProjectID:                     deployment.ProjectID,
+		AppID:                         deployment.AppID,
+		DeploymentID:                  deployment.ID,
+		WorkspaceID:                   deployment.WorkspaceID,
+		PrNumber:                      source.GetPrNumber(),
+		EncryptedEnvironmentVariables: deployment.EncryptedEnvironmentVariables,
+		EnvironmentID:                 deployment.EnvironmentID,
+	}, nil
 }
 
 // createTopologies determines the target regions and replica counts, bulk-inserts
