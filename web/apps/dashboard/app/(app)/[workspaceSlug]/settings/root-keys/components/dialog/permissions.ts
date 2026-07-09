@@ -270,6 +270,10 @@ export const workspacePermissions = {
       description: "Read environment variables for any environment in this workspace",
       permission: "environment.*.read_environment_variables",
     },
+    create_policy: {
+      description: "Create gateway policies for any environment in this workspace",
+      permission: "environment.*.create_policy",
+    },
   },
 } satisfies Record<string, UnkeyPermissions>;
 
@@ -402,6 +406,10 @@ export function environmentPermissions(environmentId: string): {
       read_environment_variables: {
         description: "Read environment variables for this environment.",
         permission: `environment.${environmentId}.read_environment_variables`,
+      },
+      create_policy: {
+        description: "Create gateway policies for this environment.",
+        permission: `environment.${environmentId}.create_policy`,
       },
     },
   };

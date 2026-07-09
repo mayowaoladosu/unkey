@@ -18,6 +18,8 @@ import { z } from "zod";
 export const SENTINEL_LIMITS = {
   maxPolicies: 10,
   maxKeyspacesPerPolicy: 5,
+  // Must stay >= the API's Policy.match maxItems (svc/api/openapi/spec/common/
+  // Policy.yaml); a lower value here breaks reading back API-written configs.
   maxMatchExprsPerPolicy: 10,
   // Documented in svc/sentinel/proto/policies/v1/keyauth.proto:60
   // ("Limits: maximum 1000 characters, maximum 100 permission terms").
