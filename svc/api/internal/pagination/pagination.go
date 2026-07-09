@@ -45,7 +45,7 @@ func (p Params) FetchLimit() int32 {
 // Paginate trims rows over-fetched with FetchLimit back to the requested page
 // size and builds the response pagination. cursor extracts the value the next
 // page's query resumes from.
-func Paginate[T any](rows []T, p Params, cursor func(T) string) ([]T, *openapi.Pagination) {
+func Paginate[T any](rows []T, p Params, cursor func(T) string) ([]T, openapi.Pagination) {
 	hasMore := len(rows) > p.Limit
 	var next *string
 	if hasMore {
@@ -53,7 +53,7 @@ func Paginate[T any](rows []T, p Params, cursor func(T) string) ([]T, *openapi.P
 		rows = rows[:p.Limit]
 	}
 
-	return rows, &openapi.Pagination{
+	return rows, openapi.Pagination{
 		Cursor:  next,
 		HasMore: hasMore,
 	}

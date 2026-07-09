@@ -947,7 +947,7 @@ type V2ApisListKeysResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2ApisListKeysResponseData Array of API keys with complete configuration and metadata.
@@ -1046,7 +1046,7 @@ type V2AppsListAppsResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2AppsUpdateAppRequestBody defines model for V2AppsUpdateAppRequestBody.
@@ -1243,7 +1243,7 @@ type V2EnvironmentsListEnvironmentVariablesResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2EnvironmentsListEnvironmentsRequestBody defines model for V2EnvironmentsListEnvironmentsRequestBody.
@@ -1528,7 +1528,7 @@ type V2IdentitiesListIdentitiesResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2IdentitiesListIdentitiesResponseData List of identities matching the specified criteria.
@@ -2579,7 +2579,7 @@ type V2PermissionsListPermissionsResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2PermissionsListPermissionsResponseData Array of permission objects with complete configuration details.
@@ -2609,7 +2609,7 @@ type V2PermissionsListRolesResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2PermissionsListRolesResponseData Array of roles with their assigned permissions.
@@ -2759,7 +2759,7 @@ type V2ProjectsListProjectsResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2ProjectsUpdateProjectRequestBody defines model for V2ProjectsUpdateProjectRequestBody.
@@ -2964,7 +2964,7 @@ type V2RatelimitListOverridesResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination *Pagination `json:"pagination,omitempty"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // V2RatelimitListOverridesResponseData defines model for V2RatelimitListOverridesResponseData.
