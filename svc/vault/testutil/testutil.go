@@ -5,9 +5,11 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
@@ -41,7 +43,7 @@ func StartTestVault(t *testing.T) *TestVault {
 	// Create S3 storage
 	st, err := storage.NewS3(storage.S3Config{
 		S3URL:             s3.URL,
-		S3Bucket:          "vault-test",
+		S3Bucket:          fmt.Sprintf("vault-test-%d", time.Now().UnixNano()),
 		S3AccessKeyID:     s3.AccessKeyID,
 		S3AccessKeySecret: s3.SecretAccessKey,
 	})
