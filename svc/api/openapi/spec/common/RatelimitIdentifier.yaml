@@ -1,0 +1,45 @@
+type: object
+properties:
+  remoteIp:
+    type: object
+    properties: {}
+    additionalProperties: false
+    description: Rate limit by the client's IP address.
+  header:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 256
+    additionalProperties: false
+    description: Rate limit by the value of a request header.
+  authenticatedSubject:
+    type: object
+    properties: {}
+    additionalProperties: false
+    description: Rate limit by the authenticated subject (e.g. the verified key).
+  path:
+    type: object
+    properties: {}
+    additionalProperties: false
+    description: Rate limit by the request path.
+  principalField:
+    type: object
+    required:
+      - path
+    properties:
+      path:
+        type: string
+        minLength: 1
+        maxLength: 512
+    additionalProperties: false
+    description: Rate limit by a field extracted from the authenticated principal.
+additionalProperties: false
+description: |-
+  How requests are grouped for rate limiting. Exactly one of `remoteIp`,
+  `header`, `authenticatedSubject`, `path` or `principalField` must be set.
+example:
+  remoteIp: {}

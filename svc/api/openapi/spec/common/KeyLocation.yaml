@@ -1,0 +1,39 @@
+type: object
+properties:
+  bearer:
+    type: object
+    properties: {}
+    additionalProperties: false
+    description: Extract the key from the `Authorization Bearer` header.
+  header:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 256
+      stripPrefix:
+        type: string
+        maxLength: 256
+        description: Optional prefix removed from the header value before verification.
+    additionalProperties: false
+    description: Extract the key from a custom header.
+  queryParam:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 256
+    additionalProperties: false
+    description: Extract the key from a query parameter.
+additionalProperties: false
+description: |-
+  Where to look for the API key on incoming requests. Exactly one of
+  `bearer`, `header` or `queryParam` must be set.
+example:
+  bearer: {}

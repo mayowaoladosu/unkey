@@ -14,8 +14,8 @@ const (
 
 // Defines values for EnvironmentHealthcheckMethod.
 const (
-	GET  EnvironmentHealthcheckMethod = "GET"
-	POST EnvironmentHealthcheckMethod = "POST"
+	EnvironmentHealthcheckMethodGET  EnvironmentHealthcheckMethod = "GET"
+	EnvironmentHealthcheckMethodPOST EnvironmentHealthcheckMethod = "POST"
 )
 
 // Defines values for EnvironmentShutdownSignal.
@@ -38,10 +38,36 @@ const (
 	Writeonly   EnvironmentVariableKind = "writeonly"
 )
 
+// Defines values for FirewallPolicyAction.
+const (
+	ACTIONDENY FirewallPolicyAction = "ACTION_DENY"
+)
+
 // Defines values for KeyCreditsRefillInterval.
 const (
 	KeyCreditsRefillIntervalDaily   KeyCreditsRefillInterval = "daily"
 	KeyCreditsRefillIntervalMonthly KeyCreditsRefillInterval = "monthly"
+)
+
+// Defines values for MatchExprHeaderPresent.
+const (
+	MatchExprHeaderPresentTrue MatchExprHeaderPresent = true
+)
+
+// Defines values for MatchExprMethodMethods.
+const (
+	MatchExprMethodMethodsDELETE  MatchExprMethodMethods = "DELETE"
+	MatchExprMethodMethodsGET     MatchExprMethodMethods = "GET"
+	MatchExprMethodMethodsHEAD    MatchExprMethodMethods = "HEAD"
+	MatchExprMethodMethodsOPTIONS MatchExprMethodMethods = "OPTIONS"
+	MatchExprMethodMethodsPATCH   MatchExprMethodMethods = "PATCH"
+	MatchExprMethodMethodsPOST    MatchExprMethodMethods = "POST"
+	MatchExprMethodMethodsPUT     MatchExprMethodMethods = "PUT"
+)
+
+// Defines values for MatchExprQueryParamPresent.
+const (
+	MatchExprQueryParamPresentTrue MatchExprQueryParamPresent = true
 )
 
 // Defines values for UpdateKeyCreditsRefillInterval.
@@ -348,6 +374,15 @@ type EnvironmentVariableInput struct {
 // at rest either way.
 type EnvironmentVariableKind string
 
+// FirewallPolicy Blocks matching requests.
+type FirewallPolicy struct {
+	// Action What to do with matching requests.
+	Action FirewallPolicyAction `json:"action"`
+}
+
+// FirewallPolicyAction What to do with matching requests.
+type FirewallPolicyAction string
+
 // ForbiddenErrorResponse Error response when the provided credentials are valid but lack sufficient permissions for the requested operation. This occurs when:
 // - The root key doesn't have the required permissions for this endpoint
 // - The operation requires elevated privileges that the current key lacks
@@ -431,6 +466,45 @@ type KeyCreditsRefill struct {
 // KeyCreditsRefillInterval How often credits are automatically refilled.
 type KeyCreditsRefillInterval string
 
+// KeyLocation Where to look for the API key on incoming requests. Exactly one of
+// `bearer`, `header` or `queryParam` must be set.
+type KeyLocation struct {
+	// Bearer Extract the key from the `Authorization Bearer` header.
+	Bearer *map[string]interface{} `json:"bearer,omitempty"`
+
+	// Header Extract the key from a custom header.
+	Header *struct {
+		Name string `json:"name"`
+
+		// StripPrefix Optional prefix removed from the header value before verification.
+		StripPrefix *string `json:"stripPrefix,omitempty"`
+	} `json:"header,omitempty"`
+
+	// QueryParam Extract the key from a query parameter.
+	QueryParam *struct {
+		Name string `json:"name"`
+	} `json:"queryParam,omitempty"`
+}
+
+// KeyRatelimit A rate limit applied during key verification. `limit` and `duration`
+// must be set together or both omitted; a partial pair is rejected.
+type KeyRatelimit struct {
+	// Cost Cost charged against the limit per request. Defaults to 1.
+	Cost *int64 `json:"cost,omitempty"`
+
+	// Duration Inline override: window duration in milliseconds. Must be set together
+	// with `limit`.
+	Duration *int64 `json:"duration,omitempty"`
+
+	// Limit Inline override: maximum number of operations per window. Must be set
+	// together with `duration`.
+	Limit *int64 `json:"limit,omitempty"`
+
+	// Name Name of a rate limit configured on the key or its identity, or the name
+	// of the inline override defined by `limit` and `duration`.
+	Name string `json:"name"`
+}
+
 // KeyResponseData defines model for KeyResponseData.
 type KeyResponseData struct {
 	// CreatedAt Unix timestamp in milliseconds when key was created.
@@ -471,6 +545,24 @@ type KeyResponseData struct {
 	UpdatedAt int64 `json:"updatedAt,omitempty"`
 }
 
+// KeyauthPolicy Verifies Unkey API keys on matching requests.
+type KeyauthPolicy struct {
+	// KeySpaceIds Keyspaces to verify keys against. All keyspaces must belong to your
+	// workspace.
+	KeySpaceIds []string `json:"keySpaceIds"`
+
+	// Locations Where to look for the key on incoming requests, tried in order. Defaults
+	// to the `Authorization Bearer` header when omitted.
+	Locations *[]KeyLocation `json:"locations,omitempty"`
+
+	// PermissionQuery Optional permission query the verified key must satisfy, e.g.
+	// `documents.read AND documents.write`.
+	PermissionQuery *string `json:"permissionQuery,omitempty"`
+
+	// Ratelimits Rate limits applied during key verification.
+	Ratelimits *[]KeyRatelimit `json:"ratelimits,omitempty"`
+}
+
 // KeysVerifyKeyCredits Controls credit consumption for usage-based billing and quota enforcement.
 // Omitting this field uses the default cost of 1 credit per verification.
 // Credits provide globally consistent usage tracking, essential for paid APIs with strict quotas.
@@ -497,6 +589,54 @@ type KeysVerifyKeyRatelimit struct {
 	Name string `json:"name"`
 }
 
+// MatchExpr A single request match expression. Exactly one of `path`, `method`,
+// `header` or `queryParam` must be set.
+type MatchExpr struct {
+	// Header Matches on a request header. Exactly one of `present` or `value` must
+	// be set.
+	Header *struct {
+		Name string `json:"name"`
+
+		// Present Matches when the header is present, regardless of value.
+		Present *MatchExprHeaderPresent `json:"present,omitempty"`
+
+		// Value String matcher. Exactly one of `exact`, `prefix` or `regex` must be set.
+		Value *StringMatch `json:"value,omitempty"`
+	} `json:"header,omitempty"`
+
+	// Method Matches when the request method is one of the listed methods.
+	Method *struct {
+		Methods []MatchExprMethodMethods `json:"methods"`
+	} `json:"method,omitempty"`
+
+	// Path Matches on the request path.
+	Path *struct {
+		// Path String matcher. Exactly one of `exact`, `prefix` or `regex` must be set.
+		Path StringMatch `json:"path"`
+	} `json:"path,omitempty"`
+
+	// QueryParam Matches on a query parameter. Exactly one of `present` or `value` must
+	// be set.
+	QueryParam *struct {
+		Name string `json:"name"`
+
+		// Present Matches when the query parameter is present, regardless of value.
+		Present *MatchExprQueryParamPresent `json:"present,omitempty"`
+
+		// Value String matcher. Exactly one of `exact`, `prefix` or `regex` must be set.
+		Value *StringMatch `json:"value,omitempty"`
+	} `json:"queryParam,omitempty"`
+}
+
+// MatchExprHeaderPresent Matches when the header is present, regardless of value.
+type MatchExprHeaderPresent bool
+
+// MatchExprMethodMethods defines model for MatchExpr.Method.Methods.
+type MatchExprMethodMethods string
+
+// MatchExprQueryParamPresent Matches when the query parameter is present, regardless of value.
+type MatchExprQueryParamPresent bool
+
 // Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
 type Meta struct {
 	// RequestId A unique id for this request. Always include this ID when contacting support about a specific API request. This identifier allows Unkey's support team to trace the exact request through logs and diagnostic systems to provide faster assistance.
@@ -516,6 +656,11 @@ type NotFoundErrorResponse struct {
 	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
 	Meta Meta `json:"meta"`
 }
+
+// OpenapiPolicy Validates matching requests against the app's uploaded OpenAPI spec. Has no
+// configuration of its own. If no spec has been uploaded for the deployment,
+// the policy is a no-op and requests pass through unvalidated.
+type OpenapiPolicy = map[string]interface{}
 
 // Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
 type Pagination struct {
@@ -551,6 +696,34 @@ type Permission struct {
 
 	// Slug The unique URL-safe identifier for this permission.
 	Slug string `json:"slug"`
+}
+
+// Policy A gateway policy. Exactly one of `keyauth`, `ratelimit`, `firewall` or
+// `openapi` must be set. Policy ids are generated by the server.
+type Policy struct {
+	// Enabled Disabled policies are stored but skipped during evaluation.
+	Enabled bool `json:"enabled"`
+
+	// Firewall Blocks matching requests.
+	Firewall *FirewallPolicy `json:"firewall,omitempty"`
+
+	// Keyauth Verifies Unkey API keys on matching requests.
+	Keyauth *KeyauthPolicy `json:"keyauth,omitempty"`
+
+	// Match Optional request matchers. The policy applies only to requests matching
+	// all expressions; omit to apply to every request.
+	Match *[]MatchExpr `json:"match,omitempty"`
+
+	// Name Human-readable name shown in the dashboard.
+	Name string `json:"name"`
+
+	// Openapi Validates matching requests against the app's uploaded OpenAPI spec. Has no
+	// configuration of its own. If no spec has been uploaded for the deployment,
+	// the policy is a no-op and requests pass through unvalidated.
+	Openapi *OpenapiPolicy `json:"openapi,omitempty"`
+
+	// Ratelimit Rate limits matching requests.
+	Ratelimit *RatelimitPolicy `json:"ratelimit,omitempty"`
 }
 
 // PreconditionFailedErrorResponse Error response when one or more conditions specified in the request headers are not met. This typically occurs when:
@@ -591,6 +764,29 @@ type Project struct {
 	UpdatedAt int64 `json:"updatedAt,omitempty"`
 }
 
+// RatelimitIdentifier How requests are grouped for rate limiting. Exactly one of `remoteIp`,
+// `header`, `authenticatedSubject`, `path` or `principalField` must be set.
+type RatelimitIdentifier struct {
+	// AuthenticatedSubject Rate limit by the authenticated subject (e.g. the verified key).
+	AuthenticatedSubject *map[string]interface{} `json:"authenticatedSubject,omitempty"`
+
+	// Header Rate limit by the value of a request header.
+	Header *struct {
+		Name string `json:"name"`
+	} `json:"header,omitempty"`
+
+	// Path Rate limit by the request path.
+	Path *map[string]interface{} `json:"path,omitempty"`
+
+	// PrincipalField Rate limit by a field extracted from the authenticated principal.
+	PrincipalField *struct {
+		Path string `json:"path"`
+	} `json:"principalField,omitempty"`
+
+	// RemoteIp Rate limit by the client's IP address.
+	RemoteIp *map[string]interface{} `json:"remoteIp,omitempty"`
+}
+
 // RatelimitOverride defines model for RatelimitOverride.
 type RatelimitOverride struct {
 	// Duration The duration in milliseconds for this override's rate limit window. This may differ from the default duration for the namespace, allowing custom time windows for specific entities. After this duration elapses, the rate limit counter for affected identifiers resets to zero.
@@ -621,6 +817,19 @@ type RatelimitOverride struct {
 
 	// OverrideId The unique identifier of this specific rate limit override. This ID is generated when the override is created and can be used for management operations like updating or deleting the override.
 	OverrideId string `json:"overrideId"`
+}
+
+// RatelimitPolicy Rate limits matching requests.
+type RatelimitPolicy struct {
+	// Identifier How requests are grouped for rate limiting. Exactly one of `remoteIp`,
+	// `header`, `authenticatedSubject`, `path` or `principalField` must be set.
+	Identifier RatelimitIdentifier `json:"identifier"`
+
+	// Limit Maximum number of requests per window.
+	Limit int64 `json:"limit"`
+
+	// WindowMs Window duration in milliseconds.
+	WindowMs int64 `json:"windowMs"`
 }
 
 // RatelimitRequest defines model for RatelimitRequest.
@@ -733,6 +942,22 @@ type ServiceUnavailableErrorResponse struct {
 
 	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
 	Meta Meta `json:"meta"`
+}
+
+// StringMatch String matcher. Exactly one of `exact`, `prefix` or `regex` must be set.
+type StringMatch struct {
+	// Exact Matches when the input equals this value.
+	Exact *string `json:"exact,omitempty"`
+
+	// IgnoreCase Compare case-insensitively. May accompany any match mode.
+	IgnoreCase *bool `json:"ignoreCase,omitempty"`
+
+	// Prefix Matches when the input starts with this value.
+	Prefix *string `json:"prefix,omitempty"`
+
+	// Regex Matches when the input satisfies this RE2 regular expression. Invalid
+	// patterns are rejected when the policy is created.
+	Regex *string `json:"regex,omitempty"`
 }
 
 // TooManyRequestsErrorResponse Error response when the client has sent too many requests in a given time period. This occurs when you've exceeded a rate limit or quota for the resource you're accessing.
@@ -2615,6 +2840,36 @@ type V2PermissionsListRolesResponseBody struct {
 // V2PermissionsListRolesResponseData Array of roles with their assigned permissions.
 type V2PermissionsListRolesResponseData = []Role
 
+// V2PoliciesCreatePolicyRequestBody defines model for V2PoliciesCreatePolicyRequestBody.
+type V2PoliciesCreatePolicyRequestBody struct {
+	// App Identifies a resource by either its unique ID or its slug.
+	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
+	App ResourceIdentifier `json:"app"`
+
+	// Environment Identifies a resource by either its unique ID or its slug.
+	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
+	Environment ResourceIdentifier `json:"environment"`
+
+	// Policies Policies to append to the environment, evaluated after any existing
+	// policies. The whole operation is atomic: if any policy is invalid,
+	// nothing is written. An environment can hold at most 10 policies in
+	// total, including existing ones.
+	Policies []Policy `json:"policies"`
+
+	// Project Identifies a resource by either its unique ID or its slug.
+	// Accepts a prefixed ID (such as 'proj_' or 'app_') or a slug.
+	Project ResourceIdentifier `json:"project"`
+}
+
+// V2PoliciesCreatePolicyResponseBody defines model for V2PoliciesCreatePolicyResponseBody.
+type V2PoliciesCreatePolicyResponseBody struct {
+	// Data Empty response object by design. A successful response indicates this operation was successfully executed.
+	Data EmptyResponse `json:"data"`
+
+	// Meta Metadata object included in every API response. This provides context about the request and is essential for debugging, audit trails, and support inquiries. The `requestId` is particularly important when troubleshooting issues with the Unkey support team.
+	Meta Meta `json:"meta"`
+}
+
 // V2PortalCreateSessionRequestBody defines model for V2PortalCreateSessionRequestBody.
 type V2PortalCreateSessionRequestBody struct {
 	// ExternalId The end user's identifier in the customer's system.
@@ -3291,6 +3546,9 @@ type PermissionsListPermissionsJSONRequestBody = V2PermissionsListPermissionsReq
 
 // PermissionsListRolesJSONRequestBody defines body for PermissionsListRoles for application/json ContentType.
 type PermissionsListRolesJSONRequestBody = V2PermissionsListRolesRequestBody
+
+// PoliciesCreatePolicyJSONRequestBody defines body for PoliciesCreatePolicy for application/json ContentType.
+type PoliciesCreatePolicyJSONRequestBody = V2PoliciesCreatePolicyRequestBody
 
 // PortalCreateSessionJSONRequestBody defines body for PortalCreateSession for application/json ContentType.
 type PortalCreateSessionJSONRequestBody = V2PortalCreateSessionRequestBody

@@ -1,0 +1,79 @@
+type: object
+properties:
+  path:
+    type: object
+    required:
+      - path
+    properties:
+      path:
+        "$ref": "./StringMatch.yaml"
+    additionalProperties: false
+    description: Matches on the request path.
+  method:
+    type: object
+    required:
+      - methods
+    properties:
+      methods:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - HEAD
+            - OPTIONS
+    additionalProperties: false
+    description: Matches when the request method is one of the listed methods.
+  header:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 256
+      present:
+        type: boolean
+        enum:
+          - true
+        description: Matches when the header is present, regardless of value.
+      value:
+        "$ref": "./StringMatch.yaml"
+    additionalProperties: false
+    description: |-
+      Matches on a request header. Exactly one of `present` or `value` must
+      be set.
+  queryParam:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 256
+      present:
+        type: boolean
+        enum:
+          - true
+        description: Matches when the query parameter is present, regardless of value.
+      value:
+        "$ref": "./StringMatch.yaml"
+    additionalProperties: false
+    description: |-
+      Matches on a query parameter. Exactly one of `present` or `value` must
+      be set.
+additionalProperties: false
+description: |-
+  A single request match expression. Exactly one of `path`, `method`,
+  `header` or `queryParam` must be set.
+example:
+  path:
+    path:
+      prefix: /api/

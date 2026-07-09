@@ -116,6 +116,8 @@ tags:
     description: Health check operations
   - name: permissions
     description: Permission and role management operations
+  - name: policies
+    description: Gateway policy operations
   - name: portal
     description: Customer Portal session management
   - name: ratelimit
@@ -248,6 +250,10 @@ paths:
     $ref: "./spec/paths/v2/environments/removeEnvironmentVariables/index.yaml"
   /v2/environments.listEnvironmentVariables:
     $ref: "./spec/paths/v2/environments/listEnvironmentVariables/index.yaml"
+
+  # Policies Endpoints
+  /v2/policies.createPolicy:
+    $ref: "./spec/paths/v2/policies/createPolicy/index.yaml"
 
   # Permissions Endpoints
   /v2/permissions.createRole:
