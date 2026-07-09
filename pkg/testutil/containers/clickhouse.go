@@ -159,21 +159,5 @@ func splitSQLStatements(sql string) []string {
 
 // clickhouseSchemaDir returns the path to the ClickHouse schema directory.
 func clickhouseSchemaDir() string {
-	// Try test runfiles first.
-	if runfiles := os.Getenv("TEST_SRCDIR"); runfiles != "" {
-		workspace := os.Getenv("TEST_WORKSPACE")
-		if workspace != "" {
-			candidate := filepath.Join(runfiles, workspace, "pkg", "clickhouse", "schema")
-			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-				return candidate
-			}
-		}
-		candidate := filepath.Join(runfiles, "_main", "pkg", "clickhouse", "schema")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-
-	repoRoot := sourceRepoRoot()
-	return filepath.Join(repoRoot, "pkg", "clickhouse", "schema")
+	return dataPath("pkg", "clickhouse", "schema")
 }

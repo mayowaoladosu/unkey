@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -40,7 +39,7 @@ func (c Container) Port(t testing.TB, containerPort int) int {
 func startService(t testing.TB, service string) Container {
 	t.Helper()
 
-	compose := filepath.Join(sourceRepoRoot(), "pkg", "testutil", "docker-compose.test.yaml")
+	compose := dataPath("pkg", "testutil", "docker-compose.test.yaml")
 	upArgs := []string{"-f", compose, "-p", composeProjectName(), "up", "-d", "--wait", "--wait-timeout", "60", service}
 	var out []byte
 	var err error
@@ -65,7 +64,7 @@ func startService(t testing.TB, service string) Container {
 func composeServicePort(t testing.TB, service string, port int) int {
 	t.Helper()
 
-	compose := filepath.Join(sourceRepoRoot(), "pkg", "testutil", "docker-compose.test.yaml")
+	compose := dataPath("pkg", "testutil", "docker-compose.test.yaml")
 	outText := runDockerCompose(t, "-f", compose, "-p", composeProjectName(), "port", service, strconv.Itoa(port))
 	hostPort, err := composePort(outText)
 	require.NoError(t, err)

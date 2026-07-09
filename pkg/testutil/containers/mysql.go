@@ -163,20 +163,5 @@ func markMySQLSchema(t testing.TB, ctx context.Context, hostDB mysqlSchemaDB) {
 // schemaPath returns the MySQL schema directory from test runfiles or from the
 // source tree.
 func schemaPath() string {
-	if runfiles := os.Getenv("TEST_SRCDIR"); runfiles != "" {
-		workspace := os.Getenv("TEST_WORKSPACE")
-		if workspace != "" {
-			candidate := filepath.Join(runfiles, workspace, "pkg", "mysql", "schema")
-			if _, err := os.Stat(candidate); err == nil {
-				return candidate
-			}
-		}
-		candidate := filepath.Join(runfiles, "_main", "pkg", "mysql", "schema")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-
-	repoRoot := sourceRepoRoot()
-	return filepath.Join(repoRoot, "pkg", "mysql", "schema")
+	return dataPath("pkg", "mysql", "schema")
 }
