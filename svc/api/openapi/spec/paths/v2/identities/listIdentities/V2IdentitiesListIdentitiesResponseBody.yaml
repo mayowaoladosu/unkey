@@ -2,7 +2,6 @@ type: object
 required:
   - meta
   - data
-  - pagination
 properties:
   meta:
     "$ref": "../../../../common/Meta.yaml"
@@ -10,4 +9,6 @@ properties:
     "$ref": "./V2IdentitiesListIdentitiesResponseData.yaml"
   pagination:
     "$ref": "../../../../common/Pagination.yaml"
+    x-go-type-skip-optional-pointer: true
+    x-go-type-skip-optional-pointer-with-omitzero: true
 additionalProperties: false

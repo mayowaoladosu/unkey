@@ -1069,7 +1069,6 @@ components:
             required:
                 - meta
                 - data
-                - pagination
             properties:
                 meta:
                     "$ref": "#/components/schemas/Meta"
@@ -1077,6 +1076,8 @@ components:
                     "$ref": "#/components/schemas/V2IdentitiesListIdentitiesResponseData"
                 pagination:
                     "$ref": "#/components/schemas/Pagination"
+                    x-go-type-skip-optional-pointer: true
+                    x-go-type-skip-optional-pointer-with-omitzero: true
             additionalProperties: false
         V2IdentitiesUpdateIdentityRequestBody:
             type: object

@@ -1528,7 +1528,7 @@ type V2IdentitiesListIdentitiesResponseBody struct {
 	Meta Meta `json:"meta"`
 
 	// Pagination Pagination metadata for list endpoints. Provides information necessary to traverse through large result sets efficiently using cursor-based pagination.
-	Pagination Pagination `json:"pagination"`
+	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
 // V2IdentitiesListIdentitiesResponseData List of identities matching the specified criteria.

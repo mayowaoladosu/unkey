@@ -135,7 +135,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			RequestId: s.RequestID(),
 		},
 		Data:       data,
-		Pagination: *pg,
+		Pagination: pg,
 	}
 
 	return s.JSON(http.StatusOK, response)
