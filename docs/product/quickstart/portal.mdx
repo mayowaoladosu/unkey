@@ -3,7 +3,7 @@ title: 'Customer Portal'
 description: "Give your end users a white-labeled self-service portal for API key management, usage analytics, and docs, with a Stripe-style session auth flow."
 ---
 
-The Customer Portal is a white-labeled web app you can offer to your end users. They get key management, usage analytics, and API documentation without you building any UI.
+The Customer Portal is a white-labeled web app you can offer to your end users. They get key management, usage analytics, and API documentation — without you building any UI.
 
 Authentication uses a Stripe-style session flow: your backend creates a session, redirects the user, and the portal handles the rest.
 
@@ -23,14 +23,14 @@ Your Backend                    Unkey API                     Portal
     │                              │◄─ POST /v2/portal.exchangeSession ─┤
     │                              │──── browser session token ──►│
     │                              │                            │
-    │                              │◄── Portal API calls ───────┤
+    │                              │◄── Direct API calls ───────┤
 ```
 
 1. Your backend authenticates the user in your own system
 2. Your backend calls `POST /v2/portal.createSession` with a root key
 3. You redirect the user to the returned portal URL
 4. The portal exchanges the session ID for a 24-hour browser session
-5. The browser calls the Unkey API with the portal session cookie
+5. The browser calls Unkey API directly with the session token
 
 ## 1. Configure a portal
 
@@ -40,7 +40,7 @@ Enable the Customer Portal for your workspace in the Unkey dashboard.
 Dashboard configuration UI is coming soon. During early access, reach out to the Unkey team to get your portal configured.
 </Note>
 
-When configuring your portal, you'll choose a short, human-readable slug like `my-portal` or `billing-dashboard`. Use this slug when creating sessions.
+When configuring your portal, you'll choose a slug — a short, human-readable identifier like `my-portal` or `billing-dashboard`. Use this slug when creating sessions.
 
 Slugs must be 3–64 characters, lowercase alphanumeric and hyphens only, and cannot start or end with a hyphen.
 
@@ -78,8 +78,9 @@ const response = await fetch("https://api.unkey.com/v2/portal.createSession", {
 });
 
 const { data } = await response.json();
-// data.sessionId: short-lived token (15 min)
-// data.url: full portal URL with session param
+// data.sessionId  — short-lived token (15 min)
+// data.url        — full portal URL with session param
+// data.expiresAt  — expiry timestamp (unix ms)
 ```
 
 ```go Go
@@ -100,7 +101,8 @@ The response:
   "meta": { "requestId": "req_..." },
   "data": {
     "sessionId": "pst_xxx",
-    "url": "https://portal.unkey.com/?session=pst_xxx"
+    "url": "https://portal.unkey.com/?session=pst_xxx",
+    "expiresAt": 1742000000000
   }
 }
 ```
@@ -117,7 +119,7 @@ The response:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `preview` | `boolean` | Shows a "Preview mode" banner for testing as a specific user |
+| `preview` | `boolean` | Shows a "Preview mode" banner — useful for testing as a specific user |
 
 ```bash
 curl -X POST https://api.unkey.com/v2/portal.createSession \
@@ -170,7 +172,9 @@ The API requires at least one permission. An empty permissions array is rejected
 | Session ID (`pst_xxx`) | 15 minutes | Single-use, exchanged for browser session |
 | Browser session | 24 hours | Stored as httpOnly cookie, used for API calls |
 
-When the browser session expires, the portal requires a fresh session from your backend.
+When the browser session expires:
+- If `return_url` is set on the portal config → redirects to `{return_url}?reason=session_expired`
+- Otherwise → shows a "Session expired" error page
 
 ## Branding
 
