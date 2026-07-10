@@ -10,13 +10,20 @@ import (
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// validatePolicies enforces what the OpenAPI schema cannot: each oneof in
-// the policy tree has exactly one variant set, regexes compile (the gateway
-// compiles lazily and would fail requests at match time), and inline key
-// ratelimits set limit and duration together (the gateway drops partial
-// overrides).
+// validatePolicies enforces what the OpenAPI schema cannot: ids are unique
+// within the request, each oneof in the policy tree has exactly one variant
+// set, regexes compile (the gateway compiles lazily and would fail requests
+// at match time), and inline key ratelimits set limit and duration together
+// (the gateway drops partial overrides).
 func validatePolicies(policies []openapi.Policy) error {
+	seenIDs := make(map[string]struct{}, len(policies))
 	for i, p := range policies {
+		if p.Id != nil {
+			if _, dup := seenIDs[*p.Id]; dup {
+				return invalid(fmt.Sprintf("Policy id %q is listed more than once. Each id may appear at most once.", *p.Id))
+			}
+			seenIDs[*p.Id] = struct{}{}
+		}
 		if err := validatePolicy(fmt.Sprintf("policies[%d]", i), p); err != nil {
 			return err
 		}
@@ -24,8 +31,8 @@ func validatePolicies(policies []openapi.Policy) error {
 	return nil
 }
 
-// variantName names the set variant; "unknown" covers stored variants this
-// API does not model.
+// variantName names the set variant for audit metadata. The default is
+// unreachable after validatePolicies; it only keeps the switch total.
 func variantName(p openapi.Policy) string {
 	switch {
 	case p.Keyauth != nil:
@@ -75,17 +82,16 @@ func validateMatchExpr(path string, m openapi.MatchExpr) error {
 	case m.Path != nil:
 		return validateStringMatch(path+".path.path", m.Path.Path)
 	case m.Header != nil:
-		return validateFieldMatch(path+".header", m.Header.Present, m.Header.Value)
+		return validateFieldMatch(path+".header", m.Header.Present != nil, m.Header.Value)
 	case m.QueryParam != nil:
-		return validateFieldMatch(path+".queryParam", m.QueryParam.Present, m.QueryParam.Value)
+		return validateFieldMatch(path+".queryParam", m.QueryParam.Present != nil, m.QueryParam.Value)
 	}
 	return nil
 }
 
-// present matches mere existence, value matches content; exactly one
-// applies. Generic because the callers' generated present types differ.
-func validateFieldMatch[P any](path string, present *P, value *openapi.StringMatch) error {
-	if err := exactlyOne(path, "present or value", present != nil, value != nil); err != nil {
+// present matches mere existence, value matches content; exactly one applies.
+func validateFieldMatch(path string, hasPresent bool, value *openapi.StringMatch) error {
+	if err := exactlyOne(path, "present or value", hasPresent, value != nil); err != nil {
 		return err
 	}
 	if value != nil {

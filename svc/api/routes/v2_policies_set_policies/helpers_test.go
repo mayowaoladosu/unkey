@@ -97,28 +97,28 @@ func seedSentinelConfig(t *testing.T, h *testutil.Harness, env seededEnv, blob s
 
 	// MySQL reports 0 affected rows when the value is unchanged, so verify by
 	// reading back instead.
-	var stored []byte
-	err = h.DB.RO().QueryRowContext(context.Background(),
-		"SELECT sentinel_config FROM app_runtime_settings WHERE app_id = ? AND environment_id = ?",
-		env.appID, env.environmentID).Scan(&stored)
-	require.NoError(t, err)
-	require.Equal(t, blob, string(stored))
+	require.Equal(t, blob, readStoredBlob(t, h, env))
 }
 
-// readStoredPolicies returns the raw policy documents currently stored for the
-// environment, so tests can assert exact wire bytes.
-func readStoredPolicies(t *testing.T, h *testutil.Harness, env seededEnv) []json.RawMessage {
+// readStoredBlob returns the environment's raw sentinel_config bytes.
+func readStoredBlob(t *testing.T, h *testutil.Harness, env seededEnv) string {
 	t.Helper()
 	var blob []byte
 	err := h.DB.RO().QueryRowContext(context.Background(),
 		"SELECT sentinel_config FROM app_runtime_settings WHERE app_id = ? AND environment_id = ?",
 		env.appID, env.environmentID).Scan(&blob)
 	require.NoError(t, err)
+	return string(blob)
+}
 
+// readStoredPolicies returns the raw policy documents currently stored for the
+// environment, so tests can assert exact wire bytes.
+func readStoredPolicies(t *testing.T, h *testutil.Harness, env seededEnv) []json.RawMessage {
+	t.Helper()
 	var envelope struct {
 		Policies []json.RawMessage `json:"policies"`
 	}
-	require.NoError(t, json.Unmarshal(blob, &envelope))
+	require.NoError(t, json.Unmarshal([]byte(readStoredBlob(t, h, env)), &envelope))
 	return envelope.Policies
 }
 
@@ -135,6 +135,24 @@ func storedPolicyIDs(t *testing.T, h *testutil.Harness, env seededEnv) []string 
 		ids = append(ids, doc.ID)
 	}
 	return ids
+}
+
+// pathMatch wraps a StringMatch in the generated anonymous path-matcher
+// struct, which is unreadable spelled out inline.
+func pathMatch(sm openapi.StringMatch) openapi.MatchExpr {
+	return openapi.MatchExpr{Path: &struct {
+		Path openapi.StringMatch `json:"path"`
+	}{Path: sm}}
+}
+
+// seedFirewallBlob renders a sentinel_config blob with n firewall policies
+// named seed0..seedN.
+func seedFirewallBlob(n int) string {
+	docs := make([]string, n)
+	for i := range docs {
+		docs[i] = fmt.Sprintf(`{"id":"pol_seed%d","name":"seed%d","enabled":true,"firewall":{"action":"ACTION_DENY"}}`, i, i)
+	}
+	return fmt.Sprintf(`{"policies":[%s]}`, strings.Join(docs, ","))
 }
 
 func authHeaders(rootKey string) http.Header {

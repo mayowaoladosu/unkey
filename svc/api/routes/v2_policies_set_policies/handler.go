@@ -19,8 +19,9 @@ import (
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// maxPoliciesPerEnvironment mirrors the dashboard's SENTINEL_LIMITS.maxPolicies;
-// every stored variant counts toward it.
+// maxPoliciesPerEnvironment mirrors the request schema's policies maxItems
+// (spec/paths/v2/policies/setPolicies) and the dashboard's
+// SENTINEL_LIMITS.maxPolicies; every stored variant counts toward it.
 const maxPoliciesPerEnvironment = 10
 
 type (
@@ -91,22 +92,6 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	updateIDs := make(map[string]struct{}, len(req.Policies))
-	for _, p := range req.Policies {
-		if p.Id == nil {
-			continue
-		}
-		if _, dup := updateIDs[*p.Id]; dup {
-			return fault.New(
-				"duplicate policy id",
-				fault.Code(codes.App.Validation.InvalidInput.URN()),
-				fault.Internal("duplicate policy id in request"),
-				fault.Public(fmt.Sprintf("Policy id %q is listed more than once. Each id may appear at most once.", *p.Id)),
-			)
-		}
-		updateIDs[*p.Id] = struct{}{}
-	}
-
 	if err = validatePolicies(req.Policies); err != nil {
 		return err
 	}
@@ -169,7 +154,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 				)
 			}
 		case db.IsNotFound(findErr):
-			stored = nil
+			// No runtime settings row yet; stored stays nil.
 		default:
 			return fault.Wrap(
 				findErr,
@@ -311,19 +296,11 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	})
 }
 
-// validateKeyspaceOwnership rejects keyauth policies referencing keyspaces
-// outside the workspace. Ownership never changes, so checking outside the
-// write transaction cannot race with it.
 func (h *Handler) validateKeyspaceOwnership(ctx context.Context, workspaceID string, policies []openapi.Policy) error {
 	var keyspaceIDs []string
 	for _, p := range policies {
-		if p.Keyauth == nil {
-			continue
-		}
-		for _, id := range p.Keyauth.KeySpaceIds {
-			if !slices.Contains(keyspaceIDs, id) {
-				keyspaceIDs = append(keyspaceIDs, id)
-			}
+		if p.Keyauth != nil {
+			keyspaceIDs = append(keyspaceIDs, p.Keyauth.KeySpaceIds...)
 		}
 	}
 	if len(keyspaceIDs) == 0 {

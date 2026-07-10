@@ -67,11 +67,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 
 	t.Run("merged count exceeding the environment cap", func(t *testing.T) {
 		capEnv := seedEnvironment(t, h)
-		nine := make([]string, 9)
-		for i := range nine {
-			nine[i] = fmt.Sprintf(`{"id":"pol_seed%d","name":"seed%d","enabled":true,"firewall":{"action":"ACTION_DENY"}}`, i, i)
-		}
-		seedSentinelConfig(t, h, capEnv, fmt.Sprintf(`{"policies":[%s]}`, strings.Join(nine, ",")))
+		seedSentinelConfig(t, h, capEnv, seedFirewallBlob(9))
 
 		res := testutil.CallRoute[handler.Request, openapi.BadRequestErrorResponse](h, route, headers,
 			makeRequest(capEnv, []openapi.Policy{firewallPolicy("a", true), firewallPolicy("b", true)}))
@@ -84,11 +80,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 
 	t.Run("updates do not count toward the cap", func(t *testing.T) {
 		capEnv := seedEnvironment(t, h)
-		ten := make([]string, 10)
-		for i := range ten {
-			ten[i] = fmt.Sprintf(`{"id":"pol_seed%d","name":"seed%d","enabled":true,"firewall":{"action":"ACTION_DENY"}}`, i, i)
-		}
-		seedSentinelConfig(t, h, capEnv, fmt.Sprintf(`{"policies":[%s]}`, strings.Join(ten, ",")))
+		seedSentinelConfig(t, h, capEnv, seedFirewallBlob(10))
 
 		update := firewallPolicy("seed0 updated", false)
 		update.Id = ptr("pol_seed0")
@@ -100,9 +92,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 	t.Run("more than 10 match expressions", func(t *testing.T) {
 		match := make([]openapi.MatchExpr, 11)
 		for i := range match {
-			match[i] = openapi.MatchExpr{Path: &struct {
-				Path openapi.StringMatch `json:"path"`
-			}{Path: openapi.StringMatch{Prefix: ptr(fmt.Sprintf("/p%d", i))}}}
+			match[i] = pathMatch(openapi.StringMatch{Prefix: ptr(fmt.Sprintf("/p%d", i))})
 		}
 		p := firewallPolicy("too many matches", true)
 		p.Match = &match
@@ -159,9 +149,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 
 	t.Run("invalid regex is rejected at write time", func(t *testing.T) {
 		p := firewallPolicy("bad regex", true)
-		p.Match = &[]openapi.MatchExpr{{Path: &struct {
-			Path openapi.StringMatch `json:"path"`
-		}{Path: openapi.StringMatch{Regex: ptr("[unclosed")}}}}
+		p.Match = &[]openapi.MatchExpr{pathMatch(openapi.StringMatch{Regex: ptr("[unclosed")})}
 		res := callTyped(t, []openapi.Policy{p})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 		require.Contains(t, res.Body.Error.Detail, "not a valid regular expression")
@@ -169,9 +157,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 
 	t.Run("string match with two modes", func(t *testing.T) {
 		p := firewallPolicy("m", true)
-		p.Match = &[]openapi.MatchExpr{{Path: &struct {
-			Path openapi.StringMatch `json:"path"`
-		}{Path: openapi.StringMatch{Exact: ptr("/a"), Prefix: ptr("/b")}}}}
+		p.Match = &[]openapi.MatchExpr{pathMatch(openapi.StringMatch{Exact: ptr("/a"), Prefix: ptr("/b")})}
 		res := callTyped(t, []openapi.Policy{p})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})

@@ -110,8 +110,8 @@ func mergePolicies(stored, incoming []policyDoc, prune bool) ([]byte, error) {
 	seen := make(map[string]struct{}, len(stored))
 	for _, doc := range stored {
 		seen[doc.ID] = struct{}{}
-		// An id-less stored document is unaddressable; it always passes through.
-		if raw, ok := updates[doc.ID]; ok && doc.ID != "" {
+		// An id-less stored document misses the map and passes through.
+		if raw, ok := updates[doc.ID]; ok {
 			merged = append(merged, raw)
 		} else {
 			merged = append(merged, doc.Raw)

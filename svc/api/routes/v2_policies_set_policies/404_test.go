@@ -52,12 +52,7 @@ func TestSetPoliciesNotFound(t *testing.T) {
 
 		// The rejected request must not have been written: the seeded row keeps
 		// its legacy empty blob.
-		var blob []byte
-		err := h.DB.RO().QueryRowContext(t.Context(),
-			"SELECT sentinel_config FROM app_runtime_settings WHERE app_id = ? AND environment_id = ?",
-			env.appID, env.environmentID).Scan(&blob)
-		require.NoError(t, err)
-		require.Equal(t, "{}", string(blob))
+		require.Equal(t, "{}", readStoredBlob(t, h, env))
 	})
 
 	t.Run("keyauth referencing a nonexistent keyspace", func(t *testing.T) {
@@ -70,11 +65,6 @@ func TestSetPoliciesNotFound(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
 		require.Contains(t, res.Body.Error.Type, "key_space_not_found")
 
-		var blob []byte
-		err := h.DB.RO().QueryRowContext(t.Context(),
-			"SELECT sentinel_config FROM app_runtime_settings WHERE app_id = ? AND environment_id = ?",
-			env.appID, env.environmentID).Scan(&blob)
-		require.NoError(t, err)
-		require.Equal(t, "{}", string(blob))
+		require.Equal(t, "{}", readStoredBlob(t, h, env))
 	})
 }

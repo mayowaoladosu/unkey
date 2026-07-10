@@ -74,11 +74,7 @@ func TestSetPoliciesSuccessfully(t *testing.T) {
 
 		// The dashboard reads the blob through a strict schema: enabled must be
 		// present even when false, ids must exist, and no type field may appear.
-		type storedPolicy struct {
-			keys map[string]json.RawMessage
-			id   string
-		}
-		byName := make(map[string]storedPolicy)
+		byName := make(map[string]map[string]json.RawMessage)
 		for _, raw := range stored {
 			var keys map[string]json.RawMessage
 			require.NoError(t, json.Unmarshal(raw, &keys))
@@ -89,16 +85,16 @@ func TestSetPoliciesSuccessfully(t *testing.T) {
 			require.NoError(t, json.Unmarshal(keys["id"], &id))
 			require.NoError(t, json.Unmarshal(keys["name"], &name))
 			require.True(t, strings.HasPrefix(id, "pol_"), "expected server-generated pol_ id, got %q", id)
-			byName[name] = storedPolicy{keys: keys, id: id}
+			byName[name] = keys
 		}
 
-		require.JSONEq(t, `false`, string(byName["KEBAP"].keys["enabled"]))
-		require.JSONEq(t, `{"action":"ACTION_DENY"}`, string(byName["KEBAP"].keys["firewall"]))
-		require.JSONEq(t, `{}`, string(byName["openapi"].keys["openapi"]))
+		require.JSONEq(t, `false`, string(byName["KEBAP"]["enabled"]))
+		require.JSONEq(t, `{"action":"ACTION_DENY"}`, string(byName["KEBAP"]["firewall"]))
+		require.JSONEq(t, `{}`, string(byName["openapi"]["openapi"]))
 		require.JSONEq(
 			t,
 			`{"limit":100,"windowMs":60000,"identifier":{"remoteIp":{}}}`,
-			string(byName["ratelimit"].keys["ratelimit"]),
+			string(byName["ratelimit"]["ratelimit"]),
 		)
 
 		logs := h.FindAuditLogsByTargetID(ctx, t, env.environmentID)

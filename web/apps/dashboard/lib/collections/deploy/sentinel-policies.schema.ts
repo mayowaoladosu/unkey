@@ -16,6 +16,9 @@ import { z } from "zod";
 // ── Limits ──────────────────────────────────────────────────────────────
 
 export const SENTINEL_LIMITS = {
+  // Must stay >= the API's maxPoliciesPerEnvironment
+  // (svc/api/routes/v2_policies_set_policies); savePolicies re-validates the
+  // whole array, so a lower value here breaks editing API-written configs.
   maxPolicies: 10,
   maxKeyspacesPerPolicy: 5,
   // Must stay >= the API's Policy.match maxItems (svc/api/openapi/spec/common/
