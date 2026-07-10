@@ -1,0 +1,21 @@
+---
+title: "July 10, 2026"
+description: "Free-form search across list endpoints in the HTTP API."
+noindex: true
+---
+
+## New features
+
+### Search list endpoints in the HTTP API
+
+The [HTTP API](/api-reference/overview) list endpoints now accept an optional `search` parameter for free-form filtering by ID or name. Matching is case-insensitive, and literal characters in the query are matched exactly so you don't have to worry about wildcards.
+
+Available on:
+
+- `identities.listIdentities` — filter by ID or [external ID](/platform/identities/overview)
+- `permissions.listRoles` — filter [roles](/platform/apis/features/authorization/roles-and-permissions)
+- `permissions.listPermissions` — filter [permissions](/platform/apis/features/authorization/roles-and-permissions)
+- `projects.listProjects` — filter [projects](/platform/projects/overview)
+- `apps.listApps` — filter [apps](/platform/apps/overview)
+
+This makes it practical to build type-ahead pickers and admin tooling against workspaces with many identities, roles, or projects without pulling the full list client-side.
