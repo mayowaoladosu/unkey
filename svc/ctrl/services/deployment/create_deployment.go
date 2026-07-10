@@ -121,13 +121,14 @@ func (s *Service) CreateDeployment(
 // create a deployment. Loaded once at the RPC boundary and passed to the
 // shared createAndDeploy helper.
 type deploymentContext struct {
-	project            db.Project
-	workspaceID        string
-	env                db.FindEnvironmentByAppIdAndSlugRow
-	app                db.App
-	appBuildSettings   db.AppBuildSetting
-	appRuntimeSettings db.AppRuntimeSetting
-	secretsBlob        []byte
+	project                   db.Project
+	workspaceID               string
+	env                       db.FindEnvironmentByAppIdAndSlugRow
+	app                       db.App
+	appBuildSettings          db.AppBuildSetting
+	appRuntimeSettings        db.AppRuntimeSetting
+	appliedFrameworkDetection *db.FindAppliedFrameworkDetectionRow
+	secretsBlob               []byte
 }
 
 // loadDeploymentContext resolves project, app, environment, settings, and
@@ -171,6 +172,19 @@ func (s *Service) loadDeploymentContext(
 	if err != nil {
 		return deploymentContext{}, connect.NewError(connect.CodeInternal,
 			fmt.Errorf("failed to lookup app: %w", err))
+	}
+
+	var appliedFrameworkDetection *db.FindAppliedFrameworkDetectionRow
+	detection, err := s.db.FindAppliedFrameworkDetection(ctx, db.FindAppliedFrameworkDetectionParams{
+		WorkspaceID: project.WorkspaceID,
+		ProjectID:   project.ID,
+		AppID:       appID,
+	})
+	if err == nil {
+		appliedFrameworkDetection = &detection
+	} else if !db.IsNotFound(err) {
+		return deploymentContext{}, connect.NewError(connect.CodeInternal,
+			fmt.Errorf("failed to lookup applied framework detection: %w", err))
 	}
 
 	// All three records are resolved independently, so verify they belong to
@@ -217,13 +231,14 @@ func (s *Service) loadDeploymentContext(
 	}
 
 	return deploymentContext{
-		project:            project,
-		workspaceID:        project.WorkspaceID,
-		env:                env,
-		app:                appWithSettings.App,
-		appBuildSettings:   appWithSettings.AppBuildSetting,
-		appRuntimeSettings: appWithSettings.AppRuntimeSetting,
-		secretsBlob:        secretsBlob,
+		project:                   project,
+		workspaceID:               project.WorkspaceID,
+		env:                       env,
+		app:                       appWithSettings.App,
+		appBuildSettings:          appWithSettings.AppBuildSetting,
+		appRuntimeSettings:        appWithSettings.AppRuntimeSetting,
+		appliedFrameworkDetection: appliedFrameworkDetection,
+		secretsBlob:               secretsBlob,
 	}, nil
 }
 
@@ -384,7 +399,7 @@ func (s *Service) createAndDeploy(ctx context.Context, p createParams) (string, 
 	// note doesn't bubble up as a 500 from MySQL.
 	triggerReason := trimLength(p.triggerReason, maxTriggerReasonLength)
 
-	err := s.db.InsertDeployment(ctx, db.InsertDeploymentParams{
+	deploymentParams := db.InsertDeploymentParams{
 		ID:                            deploymentID,
 		K8sName:                       uid.DNS1035(12),
 		WorkspaceID:                   c.workspaceID,
@@ -415,9 +430,28 @@ func (s *Service) createAndDeploy(ctx context.Context, p createParams) (string, 
 		DeploymentTrigger:             trigger,
 		TriggeredBy:                   sql.NullString{String: p.triggeredBy, Valid: p.triggeredBy != ""},
 		TriggerReason:                 sql.NullString{String: triggerReason, Valid: triggerReason != ""},
+	}
+
+	compiledManifest, adapterID, outputMode, err := compileDeploymentManifest(c, deployReq)
+	if err != nil {
+		return "", connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+
+	err = persistDeploymentWithManifest(ctx, s.db, deploymentParams, db.InsertDeploymentManifestParams{
+		DeploymentID:  deploymentID,
+		WorkspaceID:   c.workspaceID,
+		ProjectID:     c.project.ID,
+		AppID:         c.app.ID,
+		EnvironmentID: c.env.Environment.ID,
+		SchemaVersion: uint64(compiledManifest.Manifest.Version),
+		Fingerprint:   compiledManifest.Fingerprint,
+		AdapterID:     adapterID,
+		OutputMode:    outputMode,
+		Manifest:      compiledManifest.JSON,
+		CreatedAt:     now,
 	})
 	if err != nil {
-		logger.Error("failed to insert deployment", "error", err.Error())
+		logger.Error("failed to insert deployment and manifest", "error", err.Error())
 		return "", connect.NewError(connect.CodeInternal, err)
 	}
 
