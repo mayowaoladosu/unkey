@@ -8,10 +8,3 @@ properties:
   data:
     "$ref": "../../../../common/EmptyResponse.yaml"
 additionalProperties: false
-examples:
-  success:
-    summary: Policies set
-    value:
-      meta:
-        requestId: req_1234abcd
-      data: {}

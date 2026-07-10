@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
 	"github.com/unkeyed/unkey/svc/api/openapi"
@@ -46,18 +47,8 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("duplicate policy id in request", func(t *testing.T) {
-		first := firewallPolicy("first", true)
-		first.Id = ptr("pol_dup")
-		second := firewallPolicy("second", true)
-		second.Id = ptr("pol_dup")
-		res := callTyped(t, []openapi.Policy{first, second})
-		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
-		require.Contains(t, res.Body.Error.Detail, "listed more than once")
-	})
-
-	t.Run("more than 10 policies in request", func(t *testing.T) {
-		policies := make([]openapi.Policy, 11)
+	t.Run("more than 50 policies in request", func(t *testing.T) {
+		policies := make([]openapi.Policy, 51)
 		for i := range policies {
 			policies[i] = firewallPolicy(fmt.Sprintf("p%d", i), true)
 		}
@@ -65,34 +56,10 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("merged count exceeding the environment cap", func(t *testing.T) {
-		capEnv := seedEnvironment(t, h)
-		seedSentinelConfig(t, h, capEnv, seedFirewallBlob(9))
-
-		res := testutil.CallRoute[handler.Request, openapi.BadRequestErrorResponse](h, route, headers,
-			makeRequest(capEnv, []openapi.Policy{firewallPolicy("a", true), firewallPolicy("b", true)}))
-		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
-		require.Contains(t, res.Body.Error.Detail, "at most 10")
-
-		stored := readStoredPolicies(t, h, capEnv)
-		require.Len(t, stored, 9, "nothing may be written when the cap check fails")
-	})
-
-	t.Run("updates do not count toward the cap", func(t *testing.T) {
-		capEnv := seedEnvironment(t, h)
-		seedSentinelConfig(t, h, capEnv, seedFirewallBlob(10))
-
-		update := firewallPolicy("seed0 updated", false)
-		update.Id = ptr("pol_seed0")
-		res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers,
-			makeRequest(capEnv, []openapi.Policy{update}))
-		require.Equal(t, http.StatusOK, res.Status, "an update at the cap must succeed, received: %s", res.RawBody)
-	})
-
 	t.Run("more than 10 match expressions", func(t *testing.T) {
 		match := make([]openapi.MatchExpr, 11)
 		for i := range match {
-			match[i] = pathMatch(openapi.StringMatch{Prefix: ptr(fmt.Sprintf("/p%d", i))})
+			match[i] = pathMatch(openapi.StringMatch{Prefix: ptr.P(fmt.Sprintf("/p%d", i))})
 		}
 		p := firewallPolicy("too many matches", true)
 		p.Match = &match
@@ -100,16 +67,16 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("empty keySpaceIds", func(t *testing.T) {
+	t.Run("empty keyspaces", func(t *testing.T) {
 		res := callTyped(t, []openapi.Policy{{
 			Name:    "k",
 			Enabled: true,
-			Keyauth: &openapi.KeyauthPolicy{KeySpaceIds: []string{}},
+			Keyauth: &openapi.KeyauthPolicy{Keyspaces: []string{}},
 		}})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("more than 5 keySpaceIds", func(t *testing.T) {
+	t.Run("more than 5 keyspaces", func(t *testing.T) {
 		ids := make([]string, 6)
 		for i := range ids {
 			ids[i] = api.KeyAuthID.String
@@ -117,7 +84,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 		res := callTyped(t, []openapi.Policy{{
 			Name:    "k",
 			Enabled: true,
-			Keyauth: &openapi.KeyauthPolicy{KeySpaceIds: ids},
+			Keyauth: &openapi.KeyauthPolicy{Keyspaces: ids},
 		}})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
@@ -127,8 +94,8 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 			Name:    "k",
 			Enabled: true,
 			Keyauth: &openapi.KeyauthPolicy{
-				KeySpaceIds:     []string{api.KeyAuthID.String},
-				PermissionQuery: ptr(strings.Repeat("a", 1001)),
+				Keyspaces:       []string{api.KeyAuthID.String},
+				PermissionQuery: ptr.P(strings.Repeat("a", 1001)),
 			},
 		}})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
@@ -139,8 +106,8 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 			Name:    "k",
 			Enabled: true,
 			Keyauth: &openapi.KeyauthPolicy{
-				KeySpaceIds: []string{api.KeyAuthID.String},
-				Ratelimits:  &[]openapi.KeyRatelimit{{Name: "requests", Limit: ptr(int64(10))}},
+				Keyspaces:  []string{api.KeyAuthID.String},
+				Ratelimits: &[]openapi.KeyRatelimit{{Name: "requests", Limit: ptr.P(int64(10))}},
 			},
 		}})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
@@ -149,7 +116,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 
 	t.Run("invalid regex is rejected at write time", func(t *testing.T) {
 		p := firewallPolicy("bad regex", true)
-		p.Match = &[]openapi.MatchExpr{pathMatch(openapi.StringMatch{Regex: ptr("[unclosed")})}
+		p.Match = &[]openapi.MatchExpr{pathMatch(openapi.StringMatch{Regex: ptr.P("[unclosed")})}
 		res := callTyped(t, []openapi.Policy{p})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 		require.Contains(t, res.Body.Error.Detail, "not a valid regular expression")
@@ -157,7 +124,7 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 
 	t.Run("string match with two modes", func(t *testing.T) {
 		p := firewallPolicy("m", true)
-		p.Match = &[]openapi.MatchExpr{pathMatch(openapi.StringMatch{Exact: ptr("/a"), Prefix: ptr("/b")})}
+		p.Match = &[]openapi.MatchExpr{pathMatch(openapi.StringMatch{Exact: ptr.P("/a"), Prefix: ptr.P("/b")})}
 		res := callTyped(t, []openapi.Policy{p})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
@@ -206,9 +173,9 @@ func TestSetPoliciesBadRequest(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("malformed policy id is rejected by the schema", func(t *testing.T) {
+	t.Run("client-supplied id is rejected by the schema", func(t *testing.T) {
 		res := rawPolicy(t, map[string]any{
-			"name": "with bad id", "enabled": true, "id": "not-a-policy-id",
+			"name": "with id", "enabled": true, "id": "pol_client",
 			"firewall": map[string]any{"action": "ACTION_DENY"},
 		})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)

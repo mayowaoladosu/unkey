@@ -25,12 +25,6 @@ func makeRequest(env seededEnv, policies []openapi.Policy) handler.Request {
 	}
 }
 
-func makePruneRequest(env seededEnv, policies []openapi.Policy) handler.Request {
-	req := makeRequest(env, policies)
-	req.Prune = ptr(true)
-	return req
-}
-
 func firewallPolicy(name string, enabled bool) openapi.Policy {
 	return openapi.Policy{
 		Name:     name,
@@ -145,23 +139,9 @@ func pathMatch(sm openapi.StringMatch) openapi.MatchExpr {
 	}{Path: sm}}
 }
 
-// seedFirewallBlob renders a sentinel_config blob with n firewall policies
-// named seed0..seedN.
-func seedFirewallBlob(n int) string {
-	docs := make([]string, n)
-	for i := range docs {
-		docs[i] = fmt.Sprintf(`{"id":"pol_seed%d","name":"seed%d","enabled":true,"firewall":{"action":"ACTION_DENY"}}`, i, i)
-	}
-	return fmt.Sprintf(`{"policies":[%s]}`, strings.Join(docs, ","))
-}
-
 func authHeaders(rootKey string) http.Header {
 	return http.Header{
 		"Content-Type":  {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", rootKey)},
 	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }

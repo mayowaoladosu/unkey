@@ -15,17 +15,15 @@ import { z } from "zod";
 
 // ── Limits ──────────────────────────────────────────────────────────────
 
+// Every limit must stay >= its counterpart in the API spec
+// (svc/api/openapi/spec: setPolicies policies maxItems, Policy.match
+// maxItems, KeyauthPolicy keyspaces/ratelimits maxItems, permissionQuery
+// maxLength). savePolicies re-validates whole configs, so a lower value
+// here breaks reading back or editing API-written blobs.
 export const SENTINEL_LIMITS = {
-  // Must stay >= the API's maxPoliciesPerEnvironment
-  // (svc/api/routes/v2_policies_set_policies); savePolicies re-validates the
-  // whole array, so a lower value here breaks editing API-written configs.
-  maxPolicies: 10,
+  maxPolicies: 50,
   maxKeyspacesPerPolicy: 5,
-  // Must stay >= the API's Policy.match maxItems (svc/api/openapi/spec/common/
-  // Policy.yaml); a lower value here breaks reading back API-written configs.
   maxMatchExprsPerPolicy: 10,
-  // Documented in svc/sentinel/proto/policies/v1/keyauth.proto:60
-  // ("Limits: maximum 1000 characters, maximum 100 permission terms").
   permissionQueryMaxLength: 1000,
   maxRatelimitsPerKeyauth: 10,
 } as const;

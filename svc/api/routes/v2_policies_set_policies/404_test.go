@@ -42,25 +42,12 @@ func TestSetPoliciesNotFound(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
 	})
 
-	t.Run("unknown policy id", func(t *testing.T) {
-		update := firewallPolicy("ghost", true)
-		update.Id = ptr("pol_doesnotexist")
-		res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, headers,
-			makeRequest(env, []openapi.Policy{update}))
-		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
-		require.Contains(t, res.Body.Error.Type, "policy_not_found")
-
-		// The rejected request must not have been written: the seeded row keeps
-		// its legacy empty blob.
-		require.Equal(t, "{}", readStoredBlob(t, h, env))
-	})
-
 	t.Run("keyauth referencing a nonexistent keyspace", func(t *testing.T) {
 		res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, headers,
 			makeRequest(env, []openapi.Policy{{
 				Name:    "k",
 				Enabled: true,
-				Keyauth: &openapi.KeyauthPolicy{KeySpaceIds: []string{uid.New(uid.KeySpacePrefix)}},
+				Keyauth: &openapi.KeyauthPolicy{Keyspaces: []string{uid.New(uid.KeySpacePrefix)}},
 			}}))
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
 		require.Contains(t, res.Body.Error.Type, "key_space_not_found")

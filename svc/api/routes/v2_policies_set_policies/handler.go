@@ -3,26 +3,24 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
 	"time"
 
+	frontlinev1 "github.com/unkeyed/unkey/gen/proto/frontline/v1"
 	"github.com/unkeyed/unkey/internal/services/auditlogs"
 	"github.com/unkeyed/unkey/pkg/auditlog"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
-	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
+	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/pkg/zen"
 	"github.com/unkeyed/unkey/svc/api/openapi"
+	"google.golang.org/protobuf/encoding/protojson"
 )
-
-// maxPoliciesPerEnvironment mirrors the request schema's policies maxItems
-// (spec/paths/v2/policies/setPolicies) and the dashboard's
-// SENTINEL_LIMITS.maxPolicies; every stored variant counts toward it.
-const maxPoliciesPerEnvironment = 10
 
 type (
 	Request  = openapi.V2PoliciesSetPoliciesRequestBody
@@ -32,6 +30,19 @@ type (
 type Handler struct {
 	DB        db.Database
 	Auditlogs auditlogs.AuditLogService
+}
+
+// The sentinel_config blob is protojson for frontlinev1.Config and is read
+// back by the dashboard through a strict schema. Both contracts must hold:
+// no unknown fields, required fields present even when zero (enabled=false).
+type configEnvelope struct {
+	Policies []json.RawMessage `json:"policies"`
+}
+
+// wirePolicy marshals a policy flat with its server-generated id.
+type wirePolicy struct {
+	ID string `json:"id"`
+	openapi.Policy
 }
 
 func (h *Handler) Method() string {
@@ -100,15 +111,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		return err
 	}
 
-	prune := ptr.SafeDeref(req.Prune, false)
-	if !prune && len(req.Policies) == 0 {
-		return s.JSON(http.StatusOK, Response{
-			Meta: openapi.Meta{RequestId: s.RequestID()},
-			Data: openapi.EmptyResponse{},
-		})
-	}
-
-	incoming, err := encodePolicies(req.Policies)
+	blob, ids, err := encodePolicies(req.Policies)
 	if err != nil {
 		return fault.Wrap(
 			err,
@@ -120,99 +123,6 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 
 	now := time.Now().UnixMilli()
 	err = db.TxRetry(ctx, h.DB.RW(), func(ctx context.Context, tx db.DBTX) error {
-		if _, lockErr := db.Query.LockEnvironmentForUpdate(ctx, tx, env.ID); lockErr != nil {
-			if db.IsNotFound(lockErr) {
-				return fault.New(
-					"environment not found",
-					fault.Code(codes.Data.Environment.NotFound.URN()),
-					fault.Internal("environment deleted before lock"),
-					fault.Public("The requested environment does not exist."),
-				)
-			}
-			return fault.Wrap(
-				lockErr,
-				fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
-				fault.Internal("unable to lock environment"),
-				fault.Public("We're unable to set the policies."),
-			)
-		}
-
-		var stored []policyDoc
-		sentinelConfig, findErr := db.Query.FindSentinelConfigByAppAndEnv(ctx, tx, db.FindSentinelConfigByAppAndEnvParams{
-			AppID:         env.AppID,
-			EnvironmentID: env.ID,
-		})
-		switch {
-		case findErr == nil:
-			stored, findErr = parseStoredPolicies(sentinelConfig)
-			if findErr != nil {
-				return fault.Wrap(
-					findErr,
-					fault.Code(codes.App.Internal.UnexpectedError.URN()),
-					fault.Internal("stored sentinel config is corrupted"),
-					fault.Public("The stored policy configuration is corrupted. Please contact support."),
-				)
-			}
-		case db.IsNotFound(findErr):
-			// No runtime settings row yet; stored stays nil.
-		default:
-			return fault.Wrap(
-				findErr,
-				fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
-				fault.Internal("unable to load runtime settings"),
-				fault.Public("We're unable to set the policies."),
-			)
-		}
-
-		storedIDs := make(map[string]struct{}, len(stored))
-		for _, doc := range stored {
-			storedIDs[doc.ID] = struct{}{}
-		}
-		creates := 0
-		for _, p := range req.Policies {
-			if p.Id == nil {
-				creates++
-				continue
-			}
-			if _, ok := storedIDs[*p.Id]; !ok {
-				return fault.New(
-					"policy not found",
-					fault.Code(codes.Data.Policy.NotFound.URN()),
-					fault.Internal("policy id not found in environment"),
-					fault.Public(fmt.Sprintf("Policy %q does not exist.", *p.Id)),
-				)
-			}
-		}
-
-		// Only creates grow the list; a prune result is the request itself.
-		// Belt behind the schema's maxItems: an oversized blob bricks the
-		// dashboard's strict reader.
-		total := len(stored) + creates
-		if prune {
-			total = len(req.Policies)
-		}
-		if total > maxPoliciesPerEnvironment {
-			return fault.New(
-				"too many policies",
-				fault.Code(codes.App.Validation.InvalidInput.URN()),
-				fault.Internal("policy limit exceeded"),
-				fault.Public(fmt.Sprintf(
-					"An environment can have at most %d policies; this request would result in %d.",
-					maxPoliciesPerEnvironment, total,
-				)),
-			)
-		}
-
-		blob, mergeErr := mergePolicies(stored, incoming, prune)
-		if mergeErr != nil {
-			return fault.Wrap(
-				mergeErr,
-				fault.Code(codes.App.Internal.UnexpectedError.URN()),
-				fault.Internal("merged sentinel config is not parseable by the gateway"),
-				fault.Public("We're unable to set the policies."),
-			)
-		}
-
 		if upsertErr := db.Query.UpsertAppRuntimeSettingsSentinelConfig(ctx, tx, db.UpsertAppRuntimeSettingsSentinelConfigParams{
 			WorkspaceID:    env.WorkspaceID,
 			AppID:          env.AppID,
@@ -229,16 +139,11 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			)
 		}
 
-		auditLogs := make([]auditlog.AuditLog, 0, len(req.Policies)+1)
-		for i, p := range req.Policies {
-			verb := "Updated"
-			if p.Id == nil {
-				verb = "Created"
-			}
-			auditLogs = append(auditLogs, auditlog.AuditLog{
+		newLog := func(display string, meta map[string]any) auditlog.AuditLog {
+			return auditlog.AuditLog{
 				WorkspaceID:   principal.WorkspaceID,
 				Event:         auditlog.EnvironmentUpdateEvent,
-				Display:       fmt.Sprintf("%s policy %s (%s) for environment %s", verb, p.Name, incoming[i].ID, env.ID),
+				Display:       display,
 				ActorID:       principal.Subject.ID,
 				ActorName:     principal.Subject.Name,
 				ActorMeta:     map[string]any{},
@@ -250,38 +155,29 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 					{
 						ID:          env.ID,
 						Type:        auditlog.EnvironmentResourceType,
-						Meta:        map[string]any{"policyId": incoming[i].ID, "policyType": variantName(p), "prune": prune},
+						Meta:        meta,
 						Name:        env.Slug,
 						DisplayName: env.Slug,
 					},
 				},
-			})
+			}
 		}
 
-		// A prune with an empty payload wipes everything but yields no
-		// per-policy logs, so record the destructive action on its own.
-		if len(auditLogs) == 0 && prune {
-			auditLogs = append(auditLogs, auditlog.AuditLog{
-				WorkspaceID:   principal.WorkspaceID,
-				Event:         auditlog.EnvironmentUpdateEvent,
-				Display:       fmt.Sprintf("Pruned all policies for environment %s", env.ID),
-				ActorID:       principal.Subject.ID,
-				ActorName:     principal.Subject.Name,
-				ActorMeta:     map[string]any{},
-				ActorType:     auditlog.AuditLogActor(principal.Subject.Type),
-				RemoteIP:      s.Location(),
-				UserAgent:     s.UserAgent(),
-				CorrelationID: "",
-				Resources: []auditlog.AuditLogResource{
-					{
-						ID:          env.ID,
-						Type:        auditlog.EnvironmentResourceType,
-						Meta:        map[string]any{"prune": prune},
-						Name:        env.Slug,
-						DisplayName: env.Slug,
-					},
-				},
-			})
+		auditLogs := make([]auditlog.AuditLog, 0, len(req.Policies)+1)
+		for i, p := range req.Policies {
+			auditLogs = append(auditLogs, newLog(
+				fmt.Sprintf("Set policy %s (%s) for environment %s", p.Name, ids[i], env.ID),
+				map[string]any{"policyId": ids[i], "policyType": variantName(p)},
+			))
+		}
+
+		// An empty request wipes everything but yields no per-policy logs,
+		// so record the destructive action on its own.
+		if len(auditLogs) == 0 {
+			auditLogs = append(auditLogs, newLog(
+				fmt.Sprintf("Removed all policies for environment %s", env.ID),
+				map[string]any{},
+			))
 		}
 
 		return h.Auditlogs.Insert(ctx, tx, auditLogs)
@@ -300,7 +196,7 @@ func (h *Handler) validateKeyspaceOwnership(ctx context.Context, workspaceID str
 	var keyspaceIDs []string
 	for _, p := range policies {
 		if p.Keyauth != nil {
-			keyspaceIDs = append(keyspaceIDs, p.Keyauth.KeySpaceIds...)
+			keyspaceIDs = append(keyspaceIDs, p.Keyauth.Keyspaces...)
 		}
 	}
 	if len(keyspaceIDs) == 0 {
@@ -331,4 +227,52 @@ func (h *Handler) validateKeyspaceOwnership(ctx context.Context, workspaceID str
 		}
 	}
 	return nil
+}
+
+// encodePolicies serializes the request into the blob to store, generating
+// an id per policy; ids[i] belongs to policies[i]. The blob must strictly
+// parse as frontlinev1.Config: a failure is our serialization bug, never a
+// user error.
+func encodePolicies(policies []openapi.Policy) (blob []byte, ids []string, err error) {
+	ids = make([]string, 0, len(policies))
+	raws := make([]json.RawMessage, 0, len(policies))
+	for _, p := range policies {
+		id := uid.New(uid.PolicyPrefix)
+		raw, marshalErr := json.Marshal(wirePolicy{ID: id, Policy: p})
+		if marshalErr != nil {
+			return nil, nil, fmt.Errorf("marshal policy %q: %w", id, marshalErr)
+		}
+
+		// The API says `keyspaces`, the proto and stored blobs say
+		// `keySpaceIds`; rename the key on the way in.
+		if p.Keyauth != nil {
+			var doc, keyauth map[string]json.RawMessage
+			if err = json.Unmarshal(raw, &doc); err != nil {
+				return nil, nil, fmt.Errorf("rewrite policy %q: %w", id, err)
+			}
+			if err = json.Unmarshal(doc["keyauth"], &keyauth); err != nil {
+				return nil, nil, fmt.Errorf("rewrite policy %q: %w", id, err)
+			}
+			keyauth["keySpaceIds"] = keyauth["keyspaces"]
+			delete(keyauth, "keyspaces")
+			if doc["keyauth"], err = json.Marshal(keyauth); err != nil {
+				return nil, nil, fmt.Errorf("rewrite policy %q: %w", id, err)
+			}
+			if raw, err = json.Marshal(doc); err != nil {
+				return nil, nil, fmt.Errorf("rewrite policy %q: %w", id, err)
+			}
+		}
+
+		ids = append(ids, id)
+		raws = append(raws, raw)
+	}
+
+	blob, err = json.Marshal(configEnvelope{Policies: raws})
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = protojson.Unmarshal(blob, &frontlinev1.Config{}); err != nil {
+		return nil, nil, fmt.Errorf("encoded policies are not gateway-compatible: %w", err)
+	}
+	return blob, ids, nil
 }

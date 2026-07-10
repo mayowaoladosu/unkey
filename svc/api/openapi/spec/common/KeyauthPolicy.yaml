@@ -1,8 +1,8 @@
 type: object
 required:
-  - keySpaceIds
+  - keyspaces
 properties:
-  keySpaceIds:
+  keyspaces:
     type: array
     minItems: 1
     maxItems: 5
@@ -11,8 +11,8 @@ properties:
       minLength: 1
       maxLength: 256
     description: |-
-      Keyspaces to verify keys against. All keyspaces must belong to your
-      workspace.
+      Keyspaces to verify keys against, referenced by id. All keyspaces must
+      belong to your workspace.
   locations:
     type: array
     items:
@@ -35,5 +35,5 @@ properties:
 additionalProperties: false
 description: Verifies Unkey API keys on matching requests.
 example:
-  keySpaceIds:
+  keyspaces:
     - ks_1234abcd

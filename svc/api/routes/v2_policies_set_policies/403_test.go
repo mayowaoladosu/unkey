@@ -30,7 +30,6 @@ func TestSetPoliciesForbidden(t *testing.T) {
 		{name: "permission and more", permissions: []string{"some.other.permission", "environment.*.set_policies"}, shouldPass: true},
 		{name: "update action is not enough", permissions: []string{"environment.*.update_environment"}, shouldPass: false},
 		{name: "set variables action is not enough", permissions: []string{"environment.*.set_environment_variables"}, shouldPass: false},
-		{name: "retired create_policy action is not enough", permissions: []string{"environment.*.create_policy"}, shouldPass: false},
 		{name: "other environment id does not match", permissions: []string{fmt.Sprintf("environment.%s.set_policies", uid.New(uid.EnvironmentPrefix))}, shouldPass: false},
 		{name: "unrelated permission", permissions: []string{"api.*.read_api"}, shouldPass: false},
 		{name: "no permissions", permissions: []string{}, shouldPass: false},

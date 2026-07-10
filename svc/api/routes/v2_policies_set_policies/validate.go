@@ -10,20 +10,11 @@ import (
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// validatePolicies enforces what the OpenAPI schema cannot: ids are unique
-// within the request, each oneof in the policy tree has exactly one variant
-// set, regexes compile (the gateway compiles lazily and would fail requests
-// at match time), and inline key ratelimits set limit and duration together
-// (the gateway drops partial overrides).
+// validatePolicies enforces the rules the OpenAPI schema cannot express;
+// a policy passing schema but failing here would otherwise misbehave at
+// request time in the gateway.
 func validatePolicies(policies []openapi.Policy) error {
-	seenIDs := make(map[string]struct{}, len(policies))
 	for i, p := range policies {
-		if p.Id != nil {
-			if _, dup := seenIDs[*p.Id]; dup {
-				return invalid(fmt.Sprintf("Policy id %q is listed more than once. Each id may appear at most once.", *p.Id))
-			}
-			seenIDs[*p.Id] = struct{}{}
-		}
 		if err := validatePolicy(fmt.Sprintf("policies[%d]", i), p); err != nil {
 			return err
 		}

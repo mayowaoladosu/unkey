@@ -22,7 +22,7 @@ func TestValidatePolicies(t *testing.T) {
 		{
 			name: "valid one of each variant",
 			policies: []openapi.Policy{
-				{Name: "kebap-keyauth", Enabled: true, Keyauth: &openapi.KeyauthPolicy{KeySpaceIds: []string{"ks_1"}}},
+				{Name: "kebap-keyauth", Enabled: true, Keyauth: &openapi.KeyauthPolicy{Keyspaces: []string{"ks_1"}}},
 				{Name: "ratelimit", Enabled: true, Ratelimit: &openapi.RatelimitPolicy{
 					Limit: 10, WindowMs: 1000,
 					Identifier: openapi.RatelimitIdentifier{RemoteIp: &map[string]interface{}{}},
@@ -102,8 +102,8 @@ func TestValidatePolicies(t *testing.T) {
 			policies: []openapi.Policy{{
 				Name: "k", Enabled: true,
 				Keyauth: &openapi.KeyauthPolicy{
-					KeySpaceIds: []string{"ks_1"},
-					Locations:   &[]openapi.KeyLocation{{}},
+					Keyspaces: []string{"ks_1"},
+					Locations: &[]openapi.KeyLocation{{}},
 				},
 			}},
 			wantErr: "policies[0].keyauth.locations[0] must set exactly one of",
@@ -113,8 +113,8 @@ func TestValidatePolicies(t *testing.T) {
 			policies: []openapi.Policy{{
 				Name: "k", Enabled: true,
 				Keyauth: &openapi.KeyauthPolicy{
-					KeySpaceIds: []string{"ks_1"},
-					Ratelimits:  &[]openapi.KeyRatelimit{{Name: "requests", Limit: ptr.P(int64(10))}},
+					Keyspaces:  []string{"ks_1"},
+					Ratelimits: &[]openapi.KeyRatelimit{{Name: "requests", Limit: ptr.P(int64(10))}},
 				},
 			}},
 			wantErr: "policies[0].keyauth.ratelimits[0] must set limit and duration together",
