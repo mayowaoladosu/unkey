@@ -72,7 +72,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	limit := ptr.SafeDeref(req.Limit, 100)
 	cursor := ptr.SafeDeref(req.Cursor, "")
 
-	if err := principal.Authorize(rbac.S(string(portalrbac.CapKeysRead))); err != nil {
+	if err := principal.Authorize(rbac.S(portalrbac.CapKeysRead)); err != nil {
 		return err
 	}
 

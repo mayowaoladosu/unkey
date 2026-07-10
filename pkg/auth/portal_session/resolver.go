@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/unkeyed/unkey/internal/services/portal"
-	"github.com/unkeyed/unkey/pkg/auth/portalrbac"
 	"github.com/unkeyed/unkey/pkg/auth/principal"
 	"github.com/unkeyed/unkey/pkg/zen"
 )
@@ -46,15 +46,7 @@ func (r *Resolver) Resolve(ctx context.Context, sess *zen.Session) (*principal.P
 		return nil, err
 	}
 
-	// Validate the persisted strings before exposing them as exact-match grants.
-	capabilities, err := portalrbac.ParseAll(session.Permissions)
-	if err != nil {
-		return nil, err
-	}
-	permissions := make([]string, len(capabilities))
-	for i, capability := range capabilities {
-		permissions[i] = string(capability)
-	}
+	permissions := slices.Clone(session.Permissions)
 
 	return &principal.Principal{
 		Version: principal.Version,

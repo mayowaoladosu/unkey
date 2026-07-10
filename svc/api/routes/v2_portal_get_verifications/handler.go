@@ -65,7 +65,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 
 	// Capability and identity scope are separate: this gates the action while the
 	// ClickHouse query below fixes the visible data to the session external ID.
-	err = principal.Authorize(rbac.S(string(portalrbac.CapAnalyticsRead)))
+	err = principal.Authorize(rbac.S(portalrbac.CapAnalyticsRead))
 	if err != nil {
 		return err
 	}

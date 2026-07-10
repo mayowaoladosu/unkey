@@ -59,7 +59,7 @@ func TestResolver_ResolvePortalCookie(t *testing.T) {
 
 	// Portal principals carry the product capability directly. Resource scope is
 	// enforced separately by portal handlers.
-	expected := []string{string(portalrbac.CapKeysReroll)}
+	expected := []string{portalrbac.CapKeysReroll}
 	require.Equal(t, expected, source.Permissions)
 	require.Equal(t, expected, principal.Permissions)
 }
