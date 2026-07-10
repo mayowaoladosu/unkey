@@ -13,7 +13,7 @@ import (
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_create_policy"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_set_policies"
 )
 
 func makeRequest(env seededEnv, policies []openapi.Policy) handler.Request {
@@ -23,6 +23,12 @@ func makeRequest(env seededEnv, policies []openapi.Policy) handler.Request {
 		Environment: env.environmentID,
 		Policies:    policies,
 	}
+}
+
+func makePruneRequest(env seededEnv, policies []openapi.Policy) handler.Request {
+	req := makeRequest(env, policies)
+	req.Prune = ptr(true)
+	return req
 }
 
 func firewallPolicy(name string, enabled bool) openapi.Policy {
@@ -114,6 +120,21 @@ func readStoredPolicies(t *testing.T, h *testutil.Harness, env seededEnv) []json
 	}
 	require.NoError(t, json.Unmarshal(blob, &envelope))
 	return envelope.Policies
+}
+
+// storedPolicyIDs returns the ids of the stored policies in stored order.
+func storedPolicyIDs(t *testing.T, h *testutil.Harness, env seededEnv) []string {
+	t.Helper()
+	stored := readStoredPolicies(t, h, env)
+	ids := make([]string, 0, len(stored))
+	for _, raw := range stored {
+		var doc struct {
+			ID string `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(raw, &doc))
+		ids = append(ids, doc.ID)
+	}
+	return ids
 }
 
 func authHeaders(rootKey string) http.Header {

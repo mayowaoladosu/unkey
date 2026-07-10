@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_create_policy"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_set_policies"
 )
 
-func TestCreatePolicyUnauthorized(t *testing.T) {
+func TestSetPoliciesUnauthorized(t *testing.T) {
 	h := testutil.NewHarness(t)
 
 	route := &handler.Handler{DB: h.DB, Auditlogs: h.Auditlogs}

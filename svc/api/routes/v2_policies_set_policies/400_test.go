@@ -10,10 +10,10 @@ import (
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_create_policy"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_set_policies"
 )
 
-func TestCreatePolicyBadRequest(t *testing.T) {
+func TestSetPoliciesBadRequest(t *testing.T) {
 	h := testutil.NewHarness(t)
 
 	route := &handler.Handler{DB: h.DB, Auditlogs: h.Auditlogs}
@@ -22,7 +22,7 @@ func TestCreatePolicyBadRequest(t *testing.T) {
 	workspace := h.Resources().UserWorkspace
 	env := seedEnvironment(t, h)
 	api := h.CreateApi(seed.CreateApiRequest{WorkspaceID: workspace.ID})
-	rootKey := h.CreateRootKey(workspace.ID, "environment.*.create_policy")
+	rootKey := h.CreateRootKey(workspace.ID, "environment.*.set_policies")
 	headers := authHeaders(rootKey)
 
 	callTyped := func(t *testing.T, policies []openapi.Policy) testutil.TestResponse[openapi.BadRequestErrorResponse] {
@@ -46,9 +46,14 @@ func TestCreatePolicyBadRequest(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("empty policies array", func(t *testing.T) {
-		res := callTyped(t, []openapi.Policy{})
+	t.Run("duplicate policy id in request", func(t *testing.T) {
+		first := firewallPolicy("first", true)
+		first.Id = ptr("pol_dup")
+		second := firewallPolicy("second", true)
+		second.Id = ptr("pol_dup")
+		res := callTyped(t, []openapi.Policy{first, second})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
+		require.Contains(t, res.Body.Error.Detail, "listed more than once")
 	})
 
 	t.Run("more than 10 policies in request", func(t *testing.T) {
@@ -75,6 +80,21 @@ func TestCreatePolicyBadRequest(t *testing.T) {
 
 		stored := readStoredPolicies(t, h, capEnv)
 		require.Len(t, stored, 9, "nothing may be written when the cap check fails")
+	})
+
+	t.Run("updates do not count toward the cap", func(t *testing.T) {
+		capEnv := seedEnvironment(t, h)
+		ten := make([]string, 10)
+		for i := range ten {
+			ten[i] = fmt.Sprintf(`{"id":"pol_seed%d","name":"seed%d","enabled":true,"firewall":{"action":"ACTION_DENY"}}`, i, i)
+		}
+		seedSentinelConfig(t, h, capEnv, fmt.Sprintf(`{"policies":[%s]}`, strings.Join(ten, ",")))
+
+		update := firewallPolicy("seed0 updated", false)
+		update.Id = ptr("pol_seed0")
+		res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers,
+			makeRequest(capEnv, []openapi.Policy{update}))
+		require.Equal(t, http.StatusOK, res.Status, "an update at the cap must succeed, received: %s", res.RawBody)
 	})
 
 	t.Run("more than 10 match expressions", func(t *testing.T) {
@@ -137,7 +157,7 @@ func TestCreatePolicyBadRequest(t *testing.T) {
 		require.Contains(t, res.Body.Error.Detail, "limit and duration together")
 	})
 
-	t.Run("invalid regex is rejected at create time", func(t *testing.T) {
+	t.Run("invalid regex is rejected at write time", func(t *testing.T) {
 		p := firewallPolicy("bad regex", true)
 		p.Match = &[]openapi.MatchExpr{{Path: &struct {
 			Path openapi.StringMatch `json:"path"`
@@ -175,8 +195,8 @@ func TestCreatePolicyBadRequest(t *testing.T) {
 				Limit:    10,
 				WindowMs: 1000,
 				Identifier: openapi.RatelimitIdentifier{
-					RemoteIp: &map[string]interface{}{},
-					Path:     &map[string]interface{}{},
+					RemoteIp: &map[string]any{},
+					Path:     &map[string]any{},
 				},
 			},
 		}})
@@ -200,9 +220,9 @@ func TestCreatePolicyBadRequest(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)
 	})
 
-	t.Run("client-supplied id is rejected by the schema", func(t *testing.T) {
+	t.Run("malformed policy id is rejected by the schema", func(t *testing.T) {
 		res := rawPolicy(t, map[string]any{
-			"name": "with id", "enabled": true, "id": "pol_mine",
+			"name": "with bad id", "enabled": true, "id": "not-a-policy-id",
 			"firewall": map[string]any{"action": "ACTION_DENY"},
 		})
 		require.Equal(t, http.StatusBadRequest, res.Status, "received: %s", res.RawBody)

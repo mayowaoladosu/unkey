@@ -13,11 +13,11 @@ import (
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil/seed"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_create_policy"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_set_policies"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func TestCreatePolicySuccessfully(t *testing.T) {
+func TestSetPoliciesSuccessfully(t *testing.T) {
 	h := testutil.NewHarness(t)
 
 	route := &handler.Handler{DB: h.DB, Auditlogs: h.Auditlogs}
@@ -25,7 +25,7 @@ func TestCreatePolicySuccessfully(t *testing.T) {
 
 	ctx := context.Background()
 	workspace := h.Resources().UserWorkspace
-	rootKey := h.CreateRootKey(workspace.ID, "environment.*.create_policy")
+	rootKey := h.CreateRootKey(workspace.ID, "environment.*.set_policies")
 	headers := authHeaders(rootKey)
 
 	call := func(t *testing.T, req handler.Request) handler.Response {
@@ -52,7 +52,7 @@ func TestCreatePolicySuccessfully(t *testing.T) {
 				Ratelimit: &openapi.RatelimitPolicy{
 					Limit:      100,
 					WindowMs:   60000,
-					Identifier: openapi.RatelimitIdentifier{RemoteIp: &map[string]interface{}{}},
+					Identifier: openapi.RatelimitIdentifier{RemoteIp: &map[string]any{}},
 				},
 			},
 			firewallPolicy("KEBAP", false),
@@ -95,7 +95,8 @@ func TestCreatePolicySuccessfully(t *testing.T) {
 		require.JSONEq(t, `false`, string(byName["KEBAP"].keys["enabled"]))
 		require.JSONEq(t, `{"action":"ACTION_DENY"}`, string(byName["KEBAP"].keys["firewall"]))
 		require.JSONEq(t, `{}`, string(byName["openapi"].keys["openapi"]))
-		require.JSONEq(t,
+		require.JSONEq(
+			t,
 			`{"limit":100,"windowMs":60000,"identifier":{"remoteIp":{}}}`,
 			string(byName["ratelimit"].keys["ratelimit"]),
 		)
@@ -130,13 +131,119 @@ func TestCreatePolicySuccessfully(t *testing.T) {
 		require.Len(t, stored, 1)
 	})
 
+	t.Run("update by id replaces in place and keeps position", func(t *testing.T) {
+		env := seedEnvironment(t, h)
+		call(t, makeRequest(env, []openapi.Policy{
+			firewallPolicy("first", true),
+			firewallPolicy("second", true),
+			firewallPolicy("third", true),
+		}))
+		ids := storedPolicyIDs(t, h, env)
+		require.Len(t, ids, 3)
+
+		// Variant change on update is allowed: second becomes an openapi policy.
+		update := openapi.Policy{
+			Id:      &ids[1],
+			Name:    "second updated",
+			Enabled: false,
+			Openapi: &openapi.OpenapiPolicy{},
+		}
+		call(t, makeRequest(env, []openapi.Policy{update}))
+
+		require.Equal(t, ids, storedPolicyIDs(t, h, env), "update must not move or add policies")
+		stored := readStoredPolicies(t, h, env)
+		require.JSONEq(
+			t,
+			fmt.Sprintf(`{"id":"%s","name":"second updated","enabled":false,"openapi":{}}`, ids[1]),
+			string(stored[1]),
+		)
+
+		logs := h.FindAuditLogsByTargetID(ctx, t, env.environmentID)
+		var updated int
+		for _, l := range logs {
+			if strings.Contains(l.Description, "Updated policy") {
+				updated++
+			}
+		}
+		require.Equal(t, 1, updated)
+	})
+
+	t.Run("mixed create and update in one request", func(t *testing.T) {
+		env := seedEnvironment(t, h)
+		call(t, makeRequest(env, []openapi.Policy{firewallPolicy("existing", true)}))
+		ids := storedPolicyIDs(t, h, env)
+
+		update := firewallPolicy("existing renamed", false)
+		update.Id = &ids[0]
+		call(t, makeRequest(env, []openapi.Policy{update, firewallPolicy("brand new", true)}))
+
+		after := storedPolicyIDs(t, h, env)
+		require.Len(t, after, 2)
+		require.Equal(t, ids[0], after[0], "updated policy keeps its position")
+		stored := readStoredPolicies(t, h, env)
+		require.Contains(t, string(stored[0]), `"name":"existing renamed"`)
+		require.Contains(t, string(stored[1]), `"name":"brand new"`)
+	})
+
+	t.Run("prune reorders and drops unmentioned policies including jwtauth", func(t *testing.T) {
+		env := seedEnvironment(t, h)
+		jwtauth := `{"id":"pol_jwt","name":"legacy jwt","enabled":true,"jwtauth":{}}`
+		seedSentinelConfig(t, h, env, fmt.Sprintf(`{"policies":[%s]}`, jwtauth))
+		call(t, makeRequest(env, []openapi.Policy{
+			firewallPolicy("first", true),
+			firewallPolicy("second", true),
+		}))
+		ids := storedPolicyIDs(t, h, env)
+		require.Len(t, ids, 3) // jwtauth + two created
+
+		// Result must be exactly: second, first — jwtauth is gone.
+		second := firewallPolicy("second", true)
+		second.Id = &ids[2]
+		first := firewallPolicy("first", true)
+		first.Id = &ids[1]
+		call(t, makePruneRequest(env, []openapi.Policy{second, first}))
+
+		after := storedPolicyIDs(t, h, env)
+		require.Equal(t, []string{ids[2], ids[1]}, after)
+	})
+
+	t.Run("prune with empty list clears all policies", func(t *testing.T) {
+		env := seedEnvironment(t, h)
+		call(t, makeRequest(env, []openapi.Policy{firewallPolicy("doomed", true)}))
+
+		call(t, makePruneRequest(env, []openapi.Policy{}))
+
+		stored := readStoredPolicies(t, h, env)
+		require.Empty(t, stored)
+
+		logs := h.FindAuditLogsByTargetID(ctx, t, env.environmentID)
+		var pruned bool
+		for _, l := range logs {
+			if strings.Contains(l.Description, "Pruned all policies") {
+				pruned = true
+			}
+		}
+		require.True(t, pruned, "prune-to-empty must leave a dedicated audit entry")
+	})
+
+	t.Run("empty request without prune is a no-op", func(t *testing.T) {
+		env := seedEnvironment(t, h)
+		call(t, makeRequest(env, []openapi.Policy{firewallPolicy("keeper", true)}))
+		before := readStoredPolicies(t, h, env)
+
+		call(t, makeRequest(env, []openapi.Policy{}))
+
+		after := readStoredPolicies(t, h, env)
+		require.Equal(t, before, after)
+	})
+
 	t.Run("concurrent creates lose no policies", func(t *testing.T) {
 		env := seedEnvironment(t, h)
 
 		const workers = 5
 		var wg sync.WaitGroup
 		errs := make([]int, workers)
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()

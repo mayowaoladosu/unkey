@@ -1,0 +1,70 @@
+type: object
+required:
+  - project
+  - app
+  - environment
+  - policies
+properties:
+  project:
+    "$ref": "../../../../common/ResourceIdentifier.yaml"
+  app:
+    "$ref": "../../../../common/ResourceIdentifier.yaml"
+  environment:
+    "$ref": "../../../../common/ResourceIdentifier.yaml"
+  policies:
+    type: array
+    maxItems: 10
+    items:
+      "$ref": "../../../../common/Policy.yaml"
+    description: |-
+      Policies to apply, in evaluation order among themselves. An item
+      without an `id` is created and appended after the environment's
+      existing policies. An item with an `id` replaces the stored policy
+      with that id in place, keeping its position. The whole operation is
+      atomic: if any policy is invalid, nothing is written. An environment
+      can hold at most 10 policies in total.
+  prune:
+    type: boolean
+    default: false
+    description: |-
+      Optional. Defaults to false. When false, policies with an `id` are
+      updated in place, new policies are appended, and any existing policy
+      not in the list is kept. When true, this becomes a full replace: the
+      environment's policies become exactly this list in this order — use it
+      to reorder or delete policies. Combined with an empty `policies` list,
+      `prune: true` removes every policy.
+additionalProperties: false
+examples:
+  append:
+    summary: Append new policies, keep existing ones
+    value:
+      project: payments
+      app: payments-api
+      environment: production
+      policies:
+        - name: Require API key
+          enabled: true
+          keyauth:
+            keySpaceIds:
+              - ks_1234abcd
+  update:
+    summary: Update one policy in place by id
+    value:
+      project: payments
+      app: payments-api
+      environment: production
+      policies:
+        - id: pol_1234abcd
+          name: Require API key
+          enabled: false
+          keyauth:
+            keySpaceIds:
+              - ks_1234abcd
+  reset:
+    summary: Remove all policies
+    value:
+      project: payments
+      app: payments-api
+      environment: production
+      prune: true
+      policies: []

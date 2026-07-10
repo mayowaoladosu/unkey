@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -14,21 +13,19 @@ import (
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
+	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/rbac"
-	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/pkg/zen"
-	"github.com/unkeyed/unkey/svc/api/internal/policy"
 	"github.com/unkeyed/unkey/svc/api/openapi"
 )
 
-// maxPoliciesPerEnvironment mirrors SENTINEL_LIMITS.maxPolicies in the
-// dashboard's sentinel-policies schema; stored policies of any variant count
-// toward it.
+// maxPoliciesPerEnvironment mirrors the dashboard's SENTINEL_LIMITS.maxPolicies;
+// every stored variant counts toward it.
 const maxPoliciesPerEnvironment = 10
 
 type (
-	Request  = openapi.V2PoliciesCreatePolicyRequestBody
-	Response = openapi.V2PoliciesCreatePolicyResponseBody
+	Request  = openapi.V2PoliciesSetPoliciesRequestBody
+	Response = openapi.V2PoliciesSetPoliciesResponseBody
 )
 
 type Handler struct {
@@ -41,7 +38,7 @@ func (h *Handler) Method() string {
 }
 
 func (h *Handler) Path() string {
-	return "/v2/policies.createPolicy"
+	return "/v2/policies.setPolicies"
 }
 
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
@@ -82,41 +79,57 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		rbac.T(rbac.Tuple{
 			ResourceType: rbac.Environment,
 			ResourceID:   "*",
-			Action:       rbac.CreatePolicy,
+			Action:       rbac.SetPolicies,
 		}),
 		rbac.T(rbac.Tuple{
 			ResourceType: rbac.Environment,
 			ResourceID:   env.ID,
-			Action:       rbac.CreatePolicy,
+			Action:       rbac.SetPolicies,
 		}),
 	))
 	if err != nil {
 		return err
 	}
 
-	if err = policy.ValidatePolicies(req.Policies); err != nil {
+	updateIDs := make(map[string]struct{}, len(req.Policies))
+	for _, p := range req.Policies {
+		if p.Id == nil {
+			continue
+		}
+		if _, dup := updateIDs[*p.Id]; dup {
+			return fault.New(
+				"duplicate policy id",
+				fault.Code(codes.App.Validation.InvalidInput.URN()),
+				fault.Internal("duplicate policy id in request"),
+				fault.Public(fmt.Sprintf("Policy id %q is listed more than once. Each id may appear at most once.", *p.Id)),
+			)
+		}
+		updateIDs[*p.Id] = struct{}{}
+	}
+
+	if err = validatePolicies(req.Policies); err != nil {
 		return err
 	}
 
-	if err = h.assertKeyspacesOwned(ctx, principal.WorkspaceID, req.Policies); err != nil {
+	if err = h.validateKeyspaceOwnership(ctx, principal.WorkspaceID, req.Policies); err != nil {
 		return err
 	}
 
-	ids := make([]string, len(req.Policies))
-	for i := range ids {
-		ids[i] = uid.New(uid.PolicyPrefix)
+	prune := ptr.SafeDeref(req.Prune, false)
+	if !prune && len(req.Policies) == 0 {
+		return s.JSON(http.StatusOK, Response{
+			Meta: openapi.Meta{RequestId: s.RequestID()},
+			Data: openapi.EmptyResponse{},
+		})
 	}
 
-	newRaw, err := policy.MarshalPolicies(req.Policies, ids)
-	if err == nil {
-		err = policy.AssertWireCompatible(newRaw)
-	}
+	incoming, err := encodePolicies(req.Policies)
 	if err != nil {
 		return fault.Wrap(
 			err,
 			fault.Code(codes.App.Internal.UnexpectedError.URN()),
 			fault.Internal("policy serialization produced gateway-incompatible JSON"),
-			fault.Public("We're unable to create the policies."),
+			fault.Public("We're unable to set the policies."),
 		)
 	}
 
@@ -135,18 +148,18 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 				lockErr,
 				fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
 				fault.Internal("unable to lock environment"),
-				fault.Public("We're unable to create the policies."),
+				fault.Public("We're unable to set the policies."),
 			)
 		}
 
-		var existing []json.RawMessage
-		settings, findErr := db.Query.FindAppRuntimeSettingsByAppAndEnv(ctx, tx, db.FindAppRuntimeSettingsByAppAndEnvParams{
+		var stored []policyDoc
+		sentinelConfig, findErr := db.Query.FindSentinelConfigByAppAndEnv(ctx, tx, db.FindSentinelConfigByAppAndEnvParams{
 			AppID:         env.AppID,
 			EnvironmentID: env.ID,
 		})
 		switch {
 		case findErr == nil:
-			existing, findErr = policy.ParseStoredPolicies(settings.AppRuntimeSetting.SentinelConfig)
+			stored, findErr = parseStoredPolicies(sentinelConfig)
 			if findErr != nil {
 				return fault.Wrap(
 					findErr,
@@ -156,38 +169,62 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 				)
 			}
 		case db.IsNotFound(findErr):
-			existing = nil
+			stored = nil
 		default:
 			return fault.Wrap(
 				findErr,
 				fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
 				fault.Internal("unable to load runtime settings"),
-				fault.Public("We're unable to create the policies."),
+				fault.Public("We're unable to set the policies."),
 			)
 		}
 
-		if len(existing)+len(req.Policies) > maxPoliciesPerEnvironment {
+		storedIDs := make(map[string]struct{}, len(stored))
+		for _, doc := range stored {
+			storedIDs[doc.ID] = struct{}{}
+		}
+		creates := 0
+		for _, p := range req.Policies {
+			if p.Id == nil {
+				creates++
+				continue
+			}
+			if _, ok := storedIDs[*p.Id]; !ok {
+				return fault.New(
+					"policy not found",
+					fault.Code(codes.Data.Policy.NotFound.URN()),
+					fault.Internal("policy id not found in environment"),
+					fault.Public(fmt.Sprintf("Policy %q does not exist.", *p.Id)),
+				)
+			}
+		}
+
+		// Only creates grow the list; a prune result is the request itself.
+		// Belt behind the schema's maxItems: an oversized blob bricks the
+		// dashboard's strict reader.
+		total := len(stored) + creates
+		if prune {
+			total = len(req.Policies)
+		}
+		if total > maxPoliciesPerEnvironment {
 			return fault.New(
 				"too many policies",
 				fault.Code(codes.App.Validation.InvalidInput.URN()),
 				fault.Internal("policy limit exceeded"),
 				fault.Public(fmt.Sprintf(
-					"An environment can have at most %d policies; it has %d and this request adds %d.",
-					maxPoliciesPerEnvironment, len(existing), len(req.Policies),
+					"An environment can have at most %d policies; this request would result in %d.",
+					maxPoliciesPerEnvironment, total,
 				)),
 			)
 		}
 
-		blob, blobErr := policy.BuildBlob(existing, newRaw)
-		if blobErr == nil {
-			blobErr = policy.AssertParseable(blob)
-		}
-		if blobErr != nil {
+		blob, mergeErr := mergePolicies(stored, incoming, prune)
+		if mergeErr != nil {
 			return fault.Wrap(
-				blobErr,
+				mergeErr,
 				fault.Code(codes.App.Internal.UnexpectedError.URN()),
 				fault.Internal("merged sentinel config is not parseable by the gateway"),
-				fault.Public("We're unable to create the policies."),
+				fault.Public("We're unable to set the policies."),
 			)
 		}
 
@@ -203,16 +240,20 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 				upsertErr,
 				fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
 				fault.Internal("unable to write sentinel config"),
-				fault.Public("We're unable to create the policies."),
+				fault.Public("We're unable to set the policies."),
 			)
 		}
 
-		auditLogs := make([]auditlog.AuditLog, 0, len(req.Policies))
+		auditLogs := make([]auditlog.AuditLog, 0, len(req.Policies)+1)
 		for i, p := range req.Policies {
+			verb := "Updated"
+			if p.Id == nil {
+				verb = "Created"
+			}
 			auditLogs = append(auditLogs, auditlog.AuditLog{
 				WorkspaceID:   principal.WorkspaceID,
 				Event:         auditlog.EnvironmentUpdateEvent,
-				Display:       fmt.Sprintf("Created policy %s (%s) for environment %s", p.Name, ids[i], env.ID),
+				Display:       fmt.Sprintf("%s policy %s (%s) for environment %s", verb, p.Name, incoming[i].ID, env.ID),
 				ActorID:       principal.Subject.ID,
 				ActorName:     principal.Subject.Name,
 				ActorMeta:     map[string]any{},
@@ -224,7 +265,33 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 					{
 						ID:          env.ID,
 						Type:        auditlog.EnvironmentResourceType,
-						Meta:        map[string]any{"policyId": ids[i], "policyType": variantName(p)},
+						Meta:        map[string]any{"policyId": incoming[i].ID, "policyType": variantName(p), "prune": prune},
+						Name:        env.Slug,
+						DisplayName: env.Slug,
+					},
+				},
+			})
+		}
+
+		// A prune with an empty payload wipes everything but yields no
+		// per-policy logs, so record the destructive action on its own.
+		if len(auditLogs) == 0 && prune {
+			auditLogs = append(auditLogs, auditlog.AuditLog{
+				WorkspaceID:   principal.WorkspaceID,
+				Event:         auditlog.EnvironmentUpdateEvent,
+				Display:       fmt.Sprintf("Pruned all policies for environment %s", env.ID),
+				ActorID:       principal.Subject.ID,
+				ActorName:     principal.Subject.Name,
+				ActorMeta:     map[string]any{},
+				ActorType:     auditlog.AuditLogActor(principal.Subject.Type),
+				RemoteIP:      s.Location(),
+				UserAgent:     s.UserAgent(),
+				CorrelationID: "",
+				Resources: []auditlog.AuditLogResource{
+					{
+						ID:          env.ID,
+						Type:        auditlog.EnvironmentResourceType,
+						Meta:        map[string]any{"prune": prune},
 						Name:        env.Slug,
 						DisplayName: env.Slug,
 					},
@@ -244,10 +311,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	})
 }
 
-// assertKeyspacesOwned rejects keyauth policies referencing keyspaces outside
-// the workspace. Ownership never changes, so checking outside the write
-// transaction cannot race with it.
-func (h *Handler) assertKeyspacesOwned(ctx context.Context, workspaceID string, policies []openapi.Policy) error {
+// validateKeyspaceOwnership rejects keyauth policies referencing keyspaces
+// outside the workspace. Ownership never changes, so checking outside the
+// write transaction cannot race with it.
+func (h *Handler) validateKeyspaceOwnership(ctx context.Context, workspaceID string, policies []openapi.Policy) error {
 	var keyspaceIDs []string
 	for _, p := range policies {
 		if p.Keyauth == nil {
@@ -272,7 +339,7 @@ func (h *Handler) assertKeyspacesOwned(ctx context.Context, workspaceID string, 
 			err,
 			fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
 			fault.Internal("unable to verify keyspaces"),
-			fault.Public("We're unable to create the policies."),
+			fault.Public("We're unable to set the policies."),
 		)
 	}
 
@@ -287,19 +354,4 @@ func (h *Handler) assertKeyspacesOwned(ctx context.Context, workspaceID string, 
 		}
 	}
 	return nil
-}
-
-func variantName(p openapi.Policy) string {
-	switch {
-	case p.Keyauth != nil:
-		return "keyauth"
-	case p.Ratelimit != nil:
-		return "ratelimit"
-	case p.Firewall != nil:
-		return "firewall"
-	case p.Openapi != nil:
-		return "openapi"
-	default:
-		return "unknown"
-	}
 }

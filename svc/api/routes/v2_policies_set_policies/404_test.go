@@ -8,17 +8,17 @@ import (
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_create_policy"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_set_policies"
 )
 
-func TestCreatePolicyNotFound(t *testing.T) {
+func TestSetPoliciesNotFound(t *testing.T) {
 	h := testutil.NewHarness(t)
 
 	route := &handler.Handler{DB: h.DB, Auditlogs: h.Auditlogs}
 	h.Register(route)
 
 	env := seedEnvironment(t, h)
-	rootKey := h.CreateRootKey(env.workspaceID, "environment.*.create_policy")
+	rootKey := h.CreateRootKey(env.workspaceID, "environment.*.set_policies")
 	headers := authHeaders(rootKey)
 
 	t.Run("nonexistent environment", func(t *testing.T) {
@@ -42,6 +42,24 @@ func TestCreatePolicyNotFound(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
 	})
 
+	t.Run("unknown policy id", func(t *testing.T) {
+		update := firewallPolicy("ghost", true)
+		update.Id = ptr("pol_doesnotexist")
+		res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, headers,
+			makeRequest(env, []openapi.Policy{update}))
+		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
+		require.Contains(t, res.Body.Error.Type, "policy_not_found")
+
+		// The rejected request must not have been written: the seeded row keeps
+		// its legacy empty blob.
+		var blob []byte
+		err := h.DB.RO().QueryRowContext(t.Context(),
+			"SELECT sentinel_config FROM app_runtime_settings WHERE app_id = ? AND environment_id = ?",
+			env.appID, env.environmentID).Scan(&blob)
+		require.NoError(t, err)
+		require.Equal(t, "{}", string(blob))
+	})
+
 	t.Run("keyauth referencing a nonexistent keyspace", func(t *testing.T) {
 		res := testutil.CallRoute[handler.Request, openapi.NotFoundErrorResponse](h, route, headers,
 			makeRequest(env, []openapi.Policy{{
@@ -52,8 +70,6 @@ func TestCreatePolicyNotFound(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.Status, "expected 404, received: %s", res.RawBody)
 		require.Contains(t, res.Body.Error.Type, "key_space_not_found")
 
-		// The rejected policy must not have been written: the seeded row keeps
-		// its legacy empty blob.
 		var blob []byte
 		err := h.DB.RO().QueryRowContext(t.Context(),
 			"SELECT sentinel_config FROM app_runtime_settings WHERE app_id = ? AND environment_id = ?",

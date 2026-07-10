@@ -9,10 +9,10 @@ import (
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/api/internal/testutil"
 	"github.com/unkeyed/unkey/svc/api/openapi"
-	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_create_policy"
+	handler "github.com/unkeyed/unkey/svc/api/routes/v2_policies_set_policies"
 )
 
-func TestCreatePolicyForbidden(t *testing.T) {
+func TestSetPoliciesForbidden(t *testing.T) {
 	h := testutil.NewHarness(t)
 
 	route := &handler.Handler{DB: h.DB, Auditlogs: h.Auditlogs}
@@ -25,12 +25,13 @@ func TestCreatePolicyForbidden(t *testing.T) {
 		permissions []string
 		shouldPass  bool
 	}{
-		{name: "wildcard permission", permissions: []string{"environment.*.create_policy"}, shouldPass: true},
-		{name: "specific permission", permissions: []string{fmt.Sprintf("environment.%s.create_policy", env.environmentID)}, shouldPass: true},
-		{name: "permission and more", permissions: []string{"some.other.permission", "environment.*.create_policy"}, shouldPass: true},
+		{name: "wildcard permission", permissions: []string{"environment.*.set_policies"}, shouldPass: true},
+		{name: "specific permission", permissions: []string{fmt.Sprintf("environment.%s.set_policies", env.environmentID)}, shouldPass: true},
+		{name: "permission and more", permissions: []string{"some.other.permission", "environment.*.set_policies"}, shouldPass: true},
 		{name: "update action is not enough", permissions: []string{"environment.*.update_environment"}, shouldPass: false},
 		{name: "set variables action is not enough", permissions: []string{"environment.*.set_environment_variables"}, shouldPass: false},
-		{name: "other environment id does not match", permissions: []string{fmt.Sprintf("environment.%s.create_policy", uid.New(uid.EnvironmentPrefix))}, shouldPass: false},
+		{name: "retired create_policy action is not enough", permissions: []string{"environment.*.create_policy"}, shouldPass: false},
+		{name: "other environment id does not match", permissions: []string{fmt.Sprintf("environment.%s.set_policies", uid.New(uid.EnvironmentPrefix))}, shouldPass: false},
 		{name: "unrelated permission", permissions: []string{"api.*.read_api"}, shouldPass: false},
 		{name: "no permissions", permissions: []string{}, shouldPass: false},
 	}

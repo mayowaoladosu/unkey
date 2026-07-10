@@ -114,6 +114,11 @@ const (
 	// NotFound indicates the requested environment does not exist.
 	UnkeyDataErrorsEnvironmentNotFound URN = "err:unkey:data:environment_not_found"
 
+	// Policy
+
+	// NotFound indicates the requested policy does not exist.
+	UnkeyDataErrorsPolicyNotFound URN = "err:unkey:data:policy_not_found"
+
 	// Migration
 
 	// NotFound indicates the requested migration was not found.

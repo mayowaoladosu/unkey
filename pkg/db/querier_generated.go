@@ -1297,6 +1297,15 @@ type Querier interface {
 	//
 	//  SELECT id, name FROM roles WHERE workspace_id = ? AND name IN (/*SLICE:names*/?)
 	FindRolesByNames(ctx context.Context, db DBTX, arg FindRolesByNamesParams) ([]FindRolesByNamesRow, error)
+	// Policy reads and writes only need the sentinel blob; use
+	// FindAppRuntimeSettingsByAppAndEnv when the full settings row is needed.
+	//
+	//
+	//  SELECT sentinel_config
+	//  FROM app_runtime_settings
+	//  WHERE app_id = ?
+	//    AND environment_id = ?
+	FindSentinelConfigByAppAndEnv(ctx context.Context, db DBTX, arg FindSentinelConfigByAppAndEnvParams) ([]byte, error)
 	//FindValidPortalSession
 	//
 	//  SELECT pk, id, workspace_id, portal_config_id, external_id, permissions, preview, expires_at, created_at FROM portal_sessions

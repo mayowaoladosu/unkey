@@ -1,4 +1,4 @@
-package policy
+package handler
 
 import (
 	"testing"
@@ -145,7 +145,7 @@ func TestValidatePolicies(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidatePolicies(tc.policies)
+			err := validatePolicies(tc.policies)
 			if tc.wantErr == "" {
 				require.NoError(t, err)
 				return

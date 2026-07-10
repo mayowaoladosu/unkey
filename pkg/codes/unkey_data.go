@@ -55,6 +55,12 @@ type dataEnvironment struct {
 	NotFound Code
 }
 
+// dataPolicy defines errors related to gateway policy operations.
+type dataPolicy struct {
+	// NotFound indicates the requested policy does not exist.
+	NotFound Code
+}
+
 // dataPermission defines errors related to permission operations.
 type dataPermission struct {
 	// Duplicate indicates the requested permission already exists.
@@ -133,6 +139,7 @@ type UnkeyDataErrors struct {
 	Project            dataProject
 	App                dataApp
 	Environment        dataEnvironment
+	Policy             dataPolicy
 	Migration          dataMigration
 	KeySpace           dataKeySpace
 	Permission         dataPermission
@@ -182,6 +189,10 @@ var Data = UnkeyDataErrors{
 
 	Environment: dataEnvironment{
 		NotFound: Code{SystemUnkey, CategoryUnkeyData, "environment_not_found"},
+	},
+
+	Policy: dataPolicy{
+		NotFound: Code{SystemUnkey, CategoryUnkeyData, "policy_not_found"},
 	},
 
 	Permission: dataPermission{

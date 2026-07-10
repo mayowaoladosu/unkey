@@ -1,0 +1,155 @@
+post:
+  tags:
+    - policies
+  summary: Set policies
+  description: |
+    Create, update, reorder, or remove an environment's gateway policies in a
+    single atomic request. Policies run at the edge before requests reach your
+    app: verify API keys, rate limit, block requests outright, or validate
+    them against your OpenAPI spec.
+
+    Policies are an ordered list: the gateway evaluates them top to bottom and
+    the first rejection short-circuits the request.
+
+    Each policy sets exactly one of `keyauth`, `ratelimit`, `firewall` or
+    `openapi`, plus optional `match` expressions restricting which requests it
+    applies to. A policy without an `id` is created (the server generates the
+    id) and appended after the existing policies. A policy with an `id`
+    replaces the stored policy with that id in place, keeping its position.
+
+    By default, stored policies not present in the request are kept. With
+    `prune: true` the environment's policies become exactly the request list
+    in the given order — use this to reorder or delete policies, or with an
+    empty list to remove all of them.
+
+    The operation is atomic: if any policy is invalid, nothing is written. An
+    environment can hold at most 10 policies.
+
+    **Required Permissions**
+
+    Your root key must have one of the following permissions:
+    - `environment.*.set_policies` (for any environment)
+    - `environment.<environment_id>.set_policies` (for a specific environment)
+  operationId: policies.setPolicies
+  x-speakeasy-name-override: setPolicies
+  security:
+    - rootKey: []
+  requestBody:
+    content:
+      application/json:
+        schema:
+          "$ref": "./V2PoliciesSetPoliciesRequestBody.yaml"
+        examples:
+          append:
+            summary: Append new policies, keep existing ones
+            value:
+              project: payments
+              app: payments-api
+              environment: production
+              policies:
+                - name: Require API key
+                  enabled: true
+                  keyauth:
+                    keySpaceIds:
+                      - ks_1234abcd
+                - name: Global IP limit
+                  enabled: true
+                  ratelimit:
+                    limit: 100
+                    windowMs: 60000
+                    identifier:
+                      remoteIp: {}
+          update:
+            summary: Update one policy in place by id
+            value:
+              project: payments
+              app: payments-api
+              environment: production
+              policies:
+                - id: pol_1234abcd
+                  name: Global IP limit
+                  enabled: true
+                  ratelimit:
+                    limit: 500
+                    windowMs: 60000
+                    identifier:
+                      remoteIp: {}
+          reorder:
+            summary: Replace the whole list to reorder or delete
+            description: |-
+              With prune, the environment's policies become exactly this list
+              in this order; any policy not listed is deleted.
+            value:
+              project: payments
+              app: payments-api
+              environment: production
+              prune: true
+              policies:
+                - id: pol_5678efgh
+                  name: Block internal paths
+                  enabled: true
+                  match:
+                    - path:
+                        path:
+                          prefix: /internal/
+                  firewall:
+                    action: ACTION_DENY
+                - id: pol_1234abcd
+                  name: Require API key
+                  enabled: true
+                  keyauth:
+                    keySpaceIds:
+                      - ks_1234abcd
+          reset:
+            summary: Remove all policies
+            value:
+              project: payments
+              app: payments-api
+              environment: production
+              prune: true
+              policies: []
+    required: true
+  responses:
+    "200":
+      description: |
+        Successfully set the policies.
+      content:
+        application/json:
+          schema:
+            "$ref": "./V2PoliciesSetPoliciesResponseBody.yaml"
+    "400":
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            "$ref": "../../../../error/BadRequestErrorResponse.yaml"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            "$ref": "../../../../error/UnauthorizedErrorResponse.yaml"
+    "403":
+      description: Forbidden - Insufficient permissions (requires `environment.*.set_policies`)
+      content:
+        application/json:
+          schema:
+            "$ref": "../../../../error/ForbiddenErrorResponse.yaml"
+    "404":
+      description: Not Found - The environment, a referenced keyspace, or a policy id does not exist in your workspace
+      content:
+        application/json:
+          schema:
+            "$ref": "../../../../error/NotFoundErrorResponse.yaml"
+    "429":
+      description: Too Many Requests
+      content:
+        application/problem+json:
+          schema:
+            "$ref": "../../../../error/TooManyRequestsErrorResponse.yaml"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            "$ref": "../../../../error/InternalServerErrorResponse.yaml"

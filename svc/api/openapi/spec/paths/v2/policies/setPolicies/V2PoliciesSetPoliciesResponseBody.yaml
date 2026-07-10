@@ -10,7 +10,7 @@ properties:
 additionalProperties: false
 examples:
   success:
-    summary: Policies created
+    summary: Policies set
     value:
       meta:
         requestId: req_1234abcd

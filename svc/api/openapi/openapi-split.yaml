@@ -252,8 +252,8 @@ paths:
     $ref: "./spec/paths/v2/environments/listEnvironmentVariables/index.yaml"
 
   # Policies Endpoints
-  /v2/policies.createPolicy:
-    $ref: "./spec/paths/v2/policies/createPolicy/index.yaml"
+  /v2/policies.setPolicies:
+    $ref: "./spec/paths/v2/policies/setPolicies/index.yaml"
 
   # Permissions Endpoints
   /v2/permissions.createRole:
