@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 
 	"github.com/unkeyed/unkey/internal/services/portal"
 	"github.com/unkeyed/unkey/pkg/auth/principal"
@@ -46,8 +45,6 @@ func (r *Resolver) Resolve(ctx context.Context, sess *zen.Session) (*principal.P
 		return nil, err
 	}
 
-	permissions := slices.Clone(session.Permissions)
-
 	return &principal.Principal{
 		Version: principal.Version,
 		Subject: principal.Subject{
@@ -61,9 +58,9 @@ func (r *Resolver) Resolve(ctx context.Context, sess *zen.Session) (*principal.P
 			PortalConfigID: session.PortalConfigID,
 			ExternalID:     session.ExternalID,
 			KeyspaceIDs:    session.KeyspaceIDs,
-			Permissions:    permissions,
+			Permissions:    session.Permissions,
 		},
 		WorkspaceID: session.WorkspaceID,
-		Permissions: permissions,
+		Permissions: session.Permissions,
 	}, nil
 }
