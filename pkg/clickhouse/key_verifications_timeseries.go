@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/unkeyed/unkey/pkg/array"
 	"github.com/unkeyed/unkey/pkg/fault"
 )
 
@@ -108,11 +109,9 @@ func (c *Client) GetVerificationsByExternalID(ctx context.Context, req Verificat
 		iv.unit, iv.table, iv.stepMs,
 	)
 
-	escapeKeyspaceID := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
-	keyspaceIDs := make([]string, len(req.KeyspaceIDs))
-	for i, keyspaceID := range req.KeyspaceIDs {
-		keyspaceIDs[i] = "'" + escapeKeyspaceID.Replace(keyspaceID) + "'"
-	}
+	keyspaceIDs := array.Map(req.KeyspaceIDs, func(keyspaceID string) string {
+		return fmt.Sprintf("'%s'", keyspaceID)
+	})
 
 	results, err := Select[VerificationTimeseriesDataPoint](ctx, c.conn, query, map[string]string{
 		"workspace_id": req.WorkspaceID,
