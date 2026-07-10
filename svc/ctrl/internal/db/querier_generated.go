@@ -75,9 +75,10 @@ type Querier interface {
 	DeleteDeploymentTopologiesByEnvironmentId(ctx context.Context, environmentID string) error
 	//DeleteDeploymentsByEnvironmentId
 	//
-	//  DELETE deployment_manifests, deployments
+	//  DELETE deployment_artifacts, deployment_manifests, deployments
 	//  FROM deployments
 	//  LEFT JOIN deployment_manifests ON deployment_manifests.deployment_id = deployments.id
+	//  LEFT JOIN deployment_artifacts ON deployment_artifacts.deployment_id = deployments.id
 	//  WHERE deployments.environment_id = ?
 	DeleteDeploymentsByEnvironmentId(ctx context.Context, environmentID string) error
 	//DeleteEnvironmentById
@@ -316,6 +317,14 @@ type Querier interface {
 	//    AND w.deploy_plan IS NOT NULL
 	//    AND w.deleted_at_m IS NULL
 	FindDeployWorkspaceByStripeCustomerID(ctx context.Context, stripeCustomerID sql.NullString) (FindDeployWorkspaceByStripeCustomerIDRow, error)
+	//FindDeploymentArtifact
+	//
+	//  SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, storage_key, digest, size_bytes, content_type, metadata, created_at
+	//  FROM deployment_artifacts
+	//  WHERE deployment_id = ?
+	//    AND kind = ?
+	//    AND name = ?
+	FindDeploymentArtifact(ctx context.Context, arg FindDeploymentArtifactParams) (DeploymentArtifact, error)
 	//FindDeploymentById
 	//
 	//  SELECT pk, id, k8s_name, workspace_id, project_id, environment_id, app_id, image, build_id, git_commit_sha, git_branch, git_commit_message, git_commit_author_handle, git_commit_author_avatar_url, git_commit_timestamp, sentinel_config, cpu_millicores, memory_mib, storage_mib, desired_state, encrypted_environment_variables, command, port, shutdown_signal, upstream_protocol, healthcheck, pr_number, fork_repository_full_name, github_deployment_id, invocation_id, status, `trigger`, triggered_by, trigger_reason, created_at, updated_at FROM `deployments` WHERE id = ?
@@ -1328,6 +1337,13 @@ type Querier interface {
 	//    AND w.stripe_customer_id IS NOT NULL
 	//    AND w.deleted_at_m IS NULL
 	ListDeployBillableWorkspaces(ctx context.Context) ([]ListDeployBillableWorkspacesRow, error)
+	//ListDeploymentArtifacts
+	//
+	//  SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, storage_key, digest, size_bytes, content_type, metadata, created_at
+	//  FROM deployment_artifacts
+	//  WHERE deployment_id = ?
+	//  ORDER BY created_at ASC, name ASC
+	ListDeploymentArtifacts(ctx context.Context, deploymentID string) ([]DeploymentArtifact, error)
 	// ListDeploymentChangesByRegionAll returns all deployment changes for a region with version > after_version.
 	// Used by the unified WatchDeploymentChanges stream. Does not filter by resource_type.
 	//
@@ -1537,6 +1553,42 @@ type Querier interface {
 	//    updated_at = ?
 	//  WHERE id = ?
 	ReassignFrontlineRoute(ctx context.Context, arg ReassignFrontlineRouteParams) error
+	//RecordDeploymentArtifact
+	//
+	//  INSERT INTO deployment_artifacts (
+	//      id,
+	//      deployment_id,
+	//      workspace_id,
+	//      project_id,
+	//      app_id,
+	//      environment_id,
+	//      name,
+	//      kind,
+	//      storage_key,
+	//      digest,
+	//      size_bytes,
+	//      content_type,
+	//      metadata,
+	//      created_at
+	//  )
+	//  VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	//  ON DUPLICATE KEY UPDATE id = deployment_artifacts.id
+	RecordDeploymentArtifact(ctx context.Context, arg RecordDeploymentArtifactParams) error
 	// Records that kubelet has put a container into CrashLoopBackOff by setting
 	// container_status.waiting.reason. The lastTerminationState carries the
 	// most recent exit info and is left untouched — the dashboard renders both

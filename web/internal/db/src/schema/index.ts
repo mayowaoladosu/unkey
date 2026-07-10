@@ -21,6 +21,7 @@ export * from "./app_regional_settings";
 
 export * from "./app_environment_variables";
 export * from "./deployments";
+export * from "./deployment_artifacts";
 export * from "./deployment_manifests";
 export * from "./openapi_specs";
 export * from "./deployment_steps";

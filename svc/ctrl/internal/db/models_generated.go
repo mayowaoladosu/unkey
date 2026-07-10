@@ -442,6 +442,50 @@ func (ns NullCustomDomainsVerificationStatus) Value() (driver.Value, error) {
 	return string(ns.CustomDomainsVerificationStatus), nil
 }
 
+type DeploymentArtifactsKind string
+
+const (
+	DeploymentArtifactsKindContainerImage DeploymentArtifactsKind = "container_image"
+	DeploymentArtifactsKindStaticBundle   DeploymentArtifactsKind = "static_bundle"
+	DeploymentArtifactsKindFunctionBundle DeploymentArtifactsKind = "function_bundle"
+	DeploymentArtifactsKindSourceMap      DeploymentArtifactsKind = "source_map"
+)
+
+func (e *DeploymentArtifactsKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentArtifactsKind(s)
+	case string:
+		*e = DeploymentArtifactsKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentArtifactsKind: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentArtifactsKind struct {
+	DeploymentArtifactsKind DeploymentArtifactsKind
+	Valid                   bool // Valid is true if DeploymentArtifactsKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentArtifactsKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentArtifactsKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentArtifactsKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentArtifactsKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentArtifactsKind), nil
+}
+
 type DeploymentChangesResourceType string
 
 const (
@@ -1230,6 +1274,24 @@ type Deployment struct {
 	TriggerReason                 sql.NullString              `db:"trigger_reason"`
 	CreatedAt                     int64                       `db:"created_at"`
 	UpdatedAt                     sql.NullInt64               `db:"updated_at"`
+}
+
+type DeploymentArtifact struct {
+	Pk            uint64                  `db:"pk"`
+	ID            string                  `db:"id"`
+	DeploymentID  string                  `db:"deployment_id"`
+	WorkspaceID   string                  `db:"workspace_id"`
+	ProjectID     string                  `db:"project_id"`
+	AppID         string                  `db:"app_id"`
+	EnvironmentID string                  `db:"environment_id"`
+	Name          string                  `db:"name"`
+	Kind          DeploymentArtifactsKind `db:"kind"`
+	StorageKey    string                  `db:"storage_key"`
+	Digest        string                  `db:"digest"`
+	SizeBytes     uint64                  `db:"size_bytes"`
+	ContentType   string                  `db:"content_type"`
+	Metadata      json.RawMessage         `db:"metadata"`
+	CreatedAt     int64                   `db:"created_at"`
 }
 
 type DeploymentChange struct {
