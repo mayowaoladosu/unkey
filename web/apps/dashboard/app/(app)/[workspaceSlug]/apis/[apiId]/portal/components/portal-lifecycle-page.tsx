@@ -1,6 +1,5 @@
 "use client";
 
-import { slugify } from "@/lib/slugify";
 import { BookBookmark } from "@unkey/icons";
 import {
   Button,
@@ -32,7 +31,7 @@ export function PortalLifecyclePage({
   const { state, hydrated, enable, disable, forceState } = usePortalLifecycle(resourceId);
   const [integrateOpen, setIntegrateOpen] = useState(false);
 
-  const url = `${slugify(resourceName)}.unkey.com/portal`;
+  const url = "portal.unkey.com";
   const setup = state === "disabled" || state === "enabling";
 
   return (
