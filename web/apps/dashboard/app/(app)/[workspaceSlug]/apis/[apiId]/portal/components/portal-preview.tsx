@@ -37,7 +37,7 @@ export function PortalPreview({
   return (
     <div
       className={cn(
-        "flex w-full flex-col overflow-hidden rounded-xl border border-grayA-4 bg-gray-1 shadow-sm",
+        "flex w-full flex-col overflow-hidden rounded-lg border border-grayA-4 bg-gray-1 shadow-sm",
         className,
       )}
     >

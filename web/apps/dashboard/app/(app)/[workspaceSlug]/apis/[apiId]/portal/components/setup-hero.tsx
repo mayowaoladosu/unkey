@@ -57,7 +57,7 @@ const PortalIconRow = () => (
 
 export function SetupHero({ enabling, onEnable }: { enabling: boolean; onEnable: () => void }) {
   return (
-    <div className="flex w-full justify-center rounded-2xl border border-grayA-4 p-12">
+    <div className="flex w-full justify-center rounded-lg border border-grayA-4 p-12">
       <div className="flex flex-col items-center text-center">
         <PortalIconRow />
 

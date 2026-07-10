@@ -112,7 +112,7 @@ export function PortalConfig({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div className="w-full divide-y divide-grayA-4 overflow-hidden rounded-[14px] border border-grayA-4">
+      <div className="w-full divide-y divide-grayA-4 overflow-hidden rounded-lg border border-grayA-4">
         <div className="flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-sm font-medium text-accent-12">Portal URL</h2>
