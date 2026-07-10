@@ -75,7 +75,10 @@ type Querier interface {
 	DeleteDeploymentTopologiesByEnvironmentId(ctx context.Context, environmentID string) error
 	//DeleteDeploymentsByEnvironmentId
 	//
-	//  DELETE FROM deployments WHERE environment_id = ?
+	//  DELETE deployment_manifests, deployments
+	//  FROM deployments
+	//  LEFT JOIN deployment_manifests ON deployment_manifests.deployment_id = deployments.id
+	//  WHERE deployments.environment_id = ?
 	DeleteDeploymentsByEnvironmentId(ctx context.Context, environmentID string) error
 	//DeleteEnvironmentById
 	//

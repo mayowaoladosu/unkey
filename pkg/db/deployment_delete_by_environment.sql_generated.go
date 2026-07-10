@@ -10,12 +10,18 @@ import (
 )
 
 const deleteDeploymentsByEnvironmentId = `-- name: DeleteDeploymentsByEnvironmentId :exec
-DELETE FROM deployments WHERE environment_id = ?
+DELETE deployment_manifests, deployments
+FROM deployments
+LEFT JOIN deployment_manifests ON deployment_manifests.deployment_id = deployments.id
+WHERE deployments.environment_id = ?
 `
 
 // DeleteDeploymentsByEnvironmentId
 //
-//	DELETE FROM deployments WHERE environment_id = ?
+//	DELETE deployment_manifests, deployments
+//	FROM deployments
+//	LEFT JOIN deployment_manifests ON deployment_manifests.deployment_id = deployments.id
+//	WHERE deployments.environment_id = ?
 func (q *Queries) DeleteDeploymentsByEnvironmentId(ctx context.Context, db DBTX, environmentID string) error {
 	_, err := db.ExecContext(ctx, deleteDeploymentsByEnvironmentId, environmentID)
 	return err

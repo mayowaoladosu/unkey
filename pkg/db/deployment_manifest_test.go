@@ -64,4 +64,8 @@ func TestDeploymentManifestIsImmutableAndReadable(t *testing.T) {
 
 	err = Query.InsertDeploymentManifest(ctx, database.RW(), params)
 	require.Error(t, err, "a deployment manifest must never be replaced")
+
+	require.NoError(t, Query.DeleteDeploymentsByEnvironmentId(ctx, database.RW(), environmentID))
+	require.Equal(t, 0, countRows(t, ctx, database, "SELECT COUNT(*) FROM deployments WHERE id = ?", deploymentID))
+	require.Equal(t, 0, countRows(t, ctx, database, "SELECT COUNT(*) FROM deployment_manifests WHERE deployment_id = ?", deploymentID))
 }
