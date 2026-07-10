@@ -193,6 +193,9 @@ type HeartbeatConfig struct {
 	// billing push. When set, a heartbeat is sent after a successful push.
 	// Optional - if empty, no heartbeat is sent.
 	DeployBillingPushURL string `toml:"deploy_billing_push_url"`
+	// DeployBillingCloseURL is the Checkly heartbeat URL for the month-end
+	// Deploy billing close. Optional.
+	DeployBillingCloseURL string `toml:"deploy_billing_close_url"`
 }
 
 // BillingConfig holds Stripe configuration for the hourly Deploy billing push.
@@ -255,8 +258,8 @@ type Config struct {
 	// Each custom domain gets a unique subdomain like "{random}.{CnameDomain}".
 	CnameDomain string `toml:"cname_domain" config:"required,nonempty"`
 
-	// Database configures MySQL connections. See [config.DatabaseConfig].
-	Database config.DatabaseConfig `toml:"database"`
+	// Database is the MySQL DSN used for all control plane reads and writes.
+	Database string `toml:"database" config:"required,nonempty"`
 
 	// Vault configures the encryption/decryption service. See [config.VaultConfig].
 	Vault config.VaultConfig `toml:"vault"`

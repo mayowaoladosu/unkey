@@ -31,3 +31,31 @@ export const deployBilling = flag<boolean, Entities>({
   identify,
   adapter: adapter(),
 });
+
+export const appOverview = flag<boolean, Entities>({
+  key: "app-overview",
+  description:
+    "Show the app overview page and use it as the default app landing. Off until rollout.",
+  defaultValue: false,
+  options: [
+    { value: false, label: "Off" },
+    { value: true, label: "On" },
+  ],
+  identify,
+  adapter: adapter(),
+});
+
+// portalManagement gates the portal configuration page and its sidebar nav
+// item. Off until portal GA so it can be developed and merged without being
+// visible. Enable per-workspace to roll out to internal workspaces first.
+export const portalManagement = flag<boolean, Entities>({
+  key: "portal-management",
+  description: "Show the portal configuration page in the dashboard sidebar. Off until portal GA.",
+  defaultValue: false,
+  options: [
+    { value: false, label: "Off" },
+    { value: true, label: "On" },
+  ],
+  identify,
+  adapter: adapter(),
+});

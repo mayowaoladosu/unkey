@@ -102,6 +102,18 @@ const (
 	// Duplicate indicates the requested project already exists.
 	UnkeyDataErrorsProjectDuplicate URN = "err:unkey:data:project_already_exists"
 
+	// App
+
+	// Duplicate indicates the requested app already exists.
+	UnkeyDataErrorsAppDuplicate URN = "err:unkey:data:app_already_exists"
+	// NotFound indicates the requested app does not exist.
+	UnkeyDataErrorsAppNotFound URN = "err:unkey:data:app_not_found"
+
+	// Environment
+
+	// NotFound indicates the requested environment does not exist.
+	UnkeyDataErrorsEnvironmentNotFound URN = "err:unkey:data:environment_not_found"
+
 	// Migration
 
 	// NotFound indicates the requested migration was not found.

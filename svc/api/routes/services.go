@@ -35,6 +35,11 @@ type Services struct {
 	// Auth normalizes supported credential sources into principals for protected routes.
 	Auth auth.Authenticator
 
+	// PortalAuth resolves only portal-session cookies into principals. It backs
+	// the portal routes so a portal session can never authenticate on a
+	// protected route.
+	PortalAuth auth.Authenticator
+
 	// ClickHouse provides query access to ClickHouse for analytics.
 	ClickHouse clickhouse.ClickHouse
 
@@ -71,6 +76,10 @@ type Services struct {
 	// CtrlProjectClient communicates with the control plane for project
 	// lifecycle operations (delete cascades resources via a Restate workflow).
 	CtrlProjectClient ctrl.ProjectServiceClient
+
+	// CtrlAppClient communicates with the control plane for app lifecycle
+	// operations (create seeds default environments and settings).
+	CtrlAppClient ctrl.AppServiceClient
 
 	// PprofEnabled controls whether pprof profiling endpoints are registered.
 	PprofEnabled bool

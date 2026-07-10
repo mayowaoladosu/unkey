@@ -1,3 +1,4 @@
+import { useAppHomeHref } from "@/hooks/use-app-home-href";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { routes } from "@/lib/navigation/routes";
 import { Github, Terminal } from "@unkey/icons";
@@ -62,7 +63,7 @@ export function ProjectCard({ name, projectId, appCount, apps, actions }: Projec
   });
 
   return (
-    <div className="relative p-5 flex flex-col justify-between border border-grayA-4 hover:border-grayA-7 rounded-2xl w-full h-full gap-6 group transition-all duration-300 [&_a]:z-10 [&_button]:z-10">
+    <div className="relative p-5 flex flex-col justify-between border border-grayA-4 hover:border-grayA-7 rounded-lg w-full h-full gap-6 group transition-all duration-300 [&_a]:z-10 [&_button]:z-10">
       <Link
         href={projectPath}
         className="absolute inset-0 z-0"
@@ -98,6 +99,7 @@ function AppIconStack({
   projectId,
 }: { apps: ProjectCardApp[]; appCount: number; projectId: string }) {
   const workspace = useWorkspaceNavigation();
+  const appHomeHref = useAppHomeHref();
   const visible = apps.slice(0, MAX_VISIBLE_APPS);
   const overflow = appCount - visible.length;
 
@@ -112,7 +114,7 @@ function AppIconStack({
           position={{ side: "top" }}
         >
           <Link
-            href={routes.projects.apps.deployments({
+            href={appHomeHref({
               workspaceSlug: workspace.slug,
               projectId,
               appId: app.id,
@@ -143,7 +145,7 @@ function AppIconStack({
               {apps.map((app) => (
                 <Link
                   key={app.id}
-                  href={routes.projects.apps.deployments({
+                  href={appHomeHref({
                     workspaceSlug: workspace.slug,
                     projectId,
                     appId: app.id,

@@ -19,9 +19,12 @@ import (
 	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/pkg/rbac"
+	"github.com/unkeyed/unkey/pkg/rbac/permissions"
 	"github.com/unkeyed/unkey/pkg/retry"
 	"github.com/unkeyed/unkey/pkg/uid"
+	"github.com/unkeyed/unkey/pkg/urn"
 	"github.com/unkeyed/unkey/pkg/zen"
+	"github.com/unkeyed/unkey/svc/api/internal/auditactor"
 )
 
 type (
@@ -46,33 +49,53 @@ func (h *Handler) Path() string {
 	return "/v2/keys.rerollKey"
 }
 
-// Handle processes the HTTP request
+// Handle processes the HTTP request.
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
-	principal, err := s.GetPrincipal()
-	if err != nil {
-		return err
-	}
-
-	// 2. Request validation
 	req, err := zen.BindBody[Request](s)
 	if err != nil {
 		return err
 	}
 
-	key, err := db.Query.FindLiveKeyByID(ctx, h.DB.RO(), req.KeyId)
+	key, err := h.FindLiveKey(ctx, req.KeyId)
+	if err != nil {
+		return err
+	}
+
+	return h.RerollKey(ctx, s, req, key)
+}
+
+// FindLiveKey loads a live key by id, mapping not-found and database failures to
+// the appropriate faults. The portal route reuses this to load a key for its
+// ownership guard before delegating to RerollKey.
+func (h *Handler) FindLiveKey(ctx context.Context, keyID string) (db.FindLiveKeyByIDRow, error) {
+	var zero db.FindLiveKeyByIDRow
+
+	key, err := db.Query.FindLiveKeyByID(ctx, h.DB.RO(), keyID)
 	if err != nil {
 		if db.IsNotFound(err) {
-			return fault.New("key not found",
+			return zero, fault.New("key not found",
 				fault.Code(codes.Data.Key.NotFound.URN()),
 				fault.Public("The specified key was not found."),
 			)
 		}
 
-		return fault.Wrap(err,
+		return zero, fault.Wrap(err,
 			fault.Code(codes.App.Internal.ServiceUnavailable.URN()),
 			fault.Internal("database error"),
 			fault.Public("Failed to retrieve key."),
 		)
+	}
+
+	return key, nil
+}
+
+// RerollKey rerolls a pre-loaded key. The workspace-ownership check is enforced
+// here; any identity scoping is the caller's responsibility (the portal route
+// applies it before calling). This core is identity-agnostic.
+func (h *Handler) RerollKey(ctx context.Context, s *zen.Session, req Request, key db.FindLiveKeyByIDRow) error {
+	principal, err := s.GetPrincipal()
+	if err != nil {
+		return err
 	}
 
 	// Validate key belongs to authorized workspace
@@ -84,8 +107,24 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 		)
 	}
 
+	// Portal-authenticated rerolls are attributed to a portalEndUser actor so
+	// customers can see end-user activity in their audit logs; auditactor derives
+	// this from the principal, so this core stays identity-agnostic.
+	actor := auditactor.FromPrincipal(principal)
+
 	keyData := db.ToKeyData(key)
 
+	// Rerolling is authorized as a create_key operation because it mints a fresh
+	// key. Today this is fine for the portal too: portal sessions carry only the
+	// permissions the workspace owner enumerated at portal.createSession, and the
+	// only key-creating route we expose to them is reroll (there is no
+	// portal.createKey route). So an owner granting create_key for reroll cannot
+	// actually create arbitrary keys.
+	//
+	// TODO: when we add a portal.createKey route, that equivalence breaks — an
+	// owner will want to let a portal user reroll an existing key WITHOUT also
+	// letting them create new ones. At that point introduce a dedicated
+	// reroll_key action and authorize reroll against it instead of create_key.
 	checks := rbac.Or(
 		rbac.T(rbac.Tuple{
 			ResourceType: rbac.Api,
@@ -97,6 +136,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			ResourceID:   "*",
 			Action:       rbac.CreateKey,
 		}),
+		rbac.U(
+			urn.New().Workspace(principal.WorkspaceID).Keyspace(key.KeyAuthID),
+			permissions.CreateKey{},
+		),
 	)
 
 	if keyData.EncryptionKeyID.Valid {
@@ -113,6 +156,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 					ResourceID:   "*",
 					Action:       rbac.EncryptKey,
 				}),
+				rbac.U(
+					urn.New().Workspace(principal.WorkspaceID).Keyspace(key.KeyAuthID).Key("*"),
+					permissions.EncryptKey{},
+				),
 			),
 		)
 	}
@@ -334,10 +381,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			auditLogs = append(auditLogs, auditlog.AuditLog{
 				WorkspaceID:   principal.WorkspaceID,
 				Event:         auditlog.KeyRerollEvent,
-				ActorType:     auditlog.AuditLogActor(principal.Subject.Type),
-				ActorID:       principal.Subject.ID,
-				ActorName:     principal.Subject.Name,
-				ActorMeta:     map[string]any{},
+				ActorType:     actor.Type,
+				ActorID:       actor.ID,
+				ActorName:     actor.Name,
+				ActorMeta:     actor.Meta,
 				Display:       fmt.Sprintf("Rerolled key (%s) to (%s)", req.KeyId, keyID),
 				RemoteIP:      s.Location(),
 				UserAgent:     s.UserAgent(),

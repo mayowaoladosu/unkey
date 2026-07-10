@@ -32,10 +32,10 @@ import (
 
 	"github.com/unkeyed/unkey/pkg/assert"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
-	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/ptr"
 	"github.com/unkeyed/unkey/pkg/validation"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	githubclient "github.com/unkeyed/unkey/svc/ctrl/worker/github"
 )
 
@@ -73,7 +73,7 @@ var knownBuildErrors = []knownBuildError{
 	// The message is deliberately tech-neutral: Railpack is an implementation
 	// detail we don't surface to customers. "check the root directory" also
 	// makes the dashboard's failed-deployment banner show its settings link.
-	{substr: "railpack prepare failed", message: "Unkey could not determine how to build this app. Please check the root directory in settings, or review the build logs for details."},
+	{substr: "railpack prepare failed", message: "Unkey could not build this app automatically. For a monorepo, set the root directory to your app and a custom build command in settings, or review the build logs for details."},
 	// Settings-fixable: dockerfile path / docker context
 	{substr: "the dockerfile cannot be empty", message: "The Dockerfile appears to be empty. Please verify the file path in settings."},
 	{substr: "failed to read dockerfile", message: "Dockerfile could not be read. Please check that the file path is correct in settings."},
@@ -99,10 +99,10 @@ var knownBuildErrors = []knownBuildError{
 	{substr: "linting failed", message: "Dockerfile linting failed. Please check the Dockerfile for issues."},
 }
 
-// repoFullNameRegex matches a GitHub "owner/repo" full name. Mirrors the
-// dashboard's REPO_FULL_NAME guard (resolve-deploy-ref.ts) so untrusted inputs
-// can't smuggle a URL fragment or path traversal into the git context URL.
-var repoFullNameRegex = regexp.MustCompile(`^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`)
+// pathNameSegmentRegex matches one GitHub owner/repo or build-context path
+// segment. Additional validation rejects "." and ".." so names cannot become
+// path traversal once interpolated into the git context URL.
+var pathNameSegmentRegex = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // commitSHARegex matches a hex git object name (7-40 chars). Anything outside
 // this set (':', '#', '/', '..') could alter what BuildKit checks out once
@@ -116,10 +116,10 @@ var commitSHARegex = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
 // buildGitContextURL unchecked. Validating here covers the dashboard, webhook,
 // rebuild-from-DB, and API paths at once.
 func validateGitBuildParams(params gitBuildParams) error {
-	if !repoFullNameRegex.MatchString(params.Repository) {
+	if !isValidRepoFullName(params.Repository) {
 		return fmt.Errorf("invalid repository %q: must be in owner/repo form", params.Repository)
 	}
-	if params.ForkRepository != "" && !repoFullNameRegex.MatchString(params.ForkRepository) {
+	if params.ForkRepository != "" && !isValidRepoFullName(params.ForkRepository) {
 		return fmt.Errorf("invalid fork repository %q: must be in owner/repo form", params.ForkRepository)
 	}
 	// SHA is unused when a PR ref drives the build (refs/pull/<n>/head), so only
@@ -127,7 +127,40 @@ func validateGitBuildParams(params gitBuildParams) error {
 	if params.CommitSHA != "" && !commitSHARegex.MatchString(params.CommitSHA) {
 		return fmt.Errorf("invalid commit SHA %q: must be a hex git object name", params.CommitSHA)
 	}
+	if !isValidGitContextPath(params.ContextPath) {
+		return fmt.Errorf("invalid context path %q: must be a relative path using letters, digits, '.', '_', or '-'", params.ContextPath)
+	}
 	return nil
+}
+
+func isValidRepoFullName(fullName string) bool {
+	owner, repo, ok := strings.Cut(fullName, "/")
+	if !ok || strings.Contains(repo, "/") {
+		return false
+	}
+	return isValidPathNameSegment(owner) && isValidPathNameSegment(repo)
+}
+
+func isValidGitContextPath(path string) bool {
+	if path != strings.TrimSpace(path) {
+		return false
+	}
+	if path == "" || path == "." {
+		return true
+	}
+	if strings.HasPrefix(path, "/") || strings.Contains(path, `\`) {
+		return false
+	}
+	for _, segment := range strings.Split(path, "/") {
+		if !isValidPathNameSegment(segment) {
+			return false
+		}
+	}
+	return true
+}
+
+func isValidPathNameSegment(segment string) bool {
+	return segment != "." && segment != ".." && pathNameSegmentRegex.MatchString(segment)
 }
 
 // buildResult contains the output of a Docker image build, including the image
@@ -141,12 +174,17 @@ type buildResult struct {
 // gitBuildParams holds the inputs for building a container image from a Git
 // repository, including the exact commit and the build context location.
 type gitBuildParams struct {
-	InstallationID                int64
-	Repository                    string
-	ForkRepository                string
-	CommitSHA                     string
-	ContextPath                   string
-	DockerfilePath                string
+	InstallationID int64
+	Repository     string
+	ForkRepository string
+	CommitSHA      string
+	ContextPath    string
+	DockerfilePath string
+	// BuildCommand overrides Railpack's auto-detected build command
+	// (RAILPACK_BUILD_CMD) so monorepos can scope the build to a single app.
+	// Empty means auto-detect. Only consumed by the Railpack build path;
+	// Dockerfile builds ignore it.
+	BuildCommand                  string
 	ProjectID                     string
 	AppID                         string
 	DeploymentID                  string
@@ -676,7 +714,7 @@ func (w *Workflow) buildGitSolverOptions(
 // getOrCreateDepotProject retrieves the Depot project ID for an Unkey project,
 // creating one if it doesn't exist.
 func (w *Workflow) getOrCreateDepotProject(ctx context.Context, unkeyProjectID string) (string, error) {
-	project, err := db.Query.FindProjectById(ctx, w.db.RO(), unkeyProjectID)
+	project, err := w.db.FindProjectById(ctx, unkeyProjectID)
 	if err != nil {
 		return "", fmt.Errorf("failed to query project: %w", err)
 	}
@@ -717,7 +755,7 @@ func (w *Workflow) getOrCreateDepotProject(ctx context.Context, unkeyProjectID s
 	depotProjectID := createResp.Msg.GetProject().GetProjectId()
 
 	now := time.Now().UnixMilli()
-	err = db.Query.UpdateProjectDepotID(ctx, w.db.RW(), db.UpdateProjectDepotIDParams{
+	err = w.db.UpdateProjectDepotID(ctx, db.UpdateProjectDepotIDParams{
 		DepotProjectID: sql.NullString{
 			String: depotProjectID,
 			Valid:  true,

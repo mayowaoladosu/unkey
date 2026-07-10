@@ -72,6 +72,9 @@ export const RootKeyDialog = ({
     apisLoading,
     allProjects,
     projectsLoading,
+    allApps,
+    allEnvironments,
+    environmentsLoading,
     hasNextPage,
     isFetchingNextPage,
     key,
@@ -90,7 +93,7 @@ export const RootKeyDialog = ({
   });
 
   const isMutating = key.isLoading || updateName.isLoading || updatePermissions.isLoading;
-  const isBusy = isMutating || apisLoading || projectsLoading;
+  const isBusy = isMutating || apisLoading || projectsLoading || environmentsLoading;
 
   const apiBadges = useMemo(
     () =>
@@ -109,6 +112,24 @@ export const RootKeyDialog = ({
         scope: { kind: "project" as const, id: project.id, name: project.name },
       })),
     [allProjects],
+  );
+  const appBadges = useMemo(
+    () =>
+      allApps.map((app) => ({
+        id: app.id,
+        name: app.name,
+        scope: { kind: "app" as const, id: app.id, name: app.name },
+      })),
+    [allApps],
+  );
+  const environmentBadges = useMemo(
+    () =>
+      allEnvironments.map((environment) => ({
+        id: environment.id,
+        name: environment.name,
+        scope: { kind: "environment" as const, id: environment.id, name: environment.name },
+      })),
+    [allEnvironments],
   );
 
   const removePermission = (permission: UnkeyPermission) =>
@@ -179,6 +200,28 @@ export const RootKeyDialog = ({
               removePermission={removePermission}
             />
           ))}
+          {appBadges.map((app) => (
+            <PermissionBadgeList
+              key={app.id}
+              selectedPermissions={selectedPermissions}
+              scope={app.scope}
+              title="from app"
+              name={app.name}
+              expandCount={ROOT_KEY_CONSTANTS.EXPAND_COUNT}
+              removePermission={removePermission}
+            />
+          ))}
+          {environmentBadges.map((environment) => (
+            <PermissionBadgeList
+              key={environment.id}
+              selectedPermissions={selectedPermissions}
+              scope={environment.scope}
+              title="from environment"
+              name={environment.name}
+              expandCount={ROOT_KEY_CONSTANTS.EXPAND_COUNT}
+              removePermission={removePermission}
+            />
+          ))}
         </div>
       </ScrollArea>
     </>
@@ -241,6 +284,8 @@ export const RootKeyDialog = ({
         selectedPermissions={selectedPermissions}
         apis={allApis}
         projects={allProjects}
+        apps={allApps}
+        environments={allEnvironments}
         onChange={handlePermissionChange}
         loadMore={fetchMoreApis}
         hasNextPage={hasNextPage}

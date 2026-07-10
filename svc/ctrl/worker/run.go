@@ -26,9 +26,9 @@ import (
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
 	"github.com/unkeyed/unkey/pkg/clock"
-	"github.com/unkeyed/unkey/pkg/db"
 	"github.com/unkeyed/unkey/pkg/healthcheck"
 	"github.com/unkeyed/unkey/pkg/logger"
+	"github.com/unkeyed/unkey/pkg/mysql/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/otel"
 	"github.com/unkeyed/unkey/pkg/prometheus"
 	"github.com/unkeyed/unkey/pkg/prometheus/lazy"
@@ -37,6 +37,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/rpc/interceptor"
 	"github.com/unkeyed/unkey/pkg/runner"
 	"github.com/unkeyed/unkey/pkg/uid"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	"github.com/unkeyed/unkey/svc/ctrl/services/acme/providers"
 	workerapp "github.com/unkeyed/unkey/svc/ctrl/worker/app"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/buildslot"
@@ -54,6 +55,7 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/worker/keylastusedsync"
 
 	ratelimitdb "github.com/unkeyed/unkey/internal/services/ratelimit/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/auditlogs"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/openapi"
 	workerproject "github.com/unkeyed/unkey/svc/ctrl/worker/project"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/routing"
@@ -145,10 +147,7 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	// Initialize database
-	database, err := db.New(db.Config{
-		PrimaryDSN:  cfg.Database.Primary,
-		ReadOnlyDSN: cfg.Database.ReadonlyReplica,
-	})
+	database, err := db.New(cfg.Database, sqlcomment.ForService("ctrl-worker", cfg.Region))
 	if err != nil {
 		return fmt.Errorf("unable to create db: %w", err)
 	}
@@ -311,15 +310,35 @@ func Run(ctx context.Context, cfg Config) error {
 		AllowUnauthenticatedDeployments: ptr.SafeDeref(cfg.GitHub).AllowUnauthenticatedDeployments,
 	})))
 
-	restateSrv.Bind(hydrav1.NewProjectServiceServer(workerproject.New(workerproject.Config{
-		DB: database,
-	})))
-	restateSrv.Bind(hydrav1.NewAppServiceServer(workerapp.New(workerapp.Config{
-		DB: database,
-	})))
+	// Deletion workflows write their audit logs as durable steps, so the audit
+	// record is tied to the retried deletion unit rather than the enqueueing RPC.
+	auditlogSvc, err := auditlogs.New(auditlogs.Config{DB: database})
+	if err != nil {
+		return fmt.Errorf("failed to create audit log service: %w", err)
+	}
+
+	projectSvc, err := workerproject.New(workerproject.Config{
+		DB:        database,
+		Auditlogs: auditlogSvc,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create project worker service: %w", err)
+	}
+	restateSrv.Bind(hydrav1.NewProjectServiceServer(projectSvc))
+
+	appSvc, err := workerapp.New(workerapp.Config{
+		DB:        database,
+		Auditlogs: auditlogSvc,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create app worker service: %w", err)
+	}
+	restateSrv.Bind(hydrav1.NewAppServiceServer(appSvc))
+
 	envSvc, err := workerenvironment.New(workerenvironment.Config{
-		DB:    database,
-		Admin: restateAdminClient,
+		DB:        database,
+		Admin:     restateAdminClient,
+		Auditlogs: auditlogSvc,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create environment worker service: %w", err)
@@ -456,13 +475,17 @@ func Run(ctx context.Context, cfg Config) error {
 		SlackQuotaCheckWebhookURL: cfg.Slack.QuotaCheckWebhookURL,
 		BillingUsageReader:        billingUsageReader,
 		StripeSecretKey:           cfg.Billing.StripeSecretKey,
+		// Derived from StripeSecretKey; only tests inject these directly.
+		BillingPusher: nil,
+		BillingCloser: nil,
 		Heartbeats: cron.Heartbeats{
-			QuotaCheck:        cronHeartbeat(cfg.Heartbeat.QuotaCheckURL),
-			KeyRefill:         cronHeartbeat(cfg.Heartbeat.KeyRefillURL),
-			KeyLastUsedSync:   cronHeartbeat(cfg.Heartbeat.KeyLastUsedSyncURL),
-			AuditLogExport:    cronHeartbeat(cfg.Heartbeat.AuditLogExportURL),
-			AuditLogCleanup:   cronHeartbeat(cfg.Heartbeat.AuditLogOutboxCleanupURL),
-			DeployBillingPush: cronHeartbeat(cfg.Heartbeat.DeployBillingPushURL),
+			QuotaCheck:         cronHeartbeat(cfg.Heartbeat.QuotaCheckURL),
+			KeyRefill:          cronHeartbeat(cfg.Heartbeat.KeyRefillURL),
+			KeyLastUsedSync:    cronHeartbeat(cfg.Heartbeat.KeyLastUsedSyncURL),
+			AuditLogExport:     cronHeartbeat(cfg.Heartbeat.AuditLogExportURL),
+			AuditLogCleanup:    cronHeartbeat(cfg.Heartbeat.AuditLogOutboxCleanupURL),
+			DeployBillingPush:  cronHeartbeat(cfg.Heartbeat.DeployBillingPushURL),
+			DeployBillingClose: cronHeartbeat(cfg.Heartbeat.DeployBillingCloseURL),
 		},
 	})
 	if err != nil {
@@ -516,11 +539,25 @@ func Run(ctx context.Context, cfg Config) error {
 	// an oncall to inspect a recent failure without bloating the journal
 	// store with ~1440 dead invocations/day. No retry override — SDK
 	// default behavior was the pre-consolidation contract.
+	// DeployBillingClose is idempotent and cron-backed; per-workspace
+	// failures are journaled as deferred so one bad customer cannot wedge
+	// the period VO. Kill on exhaustion so the backup cron can retry with
+	// a fresh idempotency key instead of sitting behind a wedged webhook
+	// invocation.
+	cronDeployBillingCloseRetry := restate.WithInvocationRetryPolicy(
+		restate.WithInitialInterval(100*time.Millisecond),
+		restate.WithExponentiationFactor(2.0),
+		restate.WithMaxInterval(5*time.Second),
+		restate.WithMaxAttempts(5),
+		restate.KillOnMaxAttempts(),
+	)
 	restateSrv.Bind(hydrav1.NewCronServiceServer(cronSvc).
 		ConfigureHandler("RunKeyLastUsedSync", cronKeyLastUsedRetry).
 		ConfigureHandler("RunRatelimitGlobalCountersCleanup", cronRatelimitGCCRetry).
 		ConfigureHandler("RunAuditLogOutboxCleanup", cronAuditLogCleanupRetry).
-		ConfigureHandler("RunAuditLogExport", restate.WithJournalRetention(1*time.Hour)))
+		ConfigureHandler("RunAuditLogExport", restate.WithJournalRetention(1*time.Hour)).
+		ConfigureHandler("RunDeployBillingClose", cronDeployBillingCloseRetry).
+		ConfigureHandler("CloseDeployBillingWorkspace", cronDeployBillingCloseRetry))
 	logger.Info("CronService enabled")
 
 	// KeyLastUsedPartitionService is the per-partition VO fanned out from
@@ -543,7 +580,7 @@ func Run(ctx context.Context, cfg Config) error {
 
 	mux := http.NewServeMux()
 	r.RegisterHealth(mux)
-	mux.Handle("/", restateHandler)
+	mux.Handle("/", sqlcomment.WrapRestateInvokeHandler(restateHandler))
 
 	h2cHandler := h2c.NewHandler(mux, &http2.Server{
 		MaxHandlers:                  0,

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -32,11 +31,11 @@ type ClickHouseConfig struct {
 
 // ClickHouse starts a ClickHouse container and returns connection info.
 //
-// The container is owned by t and removed automatically with t.Cleanup.
-func ClickHouse(t testing.TB) ClickHouseConfig {
+// The container is reused by stable Docker name across Go test processes.
+func ClickHouse(t testing.TB, opts ...Opt) ClickHouseConfig {
 	t.Helper()
 
-	ctr := startContainer(t, containerConfig{
+	cfg := containerConfig{
 		Image:        clickhouseImage,
 		ExposedPorts: []string{clickhousePort, clickhouseHTTPPort},
 		WaitStrategy: NewTCPWait(clickhousePort),
@@ -45,19 +44,25 @@ func ClickHouse(t testing.TB) ClickHouseConfig {
 			"CLICKHOUSE_USER":     clickhouseUser,
 			"CLICKHOUSE_PASSWORD": clickhousePassword,
 		},
-		Cmd:   []string{},
-		Tmpfs: nil,
-	})
+		Cmd:       []string{},
+		Tmpfs:     nil,
+		Dedicated: false,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	ctr := startContainer(t, cfg)
 
 	port := ctr.Port(clickhousePort)
 	dsn := fmt.Sprintf("clickhouse://%s:%s@%s:%s?secure=false&skip_verify=true&dial_timeout=10s",
 		clickhouseUser, clickhousePassword, ctr.Host, port)
 
 	// Connect and apply schema
-	opts, err := ch.ParseDSN(dsn)
+	clickhouseOpts, err := ch.ParseDSN(dsn)
 	require.NoError(t, err)
 
-	conn, err := ch.Open(opts)
+	conn, err := ch.Open(clickhouseOpts)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, conn.Close()) })
 
@@ -176,7 +181,7 @@ func splitSQLStatements(sql string) []string {
 
 // clickhouseSchemaDir returns the path to the ClickHouse schema directory.
 func clickhouseSchemaDir() string {
-	// Try Bazel runfiles first
+	// Try test runfiles first.
 	if runfiles := os.Getenv("TEST_SRCDIR"); runfiles != "" {
 		workspace := os.Getenv("TEST_WORKSPACE")
 		if workspace != "" {
@@ -191,15 +196,6 @@ func clickhouseSchemaDir() string {
 		}
 	}
 
-	// Fall back to relative path from this file
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		wd, err := os.Getwd()
-		if err != nil {
-			wd = "."
-		}
-		return filepath.Join(wd, "pkg", "clickhouse", "schema")
-	}
-	root := filepath.Dir(filepath.Dir(currentFile))
-	return filepath.Join(root, "clickhouse", "schema")
+	repoRoot := sourceRepoRoot()
+	return filepath.Join(repoRoot, "pkg", "clickhouse", "schema")
 }
