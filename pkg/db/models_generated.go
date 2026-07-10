@@ -485,6 +485,49 @@ func (ns NullDeploymentChangesResourceType) Value() (driver.Value, error) {
 	return string(ns.DeploymentChangesResourceType), nil
 }
 
+type DeploymentManifestsOutputMode string
+
+const (
+	DeploymentManifestsOutputModeContainer DeploymentManifestsOutputMode = "container"
+	DeploymentManifestsOutputModeStatic    DeploymentManifestsOutputMode = "static"
+	DeploymentManifestsOutputModeMixed     DeploymentManifestsOutputMode = "mixed"
+)
+
+func (e *DeploymentManifestsOutputMode) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentManifestsOutputMode(s)
+	case string:
+		*e = DeploymentManifestsOutputMode(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentManifestsOutputMode: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentManifestsOutputMode struct {
+	DeploymentManifestsOutputMode DeploymentManifestsOutputMode
+	Valid                         bool // Valid is true if DeploymentManifestsOutputMode is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentManifestsOutputMode) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentManifestsOutputMode, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentManifestsOutputMode.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentManifestsOutputMode) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentManifestsOutputMode), nil
+}
+
 type DeploymentStepsStep string
 
 const (
@@ -1195,6 +1238,21 @@ type DeploymentChange struct {
 	ResourceID   string                        `db:"resource_id"`
 	RegionID     string                        `db:"region_id"`
 	CreatedAt    int64                         `db:"created_at"`
+}
+
+type DeploymentManifest struct {
+	Pk            uint64                        `db:"pk"`
+	DeploymentID  string                        `db:"deployment_id"`
+	WorkspaceID   string                        `db:"workspace_id"`
+	ProjectID     string                        `db:"project_id"`
+	AppID         string                        `db:"app_id"`
+	EnvironmentID string                        `db:"environment_id"`
+	SchemaVersion uint64                        `db:"schema_version"`
+	Fingerprint   string                        `db:"fingerprint"`
+	AdapterID     string                        `db:"adapter_id"`
+	OutputMode    DeploymentManifestsOutputMode `db:"output_mode"`
+	Manifest      json.RawMessage               `db:"manifest"`
+	CreatedAt     int64                         `db:"created_at"`
 }
 
 type DeploymentStep struct {

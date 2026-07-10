@@ -21,6 +21,7 @@ export * from "./app_regional_settings";
 
 export * from "./app_environment_variables";
 export * from "./deployments";
+export * from "./deployment_manifests";
 export * from "./openapi_specs";
 export * from "./deployment_steps";
 export * from "./deployment_topology";
@@ -42,6 +43,5 @@ export * from "./deployment_changes";
 
 // Portal tables
 export * from "./portal_configurations";
-export * from "./portal_branding";
 export * from "./portal_session_tokens";
 export * from "./portal_sessions";

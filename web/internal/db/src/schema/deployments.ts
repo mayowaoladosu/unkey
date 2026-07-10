@@ -9,6 +9,7 @@ import {
   text,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { deploymentManifests } from "./deployment_manifests";
 import { deploymentSteps } from "./deployment_steps";
 import { environments } from "./environments";
 import { instances } from "./instances";
@@ -161,4 +162,8 @@ export const deploymentsRelations = relations(deployments, ({ one, many }) => ({
 
   instances: many(instances),
   steps: many(deploymentSteps),
+  manifest: one(deploymentManifests, {
+    fields: [deployments.id],
+    references: [deploymentManifests.deploymentId],
+  }),
 }));

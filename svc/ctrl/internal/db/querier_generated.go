@@ -27,7 +27,10 @@ type Querier interface {
 	DeleteAppBuildSettingsByEnvironmentId(ctx context.Context, environmentID string) error
 	//DeleteAppById
 	//
-	//  DELETE FROM apps WHERE id = ?
+	//  DELETE app_framework_detections, apps
+	//  FROM apps
+	//  LEFT JOIN app_framework_detections ON app_framework_detections.app_id = apps.id
+	//  WHERE apps.id = ?
 	DeleteAppById(ctx context.Context, id string) error
 	//DeleteAppEnvVarsByEnvironmentId
 	//
@@ -210,6 +213,21 @@ type Querier interface {
 	//  INNER JOIN app_runtime_settings ars ON ars.app_id = a.id AND ars.environment_id = ?
 	//  WHERE a.id = ?
 	FindAppWithSettings(ctx context.Context, arg FindAppWithSettingsParams) (FindAppWithSettingsRow, error)
+	//FindAppliedFrameworkDetection
+	//
+	//  SELECT
+	//      fingerprint,
+	//      detection_version,
+	//      detected_preset_id,
+	//      detection,
+	//      defaults
+	//  FROM app_framework_detections
+	//  WHERE workspace_id = ?
+	//    AND project_id = ?
+	//    AND app_id = ?
+	//    AND applied_fingerprint = fingerprint
+	//  LIMIT 1
+	FindAppliedFrameworkDetection(ctx context.Context, arg FindAppliedFrameworkDetectionParams) (FindAppliedFrameworkDetectionRow, error)
 	//FindCertificateByHostname
 	//
 	//  SELECT pk, id, workspace_id, hostname, certificate, encrypted_private_key, created_at, updated_at FROM certificates WHERE hostname = ?
@@ -303,6 +321,12 @@ type Querier interface {
 	//
 	//  SELECT pk, id, k8s_name, workspace_id, project_id, environment_id, app_id, image, build_id, git_commit_sha, git_branch, git_commit_message, git_commit_author_handle, git_commit_author_avatar_url, git_commit_timestamp, sentinel_config, cpu_millicores, memory_mib, storage_mib, desired_state, encrypted_environment_variables, command, port, shutdown_signal, upstream_protocol, healthcheck, pr_number, fork_repository_full_name, github_deployment_id, invocation_id, status, `trigger`, triggered_by, trigger_reason, created_at, updated_at FROM `deployments` WHERE k8s_name = ?
 	FindDeploymentByK8sName(ctx context.Context, k8sName string) (Deployment, error)
+	//FindDeploymentManifestByDeploymentID
+	//
+	//  SELECT pk, deployment_id, workspace_id, project_id, app_id, environment_id, schema_version, fingerprint, adapter_id, output_mode, manifest, created_at
+	//  FROM deployment_manifests
+	//  WHERE deployment_id = ?
+	FindDeploymentManifestByDeploymentID(ctx context.Context, deploymentID string) (DeploymentManifest, error)
 	// Returns all regions where a deployment is configured.
 	// Used for fan-out: when a deployment changes, emit state_change to each region.
 	//
@@ -841,6 +865,35 @@ type Querier interface {
 	//      ?
 	//  )
 	InsertDeploymentChange(ctx context.Context, arg InsertDeploymentChangeParams) error
+	//InsertDeploymentManifest
+	//
+	//  INSERT INTO deployment_manifests (
+	//      deployment_id,
+	//      workspace_id,
+	//      project_id,
+	//      app_id,
+	//      environment_id,
+	//      schema_version,
+	//      fingerprint,
+	//      adapter_id,
+	//      output_mode,
+	//      manifest,
+	//      created_at
+	//  )
+	//  VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	InsertDeploymentManifest(ctx context.Context, arg InsertDeploymentManifestParams) error
 	//InsertDeploymentStep
 	//
 	//  INSERT INTO `deployment_steps` (
