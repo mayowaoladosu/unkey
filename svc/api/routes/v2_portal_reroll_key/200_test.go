@@ -76,6 +76,67 @@ func TestPortalSessionRerollOwnKey(t *testing.T) {
 	require.Equal(t, identity.ID, newKey.IdentityID.String)
 }
 
+func TestPortalSessionRequiresRerollCapability(t *testing.T) {
+	h := testutil.NewHarness(t)
+
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
+
+	workspace := h.Resources().UserWorkspace
+	api := h.CreateApi(seed.CreateApiRequest{
+		WorkspaceID: workspace.ID,
+	})
+	identity := h.CreateIdentity(seed.CreateIdentityRequest{
+		WorkspaceID: workspace.ID,
+		ExternalID:  "portal_user_A",
+	})
+	key := h.CreateKey(seed.CreateKeyRequest{
+		WorkspaceID: workspace.ID,
+		KeySpaceID:  api.KeyAuthID.String,
+		IdentityID:  ptr.P(identity.ID),
+	})
+
+	headers := h.CreatePortalSession(
+		workspace.ID,
+		identity.ExternalID,
+		[]string{api.KeyAuthID.String},
+		[]string{"keys:create"},
+	)
+	res := testutil.CallRoute[Request, Response](h, route, headers, Request{KeyId: key.KeyID})
+
+	require.Equal(t, 403, res.Status, "keys:create must not authorize portal.rerollKey")
+}
+
+func TestPortalSessionCannotRerollKeyOutsideSessionKeyspaces(t *testing.T) {
+	h := testutil.NewHarness(t)
+
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
+
+	workspace := h.Resources().UserWorkspace
+	keyApi := h.CreateApi(seed.CreateApiRequest{WorkspaceID: workspace.ID})
+	sessionApi := h.CreateApi(seed.CreateApiRequest{WorkspaceID: workspace.ID})
+	identity := h.CreateIdentity(seed.CreateIdentityRequest{
+		WorkspaceID: workspace.ID,
+		ExternalID:  "portal_user_A",
+	})
+	key := h.CreateKey(seed.CreateKeyRequest{
+		WorkspaceID: workspace.ID,
+		KeySpaceID:  keyApi.KeyAuthID.String,
+		IdentityID:  ptr.P(identity.ID),
+	})
+
+	headers := h.CreatePortalSession(
+		workspace.ID,
+		identity.ExternalID,
+		[]string{sessionApi.KeyAuthID.String},
+		[]string{"keys:reroll"},
+	)
+	res := testutil.CallRoute[Request, Response](h, route, headers, Request{KeyId: key.KeyID})
+
+	require.Equal(t, 404, res.Status, "keys outside the session keyspaces must be hidden")
+}
+
 // TestPortalSessionCannotRerollOtherIdentityKey verifies a portal session
 // cannot reroll a key belonging to a different externalId and receives a 404
 // so the key's existence is not leaked.

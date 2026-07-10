@@ -7,6 +7,7 @@ import (
 
 	"github.com/unkeyed/unkey/internal/services/caches"
 	keysdb "github.com/unkeyed/unkey/internal/services/keys/db"
+	"github.com/unkeyed/unkey/pkg/auth/portalrbac"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/codes"
@@ -46,7 +47,7 @@ func (h *Handler) Method() string { return "POST" }
 func (h *Handler) Path() string { return "/v2/portal.getVerifications" }
 
 // Handle returns a verification timeseries scoped to the portal session's
-// external identity.
+// external identity and configured keyspaces.
 func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	principal, err := s.GetPrincipal()
 	if err != nil {
@@ -57,17 +58,14 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	if err != nil {
 		return err
 	}
+	keyspaceIDs, err := portalscope.KeyspaceIDs(s)
+	if err != nil {
+		return err
+	}
 
-	// The workspace owner controls whether a portal session may read analytics by
-	// including a read_analytics grant in the session permissions. Identity scoping
-	// already restricts *what* is returned to the session's own events; this gates
-	// whether analytics is exposed to this end user at all. The query spans all of
-	// the identity's keys across every API, so require the wildcard grant.
-	err = principal.Authorize(rbac.T(rbac.Tuple{
-		ResourceType: rbac.Api,
-		ResourceID:   "*",
-		Action:       rbac.ReadAnalytics,
-	}))
+	// Capability and identity scope are separate: this gates the action while the
+	// ClickHouse query below fixes the visible data to the session external ID.
+	err = principal.Authorize(rbac.S(string(portalrbac.CapAnalyticsRead)))
 	if err != nil {
 		return err
 	}
@@ -113,6 +111,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	points, err := h.ClickHouse.GetVerificationsByExternalID(ctx, clickhouse.VerificationTimeseriesRequest{
 		WorkspaceID: principal.WorkspaceID,
 		ExternalID:  externalID,
+		KeyspaceIDs: keyspaceIDs,
 		KeyID:       ptr.SafeDeref(req.KeyId),
 		StartTime:   req.StartTime,
 		EndTime:     req.EndTime,

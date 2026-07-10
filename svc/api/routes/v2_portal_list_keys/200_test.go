@@ -141,6 +141,25 @@ func TestPortalSessionScopesToOwnExternalID(t *testing.T) {
 	require.True(t, returnedIDs[setup.key2ID], "key2 should be in results")
 }
 
+func TestPortalSessionListKeysRequiresKeysRead(t *testing.T) {
+	h := testutil.NewHarness(t)
+
+	route := newHandler(h)
+	h.Register(route, h.PortalMiddleware()...)
+
+	setup := setupPortalSessionTest(t, h)
+	headers := h.CreatePortalSession(
+		setup.workspace.ID,
+		setup.identity1ExternalID,
+		[]string{setup.keySpaceID},
+		[]string{"keys:reroll"},
+	)
+
+	res := testutil.CallRoute[Request, Response](h, route, headers, Request{})
+
+	require.Equal(t, 403, res.Status, "keys:reroll must not authorize portal.listKeys")
+}
+
 func TestPortalSessionUnionsConfiguredKeyspaces(t *testing.T) {
 	h := testutil.NewHarness(t)
 

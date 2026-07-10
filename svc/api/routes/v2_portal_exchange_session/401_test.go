@@ -3,7 +3,6 @@ package handler_test
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -51,7 +50,7 @@ func TestExchangeSessionUnauthorized(t *testing.T) {
 
 	t.Run("expired session token", func(t *testing.T) {
 		tokenID := uid.New(uid.PortalSessionTokenPrefix)
-		perms, _ := json.Marshal([]string{"api.*.read_key"})
+		permissions := marshalPortalGrant(t, []string{}, []string{"keys:read"})
 
 		// Insert a token that expired 1 hour ago.
 		err := db.Query.InsertPortalSessionToken(ctx, h.DB.RW(), db.InsertPortalSessionTokenParams{
@@ -59,7 +58,7 @@ func TestExchangeSessionUnauthorized(t *testing.T) {
 			WorkspaceID:    workspaceID,
 			PortalConfigID: portalConfigID,
 			ExternalID:     "user_expired",
-			Permissions:    perms,
+			Permissions:    permissions,
 			ExpiresAt:      now - int64(time.Hour/time.Millisecond),
 			CreatedAt:      now - int64(2*time.Hour/time.Millisecond),
 		})
@@ -73,7 +72,7 @@ func TestExchangeSessionUnauthorized(t *testing.T) {
 
 	t.Run("already exchanged session token", func(t *testing.T) {
 		tokenID := uid.New(uid.PortalSessionTokenPrefix)
-		perms, _ := json.Marshal([]string{"api.*.read_key"})
+		permissions := marshalPortalGrant(t, []string{}, []string{"keys:read"})
 
 		// Insert a valid token that is already exchanged.
 		err := db.Query.InsertPortalSessionToken(ctx, h.DB.RW(), db.InsertPortalSessionTokenParams{
@@ -81,7 +80,7 @@ func TestExchangeSessionUnauthorized(t *testing.T) {
 			WorkspaceID:    workspaceID,
 			PortalConfigID: portalConfigID,
 			ExternalID:     "user_exchanged",
-			Permissions:    perms,
+			Permissions:    permissions,
 			ExpiresAt:      now + int64(15*time.Minute/time.Millisecond),
 			CreatedAt:      now,
 		})

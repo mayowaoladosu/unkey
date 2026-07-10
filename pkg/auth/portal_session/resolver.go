@@ -46,19 +46,15 @@ func (r *Resolver) Resolve(ctx context.Context, sess *zen.Session) (*principal.P
 		return nil, err
 	}
 
-	// Translate the session's simplified capability model (keyspace ids + verbs)
-	// into the RBAC permission strings the shared handlers check. This is the one
-	// place the portal capability vocabulary is mapped onto RBAC — see the
-	// portalrbac package.
+	// Validate the persisted strings before exposing them as exact-match grants.
 	capabilities, err := portalrbac.ParseAll(session.Permissions)
 	if err != nil {
 		return nil, err
 	}
-	permissions := portalrbac.Grant{
-		WorkspaceID:  session.WorkspaceID,
-		KeyspaceIDs:  session.KeyspaceIDs,
-		Capabilities: capabilities,
-	}.Expand()
+	permissions := make([]string, len(capabilities))
+	for i, capability := range capabilities {
+		permissions[i] = string(capability)
+	}
 
 	return &principal.Principal{
 		Version: principal.Version,

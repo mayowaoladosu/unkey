@@ -3,18 +3,20 @@ package clickhouse
 import (
 	"context"
 	"fmt"
-	"strconv"
 
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/unkeyed/unkey/pkg/fault"
 )
 
 // VerificationTimeseriesRequest scopes a verification timeseries to a single
-// portal end user. WorkspaceID and ExternalID are required; KeyID optionally
-// narrows to one key. StartTime and EndTime bound the window in unix
-// milliseconds (StartTime inclusive, EndTime exclusive).
+// portal end user within an explicit set of keyspaces. WorkspaceID, ExternalID,
+// and KeyspaceIDs are required; KeyID optionally narrows to one key. StartTime
+// and EndTime bound the window in unix milliseconds (StartTime inclusive,
+// EndTime exclusive).
 type VerificationTimeseriesRequest struct {
 	WorkspaceID string
 	ExternalID  string
+	KeyspaceIDs []string
 	KeyID       string
 	StartTime   int64
 	EndTime     int64
@@ -60,14 +62,15 @@ func selectVerificationInterval(windowMs int64) verificationInterval {
 }
 
 // GetVerificationsByExternalID returns a zero-filled verification timeseries for
-// one end user (workspace_id + external_id), optionally narrowed to a single
+// one end user within the requested keyspaces, optionally narrowed to a single
 // key. Bucket granularity is chosen from the window size. Empty buckets are
 // returned with zero counts so callers get a contiguous series.
 //
 // The query runs on the shared ClickHouse connection (not a per-workspace user)
-// and filters on external_id, which is denormalized onto each event at write
-// time. This is the portal-scoped read: the workspace and identity are pinned by
-// the caller, so no query DSL or per-workspace connection is involved.
+// and filters on key_space_id and external_id, which are denormalized onto each
+// event at write time. This is the portal-scoped read: the workspace, keyspaces,
+// and identity are pinned by the caller, so no query DSL or per-workspace
+// connection is involved.
 func (c *Client) GetVerificationsByExternalID(ctx context.Context, req VerificationTimeseriesRequest) ([]VerificationTimeseriesDataPoint, error) {
 	iv := selectVerificationInterval(req.EndTime - req.StartTime)
 
@@ -89,27 +92,33 @@ func (c *Client) GetVerificationsByExternalID(ctx context.Context, req Verificat
 		toInt64(SUM(IF(outcome = 'EXPIRED', count, 0))) AS expired,
 		toInt64(SUM(IF(outcome = 'USAGE_EXCEEDED', count, 0))) AS usage_exceeded
 	FROM %[2]s
-	WHERE workspace_id = {workspace_id:String}
-		AND external_id = {external_id:String}
-		AND time >= fromUnixTimestamp64Milli({start:Int64})
-		AND time < fromUnixTimestamp64Milli({end:Int64})
-		AND ({key_id:String} = '' OR key_id = {key_id:String})
+	WHERE workspace_id = @workspace_id
+		AND external_id = @external_id
+		AND key_space_id IN @keyspace_ids
+		AND time >= fromUnixTimestamp64Milli(@start)
+		AND time < fromUnixTimestamp64Milli(@end)
+		AND (@key_id = '' OR key_id = @key_id)
 	GROUP BY x
 	ORDER BY x ASC
 	WITH FILL
-		FROM toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli({start:Int64}), INTERVAL 1 %[1]s) AS DateTime64(3)))
-		TO toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli({end:Int64}), INTERVAL 1 %[1]s) AS DateTime64(3))) + %[3]d
+		FROM toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli(@start), INTERVAL 1 %[1]s) AS DateTime64(3)))
+		TO toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli(@end), INTERVAL 1 %[1]s) AS DateTime64(3))) + %[3]d
 		STEP %[3]d`,
 		iv.unit, iv.table, iv.stepMs,
 	)
 
-	results, err := Select[VerificationTimeseriesDataPoint](ctx, c.conn, query, map[string]string{
-		"workspace_id": req.WorkspaceID,
-		"external_id":  req.ExternalID,
-		"key_id":       req.KeyID,
-		"start":        strconv.FormatInt(req.StartTime, 10),
-		"end":          strconv.FormatInt(req.EndTime, 10),
-	})
+	results, err := Select[VerificationTimeseriesDataPoint](
+		ctx,
+		c.conn,
+		query,
+		nil,
+		ch.Named("workspace_id", req.WorkspaceID),
+		ch.Named("external_id", req.ExternalID),
+		ch.Named("keyspace_ids", req.KeyspaceIDs),
+		ch.Named("key_id", req.KeyID),
+		ch.Named("start", req.StartTime),
+		ch.Named("end", req.EndTime),
+	)
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Internal("failed to query verification timeseries"))
 	}

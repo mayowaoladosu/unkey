@@ -18,9 +18,8 @@ type SessionInfo struct {
 	// KeyspaceIDs scopes the session's key capabilities to a set of keyspaces.
 	KeyspaceIDs []string
 
-	// Permissions is the session's simplified capability verbs (e.g. "keys:reroll",
-	// "analytics:read"). The portal_session resolver expands these into RBAC
-	// permission strings via portalrbac.
+	// Permissions is the persisted capability vocabulary. The portal session
+	// resolver validates it before constructing a principal.
 	Permissions []string
 }
 

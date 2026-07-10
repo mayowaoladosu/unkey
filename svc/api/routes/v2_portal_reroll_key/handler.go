@@ -2,9 +2,12 @@ package handler
 
 import (
 	"context"
+	"slices"
 
+	"github.com/unkeyed/unkey/pkg/auth/portalrbac"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/fault"
+	"github.com/unkeyed/unkey/pkg/rbac"
 	"github.com/unkeyed/unkey/pkg/zen"
 	"github.com/unkeyed/unkey/svc/api/internal/portalscope"
 	rerollkey "github.com/unkeyed/unkey/svc/api/routes/v2_keys_reroll_key"
@@ -49,6 +52,10 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	if err != nil {
 		return err
 	}
+	keyspaceIDs, err := portalscope.KeyspaceIDs(s)
+	if err != nil {
+		return err
+	}
 
 	req, err := zen.BindBody[rerollkey.Request](s)
 	if err != nil {
@@ -64,6 +71,7 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 	// own external identity within its own workspace. Fail closed with a 404 so
 	// the caller cannot probe for keys it does not own.
 	if key.WorkspaceID != principal.WorkspaceID ||
+		!slices.Contains(keyspaceIDs, key.KeyAuthID) ||
 		!key.IdentityExternalID.Valid ||
 		key.IdentityExternalID.String != externalID {
 		return fault.New("key not found",
@@ -71,6 +79,9 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 			fault.Internal("key does not belong to portal session identity"),
 			fault.Public("The specified key was not found."),
 		)
+	}
+	if err := principal.Authorize(rbac.S(string(portalrbac.CapKeysReroll))); err != nil {
+		return err
 	}
 
 	return h.reroll.RerollKey(ctx, s, req, key)

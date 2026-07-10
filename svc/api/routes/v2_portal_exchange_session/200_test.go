@@ -15,6 +15,20 @@ import (
 	handler "github.com/unkeyed/unkey/svc/api/routes/v2_portal_exchange_session"
 )
 
+func marshalPortalGrant(t *testing.T, keyspaceIDs, permissions []string) []byte {
+	t.Helper()
+
+	grant, err := json.Marshal(struct {
+		KeyspaceIDs []string `json:"keyspaceIds"`
+		Permissions []string `json:"permissions"`
+	}{
+		KeyspaceIDs: keyspaceIDs,
+		Permissions: permissions,
+	})
+	require.NoError(t, err)
+	return grant
+}
+
 func TestExchangeSessionSuccess(t *testing.T) {
 	h := testutil.NewHarness(t)
 	ctx := context.Background()
@@ -26,11 +40,12 @@ func TestExchangeSessionSuccess(t *testing.T) {
 	portalConfigID := uid.New(uid.PortalConfigPrefix)
 	now := time.Now().UnixMilli()
 
+	keyspaceID := uid.New(uid.KeySpacePrefix)
 	err := db.Query.InsertPortalConfig(ctx, h.DB.RW(), db.InsertPortalConfigParams{
 		ID:          portalConfigID,
 		WorkspaceID: workspaceID,
 		Slug:        "test-portal",
-		KeyAuthID:   sql.NullString{Valid: true, String: uid.New(uid.KeySpacePrefix)},
+		KeyAuthID:   sql.NullString{Valid: true, String: keyspaceID},
 		Enabled:     true,
 		CreatedAt:   now,
 	})
@@ -42,14 +57,14 @@ func TestExchangeSessionSuccess(t *testing.T) {
 
 	t.Run("valid exchange", func(t *testing.T) {
 		tokenID := uid.New(uid.PortalSessionTokenPrefix)
-		perms, _ := json.Marshal([]string{"api.*.read_key", "api.*.read_analytics"})
+		permissions := marshalPortalGrant(t, []string{keyspaceID}, []string{"keys:read", "keys:reroll"})
 
 		err := db.Query.InsertPortalSessionToken(ctx, h.DB.RW(), db.InsertPortalSessionTokenParams{
 			ID:             tokenID,
 			WorkspaceID:    workspaceID,
 			PortalConfigID: portalConfigID,
 			ExternalID:     "user_valid",
-			Permissions:    perms,
+			Permissions:    permissions,
 			ExpiresAt:      now + int64(15*time.Minute/time.Millisecond),
 			CreatedAt:      now,
 		})
@@ -82,18 +97,19 @@ func TestExchangeSessionSuccess(t *testing.T) {
 		require.Equal(t, workspaceID, session.WorkspaceID)
 		require.Equal(t, "user_valid", session.ExternalID)
 		require.Equal(t, portalConfigID, session.PortalConfigID)
+		require.JSONEq(t, string(permissions), string(session.Permissions))
 	})
 
 	t.Run("single-use enforcement", func(t *testing.T) {
 		tokenID := uid.New(uid.PortalSessionTokenPrefix)
-		perms, _ := json.Marshal([]string{"api.*.read_key"})
+		permissions := marshalPortalGrant(t, []string{keyspaceID}, []string{"keys:read"})
 
 		err := db.Query.InsertPortalSessionToken(ctx, h.DB.RW(), db.InsertPortalSessionTokenParams{
 			ID:             tokenID,
 			WorkspaceID:    workspaceID,
 			PortalConfigID: portalConfigID,
 			ExternalID:     "user_single_use",
-			Permissions:    perms,
+			Permissions:    permissions,
 			ExpiresAt:      now + int64(15*time.Minute/time.Millisecond),
 			CreatedAt:      now,
 		})

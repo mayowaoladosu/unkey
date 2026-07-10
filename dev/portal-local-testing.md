@@ -52,7 +52,7 @@ go run . dev seed local --slug awesome --portal
 Save the root key printed at the end (e.g. `unkey_xxx`).
 
 The portal slug is the value you passed to `--slug` (e.g. `awesome`). Use
-it in `createSession` calls — it's also written to `dev/.env.seed` as
+it in `createSession` calls. It's also written to `dev/.env.seed` as
 `UNKEY_PORTAL_SLUG`.
 
 ---
@@ -92,7 +92,7 @@ The portal is port-forwarded to `http://localhost:3100`.
 curl -s -X POST http://localhost:7070/v2/portal.createSession \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <ROOT_KEY>" \
-  -d '{"slug": "awesome", "externalId": "user_123", "permissions": ["api.*.read_key", "api.*.create_key", "api.*.read_analytics"]}'
+  -d '{"slug": "awesome", "externalId": "user_123", "permissions": ["keys:read", "keys:create", "keys:reroll", "analytics:read"]}'
 ```
 
 Open `http://localhost:3100/?session=pst_xxx` in the browser.
@@ -124,7 +124,7 @@ Runs on `http://localhost:3100`. Port 3100 avoids conflict with the dashboard.
 curl -s -X POST http://localhost:7070/v2/portal.createSession \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <ROOT_KEY>" \
-  -d '{"slug": "awesome", "externalId": "user_123", "permissions": ["api.*.read_key", "api.*.create_key", "api.*.read_analytics"]}'
+  -d '{"slug": "awesome", "externalId": "user_123", "permissions": ["keys:read", "keys:create", "keys:reroll", "analytics:read"]}'
 ```
 
 Take the `sessionId` from the response and open:
@@ -143,7 +143,7 @@ Deploy the portal as an app on Unkey Deploy.
 In the Unkey dashboard, create a project for the portal (or use an existing
 internal project). Add an app with:
 - Dockerfile path: `web/apps/portal/Dockerfile`
-- Docker context: `.` (repo root — the Dockerfile uses `web/` paths)
+- Docker context: `.` (repo root because the Dockerfile uses `web/` paths)
 - Default branch: `main` (or your feature branch)
 
 ### 2. Configure environment variables
@@ -180,7 +180,7 @@ like `<app-slug>-<env>.unkey.com`.
 curl -s -X POST https://api.unkey.dev/v2/portal.createSession \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <ROOT_KEY>" \
-  -d '{"slug": "<YOUR_SLUG>", "externalId": "user_123", "permissions": ["api.*.read_key", "api.*.create_key", "api.*.read_analytics"]}'
+  -d '{"slug": "<YOUR_SLUG>", "externalId": "user_123", "permissions": ["keys:read", "keys:create", "keys:reroll", "analytics:read"]}'
 ```
 
 The response URL will point to the portal's deployment URL (or custom
@@ -192,7 +192,7 @@ domain if configured). Open it in the browser.
   deployment URL for session redirect URLs to work correctly.
 - For preview environments, you may need to manually adjust the session URL
   domain if `portal_base_url` points to production.
-- Custom domains work the same as any Deploy app — add the domain in the
+- Custom domains work the same as any Deploy app. Add the domain in the
   dashboard, set the CNAME, and certificates are provisioned automatically.
 
 ---

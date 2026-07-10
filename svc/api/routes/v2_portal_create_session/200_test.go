@@ -64,7 +64,7 @@ func TestCreateSessionSuccess(t *testing.T) {
 		req := handler.Request{
 			Slug:        "test-portal",
 			ExternalId:  "user_123",
-			Permissions: []openapi.V2PortalCreateSessionRequestBodyPermissions{"keys:read"},
+			Permissions: []openapi.V2PortalCreateSessionRequestBodyPermissions{"keys:read", "analytics:read"},
 		}
 
 		res := testutil.CallRoute[handler.Request, handler.Response](h, route, headers, req)
