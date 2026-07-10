@@ -62,6 +62,10 @@ function FormSelect({
         tooltipContent={descriptionAsTooltip ? description : undefined}
       />
       <Select
+        // Base UI's Select.Value renders the raw value unless Root gets an
+        // items map — without this, triggers show e.g. "basic_member" instead
+        // of "Member".
+        items={options.map((opt) => ({ value: opt.value, label: opt.label }))}
         value={value}
         onValueChange={(newValue) => {
           if (newValue !== null) {

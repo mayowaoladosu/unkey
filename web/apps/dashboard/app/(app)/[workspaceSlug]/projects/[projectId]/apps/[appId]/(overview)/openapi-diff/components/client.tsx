@@ -184,6 +184,12 @@ export const DiffViewerContent: React.FC<DiffViewerContentProps> = ({
               level: value === "all" ? null : Number(value),
             }))
           }
+          items={[
+            { value: "all", label: "All levels" },
+            { value: "3", label: "Breaking only" },
+            { value: "2", label: "Warnings only" },
+            { value: "1", label: "Info only" },
+          ]}
         >
           <SelectTrigger wrapperClassName="w-[150px] rounded-md" className="h-9 rounded-md">
             <SelectValue placeholder="All levels" />
@@ -202,6 +208,10 @@ export const DiffViewerContent: React.FC<DiffViewerContentProps> = ({
               setFilters((p) => ({ ...p, operation: value }));
             }
           }}
+          items={[
+            { value: "all", label: "All methods" },
+            ...stats.operations.map((op) => ({ value: op, label: op })),
+          ]}
         >
           <SelectTrigger wrapperClassName="w-[150px] rounded-md" className="h-9 rounded-md">
             <SelectValue placeholder="All methods" />

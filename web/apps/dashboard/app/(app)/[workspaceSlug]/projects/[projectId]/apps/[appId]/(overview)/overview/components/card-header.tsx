@@ -9,7 +9,7 @@ import {
   Plus,
   TriangleWarning2,
 } from "@unkey/icons";
-import { Button, HoverCard, HoverCardContent, HoverCardTrigger } from "@unkey/ui";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@unkey/ui";
 import Link from "next/link";
 import { ProductionCardActionsMenu } from "./production-card-actions-menu";
 import { useProductionCard } from "./production-card-context";
@@ -33,17 +33,19 @@ function DomainHero() {
         </span>
       )}
       {additionalDomains.length > 0 && (
-        <HoverCard>
-          <HoverCardTrigger
+        <Popover>
+          {/* A real button trigger so the domain links are reachable by
+              keyboard; openOnHover preserves the old hover-card behavior. */}
+          <PopoverTrigger
+            openOnHover
             delay={0}
             closeDelay={100}
-            render={
-              <span className="rounded-full px-1.5 py-0.5 bg-grayA-3 text-gray-12 text-[11px] leading-[18px] font-mono tabular-nums shrink-0 cursor-default">
-                +{additionalDomains.length}
-              </span>
-            }
-          />
-          <HoverCardContent align="start" className="w-64 p-1">
+            className="rounded-full px-1.5 py-0.5 bg-grayA-3 text-gray-12 text-[11px] leading-[18px] font-mono tabular-nums shrink-0"
+            aria-label={`Show ${additionalDomains.length} more domains`}
+          >
+            +{additionalDomains.length}
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-1">
             <div className="flex flex-col max-h-64 overflow-y-auto">
               {additionalDomains.map((domain) => (
                 <a
@@ -58,8 +60,8 @@ function DomainHero() {
                 </a>
               ))}
             </div>
-          </HoverCardContent>
-        </HoverCard>
+          </PopoverContent>
+        </Popover>
       )}
       {addCustomDomainHref && (
         <Button

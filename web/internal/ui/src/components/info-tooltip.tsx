@@ -1,4 +1,5 @@
-import React, { type PropsWithChildren } from "react";
+import type React from "react";
+import type { PropsWithChildren } from "react";
 import { cn } from "../lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
 
@@ -39,13 +40,12 @@ const InfoTooltip = ({
   className?: string;
   triggerClassName?: string;
 }>) => {
-  // Keep `open` always controlled (a boolean) so Base UI never sees it switch
-  // between controlled and uncontrolled when `disabled` toggles. When disabled,
-  // force closed; otherwise track hover/focus via internal state.
-  const [open, setOpen] = React.useState(false);
   return (
     <TooltipProvider delay={delayDuration ?? undefined}>
-      <Tooltip open={disabled ? false : open} onOpenChange={setOpen}>
+      {/* Base UI's own `disabled` prop keeps the root uncontrolled and clears
+          open state properly — no controlled/uncontrolled flip, no stale open
+          state surviving a disabled toggle. */}
+      <Tooltip disabled={disabled}>
         {asChild ? (
           <TooltipTrigger className={triggerClassName} render={children as React.ReactElement} />
         ) : (

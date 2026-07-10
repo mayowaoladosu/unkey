@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Check, ChevronExpandY } from "@unkey/icons";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@unkey/ui";
+import { Button, Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@unkey/ui";
 import { cva } from "class-variance-authority";
 import * as React from "react";
 
@@ -295,6 +295,10 @@ export function Combobox({
             </CommandGroup>
           </CommandList>
         </Command>
+        {/* Base UI only enables the modal focus trap when a Close element is
+            rendered inside the popup, so keep this even though it is visually
+            hidden. */}
+        <PopoverClose className="sr-only">Close</PopoverClose>
       </PopoverContent>
     </Popover>
   );

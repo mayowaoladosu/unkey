@@ -40,9 +40,9 @@ export function PreviewSwitcher({ value, onSelect }: Props) {
           }
         />
         <DropdownMenuContent align="end" side="top" className="min-w-48">
-          <DropdownMenuLabel>Preview state</DropdownMenuLabel>
-          <DropdownMenuSeparator />
           <DropdownMenuGroup>
+            <DropdownMenuLabel>Preview state</DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {STATE_ORDER.map((state) => {
               const { label, description } = STATES[state];
               return (

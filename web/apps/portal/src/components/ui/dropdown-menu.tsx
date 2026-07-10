@@ -2,7 +2,6 @@
 
 import { Menu as DropdownMenuPrimitive } from "@base-ui/react/menu";
 import { type VariantProps, cva } from "class-variance-authority";
-import type * as React from "react";
 import { cn } from "~/lib/utils";
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -74,12 +73,14 @@ export function DropdownMenuItem({ className, variant, ...props }: DropdownMenuI
   );
 }
 
-// Base UI's Menu.GroupLabel throws unless nested in a Menu.Group; portal uses
-// this label as a free-floating heading (as Radix allowed), so render a plain
-// element to preserve behavior.
-export function DropdownMenuLabel({ className, ...props }: React.ComponentProps<"div">) {
+// Menu.GroupLabel wires the group's aria-labelledby; every DropdownMenuLabel
+// call site must therefore sit inside a DropdownMenuGroup.
+export function DropdownMenuLabel({ className, ...props }: DropdownMenuPrimitive.GroupLabel.Props) {
   return (
-    <div className={cn("px-2 py-1.5 font-medium text-gray-11 text-xs", className)} {...props} />
+    <DropdownMenuPrimitive.GroupLabel
+      className={cn("px-2 py-1.5 font-medium text-gray-11 text-xs", className)}
+      {...props}
+    />
   );
 }
 

@@ -33,6 +33,13 @@ export function EnvironmentSelect() {
   return (
     <Select
       value={currentValue}
+      items={[
+        { value: "all", label: "All Environments" },
+        ...environments.map((env) => ({
+          value: env.slug,
+          label: env.slug.charAt(0).toUpperCase() + env.slug.slice(1),
+        })),
+      ]}
       onValueChange={(newValue) => {
         if (newValue !== null) {
           handleChange(newValue);

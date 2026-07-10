@@ -154,7 +154,7 @@ export const DisplayPopover = ({ children }: PropsWithChildren) => {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger nativeButton={false} render={children as React.ReactElement} />
+      <PopoverTrigger render={children as React.ReactElement} />
       <PopoverContent
         className="bg-gray-1 dark:bg-black drop-shadow-2xl transform-gpu p-2 border-gray-6 rounded-lg w-96"
         align="start"

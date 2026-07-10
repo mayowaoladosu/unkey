@@ -79,7 +79,7 @@ export function SelectContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        alignItemWithTrigger={alignItemWithTrigger}
+        alignItemWithTrigger={alignItemWithTrigger ?? false}
       >
         <SelectPrimitive.Popup
           className={cn(

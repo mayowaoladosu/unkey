@@ -61,6 +61,10 @@ export const RoleSwitcher = memo<RoleSwitcherProps>(
         <div className="w-fit">
           <Select
             value={role}
+            items={[
+              { value: "admin", label: "Admin" },
+              { value: "basic_member", label: "Member" },
+            ]}
             disabled={isCurrentUser || updateMember.isLoading}
             onValueChange={(newRole) => {
               if (newRole !== null) {

@@ -62,8 +62,8 @@ export function KeysToolbar({ searchValue, onSearchChange, statusValue, onStatus
           }
         />
         <DropdownMenuContent align="start" className="min-w-44">
-          <DropdownMenuLabel>Key status</DropdownMenuLabel>
           <DropdownMenuGroup>
+            <DropdownMenuLabel>Key status</DropdownMenuLabel>
             {STATUS_FILTERS.map((value) => (
               <DropdownMenuItem
                 key={value}

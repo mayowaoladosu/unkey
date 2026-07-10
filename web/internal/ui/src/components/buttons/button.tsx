@@ -1,9 +1,26 @@
 "use client";
 import { Button as ButtonPrimitive } from "@base-ui/react/button";
+import { useRender } from "@base-ui/react/use-render";
 import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 import { cn } from "../../lib/utils";
 import { AnimatedLoadingSpinner } from "../animated-loading-spinner";
+
+// Render-target composition WITHOUT button semantics. `render` targets are
+// links/anchors (Next.js <Link>, <a>); routing them through the Base UI Button
+// primitive would bolt role="button" + keyboard handlers onto a link, which is
+// wrong semantics. useRender composes the element with the button's visual
+// classes only.
+function ButtonRenderSlot({
+  render,
+  ref,
+  ...props
+}: {
+  render: React.ReactElement;
+  ref?: React.Ref<HTMLElement>;
+} & React.HTMLAttributes<HTMLElement>) {
+  return useRender({ render, ref, props });
+}
 
 // Hack to populate fumadocs' AutoTypeTable
 export type DocumentedButtonProps = VariantProps<typeof buttonVariants> & {
@@ -355,16 +372,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       return () => document.removeEventListener("keydown", down);
     }, [props.keyboard, isClickDisabled]);
 
-    // When `render` is provided (custom element/component), render only the
-    // children — the loading spinner and keyboard hint are omitted, matching
-    // the previous `asChild` behavior.
+    // When `render` is provided (custom element/component, typically a link),
+    // compose it directly with the button's visual classes — no Base UI Button
+    // primitive, so the link keeps link semantics (no role="button", no
+    // synthetic keyboard handlers, no disabled-button behavior). Only the
+    // children render — the loading spinner and keyboard hint are omitted,
+    // matching the previous `asChild` behavior.
     if (render) {
       return (
-        <ButtonPrimitive
-          render={render}
-          // `render` targets are typically non-button elements (e.g. a Next.js
-          // <Link>/<a>), so tell Base UI not to assume native button semantics.
-          nativeButton={false}
+        <ButtonRenderSlot
+          render={render as React.ReactElement}
           className={cn(
             buttonVariants({
               variant: mappedVariant,
@@ -374,14 +391,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             }),
           )}
           onClick={loading ? undefined : props.onClick}
-          disabled={isVisuallyDisabled}
-          aria-disabled={isClickDisabled}
-          aria-busy={loading}
-          ref={ref}
-          {...props}
-        >
-          {props.children}
-        </ButtonPrimitive>
+          aria-disabled={isClickDisabled || undefined}
+          aria-busy={loading || undefined}
+          ref={ref as React.Ref<HTMLElement>}
+          {...(props as React.HTMLAttributes<HTMLElement>)}
+        />
       );
     }
 

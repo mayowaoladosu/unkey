@@ -13,6 +13,9 @@ const TabsList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
+    // Radix parity: Radix activated tabs as arrow-key focus moved; Base UI
+    // defaults to manual activation (Enter/Space). Restore automatic activation.
+    activateOnFocus
     className={cn(
       "inline-flex h-10 items-center justify-center rounded-md bg-gray-2 p-1 text-gray-11",
       className,

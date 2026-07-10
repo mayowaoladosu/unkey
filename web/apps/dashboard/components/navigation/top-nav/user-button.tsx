@@ -49,11 +49,16 @@ export const UserButton: React.FC<UserButtonProps> = ({ isCollapsed = false, cla
       <DropdownMenuContent side="bottom" className="flex w-min-44 flex-col gap-2" align="end">
         {user?.email && (
           <>
-            <DropdownMenuLabel className="font-normal">
-              <span title={user.email} className="text-accent-11 text-xs truncate max-w-44 secret">
-                {user.email}
-              </span>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="font-normal">
+                <span
+                  title={user.email}
+                  className="text-accent-11 text-xs truncate max-w-44 secret"
+                >
+                  {user.email}
+                </span>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
           </>
         )}

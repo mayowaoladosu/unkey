@@ -51,6 +51,10 @@ export function EnvVarsToolbar({
       <div className="flex-[25%] max-w-[184px]">
         <Select
           value={environmentFilter}
+          items={[
+            { value: "all", label: "All Environments" },
+            ...environments.map((env) => ({ value: env.id, label: env.slug })),
+          ]}
           onValueChange={(value) => {
             if (value !== null) {
               onEnvironmentFilterChange(value);
@@ -77,6 +81,10 @@ export function EnvVarsToolbar({
       <div className="flex-[25%] max-w-[184px]">
         <Select
           value={sortBy}
+          items={[
+            { value: "last-updated", label: "Last Updated" },
+            { value: "name-asc", label: "Name A-Z" },
+          ]}
           onValueChange={(v) => {
             if (v !== null && isSortOption(v)) {
               onSortChange(v);

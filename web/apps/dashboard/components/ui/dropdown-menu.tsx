@@ -59,7 +59,7 @@ const DropdownMenuSubContent = React.forwardRef<
         <DropdownMenuPrimitive.Popup
           ref={ref}
           className={cn(
-            "z-50 min-w-32 overflow-hidden rounded-md border bg-secondary p-1 text-secondary-foreground shadow-lg outline-none transition-[opacity,transform] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2",
+            "z-50 min-w-32 overflow-hidden rounded-md border bg-secondary p-1 text-secondary-foreground shadow-lg outline-none transition-[opacity,scale,translate] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2",
             className,
           )}
           {...props}
@@ -86,7 +86,7 @@ const DropdownMenuContent = React.forwardRef<
       <DropdownMenuPrimitive.Popup
         ref={ref}
         className={cn(
-          "z-50 min-w-32 overflow-hidden rounded-lg border border-gray-6 bg-white dark:bg-black p-2 text-gray-12 shadow-md outline-none transition-[opacity,transform] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2",
+          "z-50 min-w-32 overflow-hidden rounded-lg border border-gray-6 bg-white dark:bg-black p-2 text-gray-12 shadow-md outline-none transition-[opacity,scale,translate] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2",
           className,
         )}
         {...props}
@@ -159,16 +159,15 @@ const DropdownMenuRadioItem = React.forwardRef<
 ));
 DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName;
 
-// Radix's DropdownMenu.Label was a standalone label; Base UI's Menu.GroupLabel
-// requires a surrounding <Menu.Group>, so a bare <DropdownMenuLabel> (as used in
-// e.g. the user button) crashes. Render a plain <div> to match Radix behavior.
+// Menu.GroupLabel wires the group's aria-labelledby; every DropdownMenuLabel
+// call site must therefore sit inside a DropdownMenuGroup.
 const DropdownMenuLabel = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
+  React.ElementRef<typeof DropdownMenuPrimitive.GroupLabel>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.GroupLabel> & {
     inset?: boolean;
   }
 >(({ className, inset, ...props }, ref) => (
-  <div
+  <DropdownMenuPrimitive.GroupLabel
     ref={ref}
     className={cn("px-2 py-1.5 text-xs font-medium text-gray-11", inset && "pl-8", className)}
     {...props}

@@ -8,6 +8,8 @@ import { cn } from "../lib/utils";
 type SliderProps = SliderPrimitive.Root.Props<number[]> & {
   rangeClassName?: string;
   rangeStyle?: React.CSSProperties;
+  /** Accessible name for each thumb (Base UI thumbs render a nested range input). */
+  getAriaLabel?: (index: number) => string;
 };
 
 const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
@@ -20,6 +22,7 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
       defaultValue,
       onValueChange,
       onValueCommitted,
+      getAriaLabel,
       ...props
     },
     ref,
@@ -45,9 +48,11 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
         {...props}
       >
         <SliderPrimitive.Control className="relative flex w-full touch-none select-none items-center">
-          <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-grayA-3">
+          {/* No overflow-hidden here: Base UI nests the 16px thumbs INSIDE the
+              6px track, so clipping would shrink their visible size and hit area. */}
+          <SliderPrimitive.Track className="relative h-1.5 w-full grow rounded-full bg-grayA-3">
             <SliderPrimitive.Indicator
-              className={cn("absolute h-full bg-accent-12", rangeClassName)}
+              className={cn("absolute h-full rounded-full bg-accent-12", rangeClassName)}
               style={rangeStyle}
             />
             {Array.from({ length: thumbCount }).map((_, i) => (
@@ -55,7 +60,10 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
                 // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                 key={i}
                 index={i}
-                className="block h-4 w-4 rounded-full border border-grayA-6 bg-gray-2 shadow transition-colors duration-300 hover:border-grayA-8 focus:ring focus:ring-gray-5 focus-visible:outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:opacity-50"
+                getAriaLabel={getAriaLabel ?? ((index) => `Value ${index + 1}`)}
+                // Focus lands on the thumb's nested <input type=range>, so the
+                // visible ring on this outer div keys off has-[:focus-visible].
+                className="block h-4 w-4 rounded-full border border-grayA-6 bg-gray-2 shadow transition-colors duration-300 hover:border-grayA-8 has-[:focus-visible]:ring has-[:focus-visible]:ring-gray-5 outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:opacity-50"
               />
             ))}
           </SliderPrimitive.Track>
