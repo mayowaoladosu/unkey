@@ -14,10 +14,6 @@ import (
 // replaced with values from the parameters map. This helps prevent SQL injection
 // by properly escaping parameter values.
 //
-// Args are forwarded to the ClickHouse driver for positional or named binding.
-// Do not combine args with a non-empty parameters map: native query parameters
-// take precedence and the driver does not bind args in that mode.
-//
 // Important: The generic type T must be properly annotated with `ch` struct tags to be
 // unmarshalled correctly. Each field that corresponds to a ClickHouse column must have
 // a `ch` tag specifying the column name, like:
@@ -63,13 +59,12 @@ import (
 //
 // This function is thread-safe and can be used concurrently with the same connection,
 // as the underlying ClickHouse driver handles connection pooling.
-func Select[T any](ctx context.Context, conn ch.Conn, query string, parameters map[string]string, args ...any) ([]T, error) {
+func Select[T any](ctx context.Context, conn ch.Conn, query string, parameters map[string]string) ([]T, error) {
 	var dest []T
 	err := conn.Select(
 		ch.Context(ctx, ch.WithParameters(parameters)),
 		&dest,
 		query,
-		args...,
 	)
 	if err != nil {
 		return nil, err

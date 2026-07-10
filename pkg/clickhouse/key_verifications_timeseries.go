@@ -3,8 +3,9 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
-	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/unkeyed/unkey/pkg/fault"
 )
 
@@ -77,7 +78,7 @@ func (c *Client) GetVerificationsByExternalID(ctx context.Context, req Verificat
 	// iv.unit, iv.table and iv.stepMs come from selectVerificationInterval — a
 	// fixed switch over the window size, never caller input — so they are safe to
 	// interpolate. Every caller-supplied value (workspace, identity, key, window
-	// bounds) goes through a typed named parameter instead. SUM results are cast
+	// bounds) goes through a typed query parameter instead. SUM results are cast
 	// to Int64 so they scan into the int64 struct fields. An empty key_id means
 	// "all keys": the OR short-circuits the filter rather than binding it.
 	query := fmt.Sprintf(`
@@ -92,33 +93,35 @@ func (c *Client) GetVerificationsByExternalID(ctx context.Context, req Verificat
 		toInt64(SUM(IF(outcome = 'EXPIRED', count, 0))) AS expired,
 		toInt64(SUM(IF(outcome = 'USAGE_EXCEEDED', count, 0))) AS usage_exceeded
 	FROM %[2]s
-	WHERE workspace_id = @workspace_id
-		AND external_id = @external_id
-		AND key_space_id IN @keyspace_ids
-		AND time >= fromUnixTimestamp64Milli(@start)
-		AND time < fromUnixTimestamp64Milli(@end)
-		AND (@key_id = '' OR key_id = @key_id)
+	WHERE workspace_id = {workspace_id:String}
+		AND external_id = {external_id:String}
+		AND key_space_id IN {keyspace_ids:Array(String)}
+		AND time >= fromUnixTimestamp64Milli({start:Int64})
+		AND time < fromUnixTimestamp64Milli({end:Int64})
+		AND ({key_id:String} = '' OR key_id = {key_id:String})
 	GROUP BY x
 	ORDER BY x ASC
 	WITH FILL
-		FROM toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli(@start), INTERVAL 1 %[1]s) AS DateTime64(3)))
-		TO toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli(@end), INTERVAL 1 %[1]s) AS DateTime64(3))) + %[3]d
+		FROM toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli({start:Int64}), INTERVAL 1 %[1]s) AS DateTime64(3)))
+		TO toUnixTimestamp64Milli(CAST(toStartOfInterval(fromUnixTimestamp64Milli({end:Int64}), INTERVAL 1 %[1]s) AS DateTime64(3))) + %[3]d
 		STEP %[3]d`,
 		iv.unit, iv.table, iv.stepMs,
 	)
 
-	results, err := Select[VerificationTimeseriesDataPoint](
-		ctx,
-		c.conn,
-		query,
-		nil,
-		ch.Named("workspace_id", req.WorkspaceID),
-		ch.Named("external_id", req.ExternalID),
-		ch.Named("keyspace_ids", req.KeyspaceIDs),
-		ch.Named("key_id", req.KeyID),
-		ch.Named("start", req.StartTime),
-		ch.Named("end", req.EndTime),
-	)
+	escapeKeyspaceID := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
+	keyspaceIDs := make([]string, len(req.KeyspaceIDs))
+	for i, keyspaceID := range req.KeyspaceIDs {
+		keyspaceIDs[i] = "'" + escapeKeyspaceID.Replace(keyspaceID) + "'"
+	}
+
+	results, err := Select[VerificationTimeseriesDataPoint](ctx, c.conn, query, map[string]string{
+		"workspace_id": req.WorkspaceID,
+		"external_id":  req.ExternalID,
+		"keyspace_ids": fmt.Sprintf("[%s]", strings.Join(keyspaceIDs, ",")),
+		"key_id":       req.KeyID,
+		"start":        strconv.FormatInt(req.StartTime, 10),
+		"end":          strconv.FormatInt(req.EndTime, 10),
+	})
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Internal("failed to query verification timeseries"))
 	}
