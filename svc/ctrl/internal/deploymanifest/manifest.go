@@ -116,6 +116,29 @@ type Compiled struct {
 	Fingerprint string
 }
 
+// Parse decodes a persisted manifest and rejects unsupported versions or
+// structurally invalid deployment intent before materialization.
+func Parse(encoded []byte) (Manifest, error) {
+	var manifest Manifest
+	if err := json.Unmarshal(encoded, &manifest); err != nil {
+		return Manifest{}, fmt.Errorf("decode deployment manifest: %w", err)
+	}
+	if manifest.Version != SchemaVersion {
+		return Manifest{}, fmt.Errorf("unsupported deployment manifest version %d", manifest.Version)
+	}
+	if err := validate(Plan{
+		Source:     manifest.Source,
+		Build:      manifest.Build,
+		Outputs:    manifest.Outputs,
+		Runtime:    manifest.Runtime,
+		Routes:     manifest.Routes,
+		Provenance: manifest.Provenance,
+	}); err != nil {
+		return Manifest{}, err
+	}
+	return manifest, nil
+}
+
 // Compile validates deployment intent, canonicalizes set-like fields, and
 // returns a stable JSON document plus its SHA-256 fingerprint.
 func Compile(plan Plan) (Compiled, error) {
@@ -201,8 +224,23 @@ func validate(plan Plan) error {
 		if output.Name == "" {
 			return fmt.Errorf("deployment output requires a name")
 		}
-		if output.Kind == OutputKindContainer && (output.Port < 1 || output.Port > 65535) {
-			return fmt.Errorf("container output %q requires a valid port", output.Name)
+		switch output.Kind {
+		case OutputKindContainer:
+			if output.Port < 1 || output.Port > 65535 {
+				return fmt.Errorf("container output %q requires a valid port", output.Name)
+			}
+		case OutputKindStatic:
+			if output.Directory == "" {
+				return fmt.Errorf("static output %q requires a directory", output.Name)
+			}
+		case OutputKindFunction:
+			if output.Runtime == "" || output.Handler == "" {
+				return fmt.Errorf("function output %q requires runtime and handler", output.Name)
+			}
+		case OutputKindWorker:
+			// Workers are materialized by a runtime adapter and require no route.
+		default:
+			return fmt.Errorf("unsupported output kind %q", output.Kind)
 		}
 	}
 	return nil

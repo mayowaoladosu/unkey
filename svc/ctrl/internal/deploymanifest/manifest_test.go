@@ -84,4 +84,8 @@ func TestCompileProducesCanonicalImmutableManifest(t *testing.T) {
 	}`, string(compiled.JSON))
 	require.Equal(t, "2184e0e935333793af5a4244ded7051bae1a68e7053df0495c9f3e63947e62f4", compiled.Fingerprint)
 	require.Equal(t, SchemaVersion, compiled.Manifest.Version)
+
+	parsed, err := Parse(compiled.JSON)
+	require.NoError(t, err)
+	require.Equal(t, compiled.Manifest, parsed)
 }

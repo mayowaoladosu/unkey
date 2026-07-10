@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,13 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/deploymanifest"
 )
+
+type appliedDetectionDocument struct {
+	Output struct {
+		Mode      string  `json:"mode"`
+		Directory *string `json:"directory"`
+	} `json:"output"`
+}
 
 func compileDeploymentManifest(
 	context deploymentContext,
@@ -72,18 +80,50 @@ func compileDeploymentManifest(
 	if outputName == "" {
 		outputName = "default"
 	}
+	adapterID := "container"
+	outputMode := db.DeploymentManifestsOutputModeContainer
+	outputs := []deploymanifest.Output{
+		{
+			Kind:             deploymanifest.OutputKindContainer,
+			Name:             outputName,
+			Port:             context.appRuntimeSettings.Port,
+			UpstreamProtocol: string(context.appRuntimeSettings.UpstreamProtocol),
+		},
+	}
+
+	if source.Kind == deploymanifest.SourceKindGit && build.Strategy == deploymanifest.BuildStrategyRailpack && context.appliedFrameworkDetection != nil {
+		var detected appliedDetectionDocument
+		if err := json.Unmarshal(context.appliedFrameworkDetection.Detection, &detected); err != nil {
+			return deploymanifest.Compiled{}, "", "", fmt.Errorf("decode applied framework detection: %w", err)
+		}
+		if detected.Output.Mode == "static" && detected.Output.Directory != nil && *detected.Output.Directory != "" {
+			switch provenance.FrameworkPreset {
+			case "vite":
+				adapterID = "vite-static"
+			case "static":
+				adapterID = "plain-static"
+				build.Strategy = deploymanifest.BuildStrategyStatic
+			default:
+				break
+			}
+			if adapterID != "container" {
+				outputMode = db.DeploymentManifestsOutputModeStatic
+				build.StaticOutputDirectory = *detected.Output.Directory
+				outputs = []deploymanifest.Output{
+					{
+						Kind:      deploymanifest.OutputKindStatic,
+						Name:      outputName,
+						Directory: *detected.Output.Directory,
+					},
+				}
+			}
+		}
+	}
 
 	compiled, err := deploymanifest.Compile(deploymanifest.Plan{
-		Source: source,
-		Build:  build,
-		Outputs: []deploymanifest.Output{
-			{
-				Kind:             deploymanifest.OutputKindContainer,
-				Name:             outputName,
-				Port:             context.appRuntimeSettings.Port,
-				UpstreamProtocol: string(context.appRuntimeSettings.UpstreamProtocol),
-			},
-		},
+		Source:  source,
+		Build:   build,
+		Outputs: outputs,
 		Runtime: deploymanifest.Runtime{
 			CpuMillicores:  context.appRuntimeSettings.CpuMillicores,
 			MemoryMib:      context.appRuntimeSettings.MemoryMib,
@@ -98,5 +138,5 @@ func compileDeploymentManifest(
 		return deploymanifest.Compiled{}, "", "", fmt.Errorf("compile deployment manifest: %w", err)
 	}
 
-	return compiled, "container", db.DeploymentManifestsOutputModeContainer, nil
+	return compiled, adapterID, outputMode, nil
 }

@@ -31,6 +31,7 @@ func TestCompileDeploymentManifestMapsGitIntentAndAcceptedDetection(t *testing.T
 			Fingerprint:      "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 			DetectionVersion: 1,
 			DetectedPresetID: sql.NullString{String: "vite", Valid: true},
+			Detection:        []byte(`{"output":{"mode":"static","directory":"dist"}}`),
 		},
 	}
 	request := &hydrav1.DeployRequest{
@@ -48,10 +49,13 @@ func TestCompileDeploymentManifestMapsGitIntentAndAcceptedDetection(t *testing.T
 
 	compiled, adapterID, outputMode, err := compileDeploymentManifest(context, request)
 	require.NoError(t, err)
-	require.Equal(t, "container", adapterID)
-	require.Equal(t, db.DeploymentManifestsOutputModeContainer, outputMode)
+	require.Equal(t, "vite-static", adapterID)
+	require.Equal(t, db.DeploymentManifestsOutputModeStatic, outputMode)
 	require.Equal(t, deploymanifest.SourceKindGit, compiled.Manifest.Source.Kind)
 	require.Equal(t, deploymanifest.BuildStrategyRailpack, compiled.Manifest.Build.Strategy)
+	require.Equal(t, "dist", compiled.Manifest.Build.StaticOutputDirectory)
+	require.Equal(t, deploymanifest.OutputKindStatic, compiled.Manifest.Outputs[0].Kind)
+	require.Equal(t, "dist", compiled.Manifest.Outputs[0].Directory)
 	require.Equal(t, "vite", compiled.Manifest.Provenance.FrameworkPreset)
 	require.Equal(t, context.appliedFrameworkDetection.Fingerprint, compiled.Manifest.Provenance.DetectionFingerprint)
 	require.Equal(t, []deploymanifest.RouteIntent{
