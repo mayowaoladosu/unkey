@@ -9,6 +9,7 @@ import (
 	vaultv1 "github.com/unkeyed/unkey/gen/proto/vault/v1"
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/internal/services/caches"
+	"github.com/unkeyed/unkey/pkg/array"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/pkg/codes"
 	"github.com/unkeyed/unkey/pkg/db"
@@ -265,13 +266,9 @@ func (h *Handler) Handle(ctx context.Context, s *zen.Session) error {
 
 	plaintextMap := h.decryptKeys(ctx, req, keyResults, principal.WorkspaceID)
 
-	// Transform to response format
-	responseData := make([]openapi.KeyResponseData, len(keyResults))
-	for i, key := range keyResults {
-		keyData := db.ToKeyData(key)
-		response := BuildKeyResponseData(keyData, plaintextMap[key.ID])
-		responseData[i] = response
-	}
+	responseData := array.Map(keyResults, func(key db.ListLiveKeysByKeySpaceIDRow) openapi.KeyResponseData {
+		return BuildKeyResponseData(db.ToKeyData(key), plaintextMap[key.ID])
+	})
 
 	return s.JSON(http.StatusOK, Response{
 		Meta: openapi.Meta{
