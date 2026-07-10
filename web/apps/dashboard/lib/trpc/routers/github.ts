@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import { and, db, eq, schema } from "@/lib/db";
+import { resolveFrameworkDefaults } from "@/lib/deploy/framework-defaults";
+import { detectFramework as detectRepositoryFramework } from "@/lib/deploy/framework-detection";
 import { githubAppEnv, githubOAuthEnv } from "@/lib/env";
 import {
   type BranchActivity,
@@ -8,6 +10,7 @@ import {
   getInstallationRepositories,
   getMostActiveBranches,
   getRepository,
+  getRepositoryBlobContent,
   getRepositoryBranches,
   getRepositoryById,
   getRepositoryTree,
@@ -19,6 +22,7 @@ import { z } from "zod";
 import { t, workspaceProcedure } from "../trpc";
 
 const STATE_TTL_MS = 15 * 60 * 1000;
+const FRAMEWORK_DETECTION_VERSION = 1;
 
 // State payload signed and handed to GitHub's install URL. The signature
 // binds the state to a specific user + workspace + project so the callback
@@ -471,6 +475,195 @@ export const githubRouter = t.router({
       }
     }),
 
+  detectFramework: workspaceProcedure
+    .input(z.object({ projectId: z.string().min(1), appId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const githubContext = await fetchGithubContext(
+        ctx.workspace.id,
+        input.projectId,
+        input.appId,
+      );
+      if (!githubContext?.repoConnection) {
+        return {
+          status: "unavailable" as const,
+          reason: "Connect a GitHub repository to detect its framework.",
+        };
+      }
+
+      const { repositoryFullName, installationId } = githubContext.repoConnection;
+      const [owner, repo] = repositoryFullName.split("/");
+      if (!owner || !repo) {
+        return {
+          status: "unavailable" as const,
+          reason: "The connected repository name is invalid.",
+        };
+      }
+
+      try {
+        const treeResult = await getRepositoryTree(
+          installationId,
+          owner,
+          repo,
+          githubContext.defaultBranch,
+        );
+        if (treeResult.truncated) {
+          return {
+            status: "unavailable" as const,
+            reason: "The repository tree is too large for reliable detection.",
+          };
+        }
+
+        const paths = treeResult.tree
+          .filter((entry) => entry.type === "blob")
+          .map((entry) => entry.path);
+        const rootPackageJson = treeResult.tree.find(
+          (entry) => entry.type === "blob" && entry.path === "package.json",
+        );
+        const packageJsonContent = rootPackageJson
+          ? await getRepositoryBlobContent(installationId, owner, repo, rootPackageJson.sha)
+          : null;
+
+        let packageJson: unknown = null;
+        if (packageJsonContent) {
+          try {
+            packageJson = JSON.parse(packageJsonContent);
+          } catch {
+            // A malformed manifest is just missing evidence. The detector is
+            // advisory and still evaluates file markers from the tree.
+          }
+        }
+
+        const detection = detectRepositoryFramework({ paths, packageJson });
+        const defaults = resolveFrameworkDefaults(detection);
+        const fingerprint = crypto
+          .createHash("sha256")
+          .update(
+            JSON.stringify({
+              version: FRAMEWORK_DETECTION_VERSION,
+              repositoryFullName,
+              branch: githubContext.defaultBranch,
+              treeSha: treeResult.sha,
+              detection,
+              defaults,
+            }),
+          )
+          .digest("hex");
+        const now = Date.now();
+
+        return await db.transaction(async (tx) => {
+          // GitHub analysis runs outside the transaction. Lock and re-check
+          // the configured source before persisting so a concurrent repository
+          // replacement, disconnect, or branch change cannot resurrect stale
+          // detection after its invalidation.
+          const [currentApp] = await tx
+            .select({ defaultBranch: schema.apps.defaultBranch })
+            .from(schema.apps)
+            .where(
+              and(
+                eq(schema.apps.id, input.appId),
+                eq(schema.apps.projectId, input.projectId),
+                eq(schema.apps.workspaceId, ctx.workspace.id),
+              ),
+            )
+            .for("update");
+          const [currentRepo] = await tx
+            .select({
+              installationId: schema.githubRepoConnections.installationId,
+              repositoryFullName: schema.githubRepoConnections.repositoryFullName,
+            })
+            .from(schema.githubRepoConnections)
+            .where(
+              and(
+                eq(schema.githubRepoConnections.appId, input.appId),
+                eq(schema.githubRepoConnections.projectId, input.projectId),
+                eq(schema.githubRepoConnections.workspaceId, ctx.workspace.id),
+              ),
+            )
+            .for("update");
+
+          if (
+            !currentApp ||
+            !currentRepo ||
+            currentRepo.installationId !== installationId ||
+            currentRepo.repositoryFullName !== repositoryFullName ||
+            currentApp.defaultBranch !== githubContext.defaultBranch
+          ) {
+            return {
+              status: "unavailable" as const,
+              reason: "The Git source changed during detection. Analyze the repository again.",
+            };
+          }
+
+          await tx
+            .insert(schema.appFrameworkDetections)
+            .values({
+              workspaceId: ctx.workspace.id,
+              projectId: input.projectId,
+              appId: input.appId,
+              repositoryFullName,
+              branch: githubContext.defaultBranch,
+              treeSha: treeResult.sha,
+              fingerprint,
+              detectionVersion: FRAMEWORK_DETECTION_VERSION,
+              detectedPresetId: detection.preset?.id ?? null,
+              detectedPresetName: detection.preset?.name ?? null,
+              confidence: detection.confidence,
+              buildStrategy: detection.buildStrategy,
+              detection,
+              defaults,
+              detectedAt: now,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onDuplicateKeyUpdate({
+              set: {
+                repositoryFullName,
+                branch: githubContext.defaultBranch,
+                treeSha: treeResult.sha,
+                fingerprint,
+                detectionVersion: FRAMEWORK_DETECTION_VERSION,
+                detectedPresetId: detection.preset?.id ?? null,
+                detectedPresetName: detection.preset?.name ?? null,
+                confidence: detection.confidence,
+                buildStrategy: detection.buildStrategy,
+                detection,
+                defaults,
+                detectedAt: now,
+                updatedAt: now,
+              },
+            });
+
+          const persisted = await tx.query.appFrameworkDetections.findFirst({
+            where: and(
+              eq(schema.appFrameworkDetections.workspaceId, ctx.workspace.id),
+              eq(schema.appFrameworkDetections.appId, input.appId),
+            ),
+            columns: { appliedFingerprint: true },
+          });
+
+          return {
+            status: "ready" as const,
+            source: {
+              repositoryFullName,
+              branch: githubContext.defaultBranch,
+              treeSha: treeResult.sha,
+            },
+            detection,
+            defaults,
+            fingerprint,
+            defaultsApplied: persisted?.appliedFingerprint === fingerprint,
+          };
+        });
+      } catch (err) {
+        console.error("Framework detection failed", err);
+        return {
+          status: "unavailable" as const,
+          reason:
+            "Framework detection is temporarily unavailable. You can configure the build manually.",
+        };
+      }
+    }),
+
   getInstallations: workspaceProcedure
     .input(
       z.object({
@@ -786,6 +979,15 @@ export const githubRouter = t.router({
           });
         });
 
+      await db
+        .delete(schema.appFrameworkDetections)
+        .where(
+          and(
+            eq(schema.appFrameworkDetections.appId, appId),
+            eq(schema.appFrameworkDetections.workspaceId, ctx.workspace.id),
+          ),
+        );
+
       const branchToStore = input.selectedBranch ?? verifiedRepo.default_branch;
       if (branchToStore) {
         await db
@@ -833,6 +1035,21 @@ export const githubRouter = t.router({
           });
         });
 
+      await db
+        .delete(schema.appFrameworkDetections)
+        .where(
+          and(
+            eq(schema.appFrameworkDetections.appId, input.appId),
+            eq(schema.appFrameworkDetections.workspaceId, ctx.workspace.id),
+          ),
+        )
+        .catch(() => {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to clear framework detection",
+          });
+        });
+
       return { success: true };
     }),
 
@@ -868,6 +1085,15 @@ export const githubRouter = t.router({
         .update(schema.apps)
         .set({ defaultBranch: input.defaultBranch, updatedAt: Date.now() })
         .where(eq(schema.apps.id, input.appId));
+
+      await db
+        .delete(schema.appFrameworkDetections)
+        .where(
+          and(
+            eq(schema.appFrameworkDetections.appId, input.appId),
+            eq(schema.appFrameworkDetections.workspaceId, ctx.workspace.id),
+          ),
+        );
 
       return { success: true };
     }),

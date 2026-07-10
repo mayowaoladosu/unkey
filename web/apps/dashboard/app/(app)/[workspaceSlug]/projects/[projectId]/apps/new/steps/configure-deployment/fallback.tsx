@@ -4,9 +4,13 @@ import { useProjectData } from "@/app/(app)/[workspaceSlug]/projects/[projectId]
 import { Button } from "@unkey/ui";
 import { cn } from "@unkey/ui/src/lib/utils";
 
-export const ConfigureDeploymentFallback = ({ settingsReady }: { settingsReady: boolean }) => {
+export const ConfigureDeploymentFallback = ({
+  settingsStatus,
+}: {
+  settingsStatus: "loading" | "ready" | "error";
+}) => {
   const { isEnvironmentsLoading } = useProjectData();
-  if (!isEnvironmentsLoading && settingsReady) {
+  if (!isEnvironmentsLoading && settingsStatus !== "loading") {
     return null;
   }
 

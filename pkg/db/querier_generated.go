@@ -50,7 +50,10 @@ type Querier interface {
 	DeleteAppBuildSettingsByEnvironmentId(ctx context.Context, db DBTX, environmentID string) error
 	//DeleteAppById
 	//
-	//  DELETE FROM apps WHERE id = ?
+	//  DELETE app_framework_detections, apps
+	//  FROM apps
+	//  LEFT JOIN app_framework_detections ON app_framework_detections.app_id = apps.id
+	//  WHERE apps.id = ?
 	DeleteAppById(ctx context.Context, db DBTX, id string) error
 	// Deletes an environment's variables whose key is in the provided set.
 	//

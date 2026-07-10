@@ -10,18 +10,18 @@ import {
 } from "@/lib/collections/deploy/environment-settings";
 import { trpc } from "@/lib/trpc/client";
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { toast } from "@unkey/ui";
-import { type PropsWithChildren, useEffect, useMemo, useRef } from "react";
+import { Button, toast } from "@unkey/ui";
+import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export const OnboardingEnvironmentSettingsInner = ({
   children,
   prodEnvId,
   environments,
-  onSettingsReady,
+  onSettingsStatusChange,
 }: PropsWithChildren<{
   prodEnvId: string;
   environments: { id: string; slug: string }[];
-  onSettingsReady: () => void;
+  onSettingsStatusChange: (status: "loading" | "ready" | "error") => void;
 }>) => {
   const otherEnvIds = useMemo(
     () => environments.filter((e) => e.id !== prodEnvId).map((e) => e.id),
@@ -45,14 +45,43 @@ export const OnboardingEnvironmentSettingsInner = ({
     { enabled: Boolean(prodEnvId) },
   );
 
-  useInitializeSettings(environments, availableRegions);
+  const { settingsInitialized, initializationError, retryInitialization } = useInitializeSettings(
+    environments,
+    availableRegions,
+  );
   useEffect(() => {
-    if (settings) {
-      onSettingsReady();
+    if (settings && settingsInitialized) {
+      onSettingsStatusChange("ready");
+    } else if (initializationError) {
+      onSettingsStatusChange("error");
+    } else {
+      onSettingsStatusChange("loading");
     }
-  }, [settings, onSettingsReady]);
+  }, [settings, settingsInitialized, initializationError, onSettingsStatusChange]);
 
-  if (!settings) {
+  if (initializationError) {
+    return (
+      <div className="w-225">
+        <div className="rounded-xl border border-errorA-5 bg-errorA-2 p-4 shadow-sm">
+          <p className="text-[13px] font-semibold text-gray-12">
+            Deployment settings could not be initialized
+          </p>
+          <p className="mt-1 text-xs text-gray-10">{initializationError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={retryInitialization}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!settings || !settingsInitialized) {
     return null;
   }
 
@@ -81,17 +110,32 @@ const EnvironmentSettingsPreloader = ({ envId }: { envId: string }) => {
 function useInitializeSettings(
   environments: { id: string; slug: string }[],
   availableRegions: { id: string; name: string }[] | undefined,
-) {
-  const hasInitializedRef = useRef(false);
+): {
+  settingsInitialized: boolean;
+  initializationError: string | null;
+  retryInitialization: () => void;
+} {
+  const startedAttemptRef = useRef<number | null>(null);
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  const retryInitialization = useCallback(() => {
+    setSettingsInitialized(false);
+    setInitializationError(null);
+    setAttempt((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     if (!availableRegions || environments.length === 0) {
       return;
     }
-    if (hasInitializedRef.current) {
+    if (startedAttemptRef.current === attempt) {
       return;
     }
-    hasInitializedRef.current = true;
+    startedAttemptRef.current = attempt;
+    setSettingsInitialized(false);
+    setInitializationError(null);
 
     const d = ENVIRONMENT_SETTINGS_DEFAULTS;
     const defaults = {
@@ -141,11 +185,19 @@ function useInitializeSettings(
     );
 
     if (mutations.length > 0) {
-      Promise.all(mutations).catch((err) => {
-        toast.error("Failed to initialize settings", {
-          description: err instanceof Error ? err.message : "An unexpected error occurred",
+      Promise.all(mutations)
+        .then(() => setSettingsInitialized(true))
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : "An unexpected error occurred";
+          setInitializationError(message);
+          toast.error("Failed to initialize settings", {
+            description: message,
+          });
         });
-      });
+    } else {
+      setSettingsInitialized(true);
     }
-  }, [environments, availableRegions]);
+  }, [environments, availableRegions, attempt]);
+
+  return { settingsInitialized, initializationError, retryInitialization };
 }

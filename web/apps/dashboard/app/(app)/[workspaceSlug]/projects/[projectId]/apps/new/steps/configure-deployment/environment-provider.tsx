@@ -13,8 +13,10 @@ import { OnboardingEnvironmentSettingsInner } from "./environment-inner";
  */
 export const OnboardingEnvironmentSettingsProvider = ({
   children,
-  onSettingsReady,
-}: PropsWithChildren<{ onSettingsReady: () => void }>) => {
+  onSettingsStatusChange,
+}: PropsWithChildren<{
+  onSettingsStatusChange: (status: "loading" | "ready" | "error") => void;
+}>) => {
   const { environments, isEnvironmentsLoading } = useProjectData();
 
   const prodEnvId = useMemo(
@@ -31,7 +33,7 @@ export const OnboardingEnvironmentSettingsProvider = ({
     <OnboardingEnvironmentSettingsInner
       prodEnvId={prodEnvId}
       environments={environments}
-      onSettingsReady={onSettingsReady}
+      onSettingsStatusChange={onSettingsStatusChange}
     >
       {children}
     </OnboardingEnvironmentSettingsInner>

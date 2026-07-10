@@ -12,14 +12,14 @@ type ConfigureDeploymentStepProps = {
 };
 
 export const ConfigureDeploymentStep = ({ projectId, appId }: ConfigureDeploymentStepProps) => {
-  const [settingsReady, setSettingsReady] = useState(false);
+  const [settingsStatus, setSettingsStatus] = useState<"loading" | "ready" | "error">("loading");
 
   return (
     <ProjectDataProvider projectId={projectId} appId={appId}>
-      <OnboardingEnvironmentSettingsProvider onSettingsReady={() => setSettingsReady(true)}>
+      <OnboardingEnvironmentSettingsProvider onSettingsStatusChange={setSettingsStatus}>
         <ConfigureDeploymentContent />
       </OnboardingEnvironmentSettingsProvider>
-      <ConfigureDeploymentFallback settingsReady={settingsReady} />
+      <ConfigureDeploymentFallback settingsStatus={settingsStatus} />
     </ProjectDataProvider>
   );
 };

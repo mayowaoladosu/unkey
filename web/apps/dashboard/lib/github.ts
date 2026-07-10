@@ -25,14 +25,31 @@ const installationRepositoriesSchema = z.object({
 });
 
 const repositoryTreeSchema = z.object({
+  sha: z.string().min(1),
   tree: z.array(
     z.object({
       path: z.string(),
       type: z.string(),
+      sha: z.string().min(1),
     }),
   ),
   truncated: z.boolean().optional(),
 });
+
+const repositoryFileContentSchema = z.object({
+  type: z.literal("file"),
+  encoding: z.literal("base64"),
+  content: z.string(),
+  size: z.number().int().nonnegative(),
+});
+
+const repositoryBlobContentSchema = z.object({
+  encoding: z.literal("base64"),
+  content: z.string(),
+  size: z.number().int().nonnegative(),
+});
+
+const REPOSITORY_FILE_BYTES_MAX = 1 << 20;
 
 const repositoryBranchesSchema = z.array(
   z.object({
@@ -231,17 +248,79 @@ export async function getRepositoryTree(
   owner: string,
   repo: string,
   branch: string,
-): Promise<{ tree: Array<{ path: string; type: string }>; truncated: boolean }> {
+): Promise<{
+  sha: string;
+  tree: Array<{ path: string; type: string; sha: string }>;
+  truncated: boolean;
+}> {
   const { token } = await getInstallationAccessToken(installationId);
 
   const data = repositoryTreeSchema.parse(
     await fetchGitHubApi(
-      `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
       token,
     ),
   );
 
-  return { tree: data.tree, truncated: data.truncated ?? false };
+  return { sha: data.sha, tree: data.tree, truncated: data.truncated ?? false };
+}
+
+/** Reads a file blob from the exact immutable tree entry used for detection. */
+export async function getRepositoryBlobContent(
+  installationId: number,
+  owner: string,
+  repo: string,
+  blobSha: string,
+): Promise<string | null> {
+  const { token } = await getInstallationAccessToken(installationId);
+  const parsed = repositoryBlobContentSchema.safeParse(
+    await fetchGitHubApi(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(blobSha)}`,
+      token,
+    ),
+  );
+  if (!parsed.success || parsed.data.size > REPOSITORY_FILE_BYTES_MAX) {
+    return null;
+  }
+
+  const content = Buffer.from(parsed.data.content.replaceAll("\n", ""), "base64");
+  return content.byteLength <= REPOSITORY_FILE_BYTES_MAX ? content.toString("utf8") : null;
+}
+
+/**
+ * Reads one repository file through the installation-scoped Contents API.
+ * Missing, non-file, non-base64, and oversized responses are treated as
+ * unavailable so repository analysis never blocks onboarding.
+ */
+export async function getRepositoryFileContent(
+  installationId: number,
+  owner: string,
+  repo: string,
+  branch: string,
+  path: string,
+): Promise<string | null> {
+  const { token } = await getInstallationAccessToken(installationId);
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+
+  try {
+    const parsed = repositoryFileContentSchema.safeParse(
+      await fetchGitHubApi(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`,
+        token,
+      ),
+    );
+    if (!parsed.success || parsed.data.size > REPOSITORY_FILE_BYTES_MAX) {
+      return null;
+    }
+
+    const content = Buffer.from(parsed.data.content.replaceAll("\n", ""), "base64");
+    return content.byteLength <= REPOSITORY_FILE_BYTES_MAX ? content.toString("utf8") : null;
+  } catch (err) {
+    if (err instanceof GitHubApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 const repositoryEventSchema = z.object({

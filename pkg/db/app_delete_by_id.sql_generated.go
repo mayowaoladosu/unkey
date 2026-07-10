@@ -10,12 +10,18 @@ import (
 )
 
 const deleteAppById = `-- name: DeleteAppById :exec
-DELETE FROM apps WHERE id = ?
+DELETE app_framework_detections, apps
+FROM apps
+LEFT JOIN app_framework_detections ON app_framework_detections.app_id = apps.id
+WHERE apps.id = ?
 `
 
 // DeleteAppById
 //
-//	DELETE FROM apps WHERE id = ?
+//	DELETE app_framework_detections, apps
+//	FROM apps
+//	LEFT JOIN app_framework_detections ON app_framework_detections.app_id = apps.id
+//	WHERE apps.id = ?
 func (q *Queries) DeleteAppById(ctx context.Context, db DBTX, id string) error {
 	_, err := db.ExecContext(ctx, deleteAppById, id)
 	return err
