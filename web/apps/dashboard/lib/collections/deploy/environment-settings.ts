@@ -378,7 +378,7 @@ async function dispatchSettingsMutations(
 			}),
 		});
 	}
-	await trackSave(allMutations);
+	await trackSave(allMutations, original.environmentId);
 }
 
 /**
@@ -389,8 +389,7 @@ async function dispatchSettingsMutations(
  */
 const saveStore = {
 	pendingSaves: 0,
-	savedCount: 0,
-	dismissedAtCount: 0,
+	environmentIds: [] as string[],
 	listeners: new Set<() => void>(),
 	notify() {
 		for (const cb of this.listeners) {
@@ -403,18 +402,31 @@ const saveStore = {
 			this.listeners.delete(cb);
 		};
 	},
-	dismiss() {
-		this.dismissedAtCount = this.savedCount;
+	dismiss(environmentId?: string) {
+		this.environmentIds = environmentId
+			? this.environmentIds.filter((id) => id !== environmentId)
+			: [];
 		this.notify();
 	},
 };
 
-export function trackSave<T>(promise: Promise<T>): Promise<T> {
+export function trackSave<T>(
+	promise: Promise<T>,
+	environmentIds: string | readonly string[],
+): Promise<T> {
+	const trackedEnvironmentIds = Array.isArray(environmentIds)
+		? environmentIds
+		: [environmentIds];
 	saveStore.pendingSaves++;
 	saveStore.notify();
 	return promise.then(
 		(result) => {
-			saveStore.savedCount++;
+			saveStore.environmentIds = [
+				...new Set([
+					...saveStore.environmentIds,
+					...trackedEnvironmentIds.filter(Boolean),
+				]),
+			];
 			saveStore.pendingSaves--;
 			saveStore.notify();
 			return result;
@@ -438,11 +450,19 @@ export function useSettingsIsSaving(): boolean {
 export function useSettingsBannerVisible(): boolean {
 	return useSyncExternalStore(
 		(cb) => saveStore.subscribe(cb),
-		() => saveStore.savedCount > saveStore.dismissedAtCount,
+		() => saveStore.environmentIds.length > 0,
+	);
+}
+
+/** Returns the environments with successful saves that have not been dismissed. */
+export function useSettingsBannerEnvironmentIds(): readonly string[] {
+	return useSyncExternalStore(
+		(cb) => saveStore.subscribe(cb),
+		() => saveStore.environmentIds,
 	);
 }
 
 /** Dismisses the pending-redeploy banner until a new save occurs. */
-export function dismissSettingsBanner(): void {
-	saveStore.dismiss();
+export function dismissSettingsBanner(environmentId?: string): void {
+	saveStore.dismiss(environmentId);
 }

@@ -3,73 +3,130 @@
 import { Switch } from "@/components/ui/switch";
 import { collection } from "@/lib/collections";
 import type { EnvironmentSettings } from "@/lib/collections/deploy/environment-settings";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { HalfDottedCirclePlay } from "@unkey/icons";
+import { SettingCard } from "@unkey/ui";
 import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { z } from "zod";
+import { useProjectData } from "../../../data-provider";
+import { useEnvironmentSettings } from "../../environment-provider";
 import { useMultiEnvironmentSettings } from "../../hooks/use-multi-environment-settings";
 import { SettingDescription } from "../shared/form-blocks";
 import { FormSettingCard, resolveSaveState } from "../shared/form-setting-card";
+import { SelectedConfig } from "../shared/selected-config";
 
-const dualSchema = z.object({ production: z.boolean(), preview: z.boolean() });
-type DualFormValues = z.infer<typeof dualSchema>;
+type AutoDeployTarget = {
+  label: string;
+  description: string;
+  settings: EnvironmentSettings;
+};
 
 export const AutoDeploy = () => {
+  const { settings, variant } = useEnvironmentSettings();
+  const { environments } = useProjectData();
+  const selectedEnvironment = environments.find(
+    (environment) => environment.id === settings.environmentId,
+  );
+
+  if (variant === "environment") {
+    if (
+      selectedEnvironment &&
+      selectedEnvironment.slug !== "production" &&
+      selectedEnvironment.slug !== "preview"
+    ) {
+      return <ManualAutoDeploy environmentSlug={selectedEnvironment.slug} />;
+    }
+
+    const slug = selectedEnvironment?.slug ?? "environment";
+    return (
+      <AutoDeployEditor
+        targets={[
+          {
+            label: titleCase(slug),
+            description:
+              slug === "production"
+                ? "pushes to the default branch"
+                : "pushes to non-default branches",
+            settings,
+          },
+        ]}
+      />
+    );
+  }
+
+  return <MultiEnvironmentAutoDeploy />;
+};
+
+const MultiEnvironmentAutoDeploy = () => {
   const multiSettings = useMultiEnvironmentSettings();
   if (!multiSettings) {
     return null;
   }
-  return <AutoDeployInner production={multiSettings.production} preview={multiSettings.preview} />;
+  return (
+    <AutoDeployEditor
+      targets={[
+        {
+          label: "Production",
+          description: "pushes to the default branch",
+          settings: multiSettings.production,
+        },
+        {
+          label: "Preview",
+          description: "pushes to non-default branches",
+          settings: multiSettings.preview,
+        },
+      ]}
+    />
+  );
 };
 
-const AutoDeployInner = ({
-  production,
-  preview,
-}: {
-  production: EnvironmentSettings;
-  preview: EnvironmentSettings;
-}) => {
-  const defaultProd = production.autoDeploy;
-  const defaultPreview = preview.autoDeploy;
+const AutoDeployEditor = ({ targets }: { targets: AutoDeployTarget[] }) => {
+  const defaultSignature = targets
+    .map((target) => `${target.settings.environmentId}:${target.settings.autoDeploy}`)
+    .join("|");
+  const getDefaultValues = () =>
+    Object.fromEntries(
+      targets.map((target) => [target.settings.environmentId, target.settings.autoDeploy]),
+    );
 
   const {
     handleSubmit,
     setValue,
-    formState: { isValid, isSubmitting },
+    formState: { isSubmitting },
     control,
     reset,
-  } = useForm<DualFormValues>({
-    resolver: zodResolver(dualSchema),
+  } = useForm<Record<string, boolean>>({
     mode: "onChange",
-    defaultValues: { production: defaultProd, preview: defaultPreview },
+    defaultValues: getDefaultValues(),
   });
 
   useEffect(() => {
-    reset({ production: defaultProd, preview: defaultPreview });
-  }, [defaultProd, defaultPreview, reset]);
+    reset(getDefaultValues());
+    // The signature changes only when the target environments or persisted
+    // auto-deploy values change; the targets array itself is created by the parent.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: see comment above
+  }, [defaultSignature, reset]);
 
-  const currentProd = useWatch({ control, name: "production" });
-  const currentPreview = useWatch({ control, name: "preview" });
+  const currentValues = useWatch({ control });
 
-  const onSubmit = async (values: DualFormValues) => {
-    if (values.production !== defaultProd) {
-      collection.environmentSettings.update(production.environmentId, (draft) => {
-        draft.autoDeploy = values.production;
-      });
-    }
-    if (values.preview !== defaultPreview) {
-      collection.environmentSettings.update(preview.environmentId, (draft) => {
-        draft.autoDeploy = values.preview;
-      });
+  const onSubmit = async (values: Record<string, boolean>) => {
+    for (const target of targets) {
+      const environmentId = target.settings.environmentId;
+      if (values[environmentId] !== target.settings.autoDeploy) {
+        collection.environmentSettings.update(environmentId, (draft) => {
+          draft.autoDeploy = values[environmentId];
+        });
+      }
     }
   };
 
-  const hasChanges = currentProd !== defaultProd || currentPreview !== defaultPreview;
+  const hasChanges = targets.some(
+    (target) =>
+      (currentValues[target.settings.environmentId] ?? target.settings.autoDeploy) !==
+      target.settings.autoDeploy,
+  );
 
   const saveState = resolveSaveState([
     [isSubmitting, { status: "saving" }],
-    [!isValid, { status: "disabled" }],
     [!hasChanges, { status: "disabled", reason: "No changes to save" }],
   ]);
 
@@ -80,15 +137,17 @@ const AutoDeployInner = ({
       description="Automatically trigger deployments when code is pushed to GitHub."
       displayValue={
         <div className="flex items-center gap-3">
-          <span className="space-x-1">
-            <span className="text-gray-11 text-xs font-normal">Production</span>
-            <span className="font-medium text-gray-12">{defaultProd ? "On" : "Off"}</span>
-          </span>
-          <span className="text-gray-8">|</span>
-          <span className="space-x-1">
-            <span className="text-gray-11 text-xs font-normal">Preview</span>
-            <span className="font-medium text-gray-12">{defaultPreview ? "On" : "Off"}</span>
-          </span>
+          {targets.map((target, index) => (
+            <div key={target.settings.environmentId} className="contents">
+              {index > 0 ? <span className="text-gray-8">|</span> : null}
+              <span className="space-x-1">
+                <span className="text-gray-11 text-xs font-normal">{target.label}</span>
+                <span className="font-medium text-gray-12">
+                  {target.settings.autoDeploy ? "On" : "Off"}
+                </span>
+              </span>
+            </div>
+          ))}
         </div>
       }
       onSubmit={handleSubmit(onSubmit)}
@@ -100,22 +159,39 @@ const AutoDeployInner = ({
       }
     >
       <div className="flex flex-col gap-1" data-form-wide>
-        <EnvRow
-          label="Production"
-          description="pushes to the default branch"
-          checked={currentProd}
-          onChange={(v) => setValue("production", v, { shouldValidate: true })}
-        />
-        <EnvRow
-          label="Preview"
-          description="pushes to non-default branches"
-          checked={currentPreview}
-          onChange={(v) => setValue("preview", v, { shouldValidate: true })}
-        />
+        {targets.map((target) => (
+          <EnvRow
+            key={target.settings.environmentId}
+            label={target.label}
+            description={target.description}
+            checked={
+              currentValues[target.settings.environmentId] ?? target.settings.autoDeploy
+            }
+            onChange={(value) =>
+              setValue(target.settings.environmentId, value, { shouldDirty: true })
+            }
+          />
+        ))}
       </div>
     </FormSettingCard>
   );
 };
+
+const ManualAutoDeploy = ({ environmentSlug }: { environmentSlug: string }) => (
+  <SettingCard
+    className="px-4 py-[18px]"
+    icon={<HalfDottedCirclePlay className="text-gray-12" iconSize="xl-medium" />}
+    title="Auto deploy"
+    description={`${titleCase(environmentSlug)} is an independent environment without a Git branch rule. Create deployments manually from Deploy.`}
+    contentWidth="w-full lg:w-[320px] justify-end"
+  >
+    <SelectedConfig label={<span className="text-gray-11 font-normal">Manual</span>} />
+  </SettingCard>
+);
+
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 const EnvRow = ({
   label,

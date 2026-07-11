@@ -102,7 +102,7 @@ export const envVars = createCollection<EnvVar, string>(
         ],
       });
 
-      await trackSave(mutation);
+      await trackSave(mutation, insertInput.environmentId);
     },
     onUpdate: async ({ transaction }) => {
       const { original, modified } = transaction.mutations[0];
@@ -125,7 +125,7 @@ export const envVars = createCollection<EnvVar, string>(
         }),
       });
 
-      await trackSave(mutation);
+      await trackSave(mutation, modified.environmentId);
     },
     onDelete: async ({ transaction }) => {
       const envVarIds = transaction.mutations.map((m) => m.original.id);
@@ -142,7 +142,10 @@ export const envVars = createCollection<EnvVar, string>(
         }),
       });
 
-      await trackSave(mutation);
+      await trackSave(
+        mutation,
+        transaction.mutations.map((mutation) => mutation.original.environmentId),
+      );
     },
   }),
 );

@@ -4,7 +4,7 @@ import { collection } from "@/lib/collections";
 import type { EnvironmentSettings } from "@/lib/collections/deploy/environment-settings";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSearchParams } from "next/navigation";
-import { type PropsWithChildren, createContext, useCallback, useContext } from "react";
+import { type PropsWithChildren, createContext, useContext } from "react";
 import { useProjectData } from "../data-provider";
 
 type EnvironmentContextType = {
@@ -23,23 +23,23 @@ export const EnvironmentSettingsProvider = ({ children }: PropsWithChildren) => 
     ? environments.find((environment) => environment.id === envIdParam)
     : undefined;
 
-  const getActiveEnvId = useCallback(() => {
-    if (selectedEnvironment) {
-      return selectedEnvironment.id;
-    }
-    return environments.find((e) => e.slug === "production")?.id ?? environments.at(0)?.id;
-  }, [selectedEnvironment, environments]);
+  const activeEnvironmentId =
+    selectedEnvironment?.id ??
+    environments.find((environment) => environment.slug === "production")?.id ??
+    environments.at(0)?.id;
 
   const { data } = useLiveQuery(
     (q) =>
-      q
-        .from({ s: collection.environmentSettings })
-        .where(({ s }) => eq(s.environmentId, getActiveEnvId())),
-    [getActiveEnvId],
+      activeEnvironmentId
+        ? q
+            .from({ s: collection.environmentSettings })
+            .where(({ s }) => eq(s.environmentId, activeEnvironmentId))
+        : undefined,
+    [activeEnvironmentId],
   );
 
   // Selected envs settings cannot but null because we apply some sane defaults to them
-  const settings = data.at(0);
+  const settings = data?.at(0);
   if (!settings) {
     return null;
   }

@@ -37,7 +37,10 @@ export async function reorderSentinelPolicies(
       description: err instanceof Error ? err.message : "Unknown error",
     }),
   });
-  await trackSave(promise);
+  await trackSave(
+    promise,
+    reorders.map((reorder) => reorder.environmentId),
+  );
   for (const r of reorders) {
     queryClient.invalidateQueries({ queryKey: ["sentinelPolicies", r.environmentId] });
   }
@@ -120,7 +123,10 @@ export const sentinelPolicies = createCollection<SentinelPolicyRow, string>(
           description: err instanceof Error ? err.message : "Unknown error",
         }),
       });
-      await trackSave(all);
+      await trackSave(
+        all,
+        transaction.mutations.map((mutation) => mutation.modified.environmentId),
+      );
     },
 
     onUpdate: async ({ transaction }) => {
@@ -141,7 +147,10 @@ export const sentinelPolicies = createCollection<SentinelPolicyRow, string>(
           description: err instanceof Error ? err.message : "Unknown error",
         }),
       });
-      await trackSave(all);
+      await trackSave(
+        all,
+        transaction.mutations.map((mutation) => mutation.modified.environmentId),
+      );
     },
 
     onDelete: async ({ transaction }) => {
@@ -161,7 +170,10 @@ export const sentinelPolicies = createCollection<SentinelPolicyRow, string>(
           description: err instanceof Error ? err.message : "Unknown error",
         }),
       });
-      await trackSave(all);
+      await trackSave(
+        all,
+        transaction.mutations.map((mutation) => mutation.original.environmentId),
+      );
     },
   }),
 );

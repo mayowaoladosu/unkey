@@ -4,7 +4,7 @@ import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { queryClient } from "@/lib/collections/client";
 import {
   dismissSettingsBanner,
-  useSettingsBannerVisible,
+  useSettingsBannerEnvironmentIds,
 } from "@/lib/collections/deploy/environment-settings";
 import { routes } from "@/lib/navigation/routes";
 import { trpc } from "@/lib/trpc/client";
@@ -15,35 +15,38 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useProjectData } from "../(overview)/data-provider";
 import { GlowIcon } from "../components/glow-icon";
+import { resolvePendingRedeployTarget } from "./pending-redeploy-target";
 
 export function PendingRedeployBanner() {
-  const { project, deployments, projectId } = useProjectData();
+  const { deployments, environments, projectId } = useProjectData();
   const router = useRouter();
   const workspace = useWorkspaceNavigation();
-  const visible = useSettingsBannerVisible();
-  const currentDeploymentId = project?.currentDeploymentId;
-
-  const currentDeployment = currentDeploymentId
-    ? deployments.find((d) => d.id === currentDeploymentId)
-    : undefined;
-
-  const show = visible && !!currentDeployment;
+  const changedEnvironmentIds = useSettingsBannerEnvironmentIds();
+  const target = resolvePendingRedeployTarget(
+    changedEnvironmentIds,
+    environments,
+    deployments,
+  );
+  const targetEnvironment = target?.environment;
+  const targetDeployment = target?.deployment;
+  const visible = changedEnvironmentIds.length > 0;
+  const show = visible && !!targetEnvironment && !!targetDeployment;
 
   const redeploy = trpc.deploy.deployment.redeploy.useMutation({
     onSuccess: async (data) => {
-      if (!currentDeployment) {
+      if (!targetDeployment || !targetEnvironment) {
         return;
       }
       await queryClient.invalidateQueries({ queryKey: ["deployments", projectId] });
       router.push(
         routes.projects.apps.deployment({
           workspaceSlug: workspace.slug,
-          projectId: currentDeployment.projectId,
-          appId: currentDeployment.appId,
+          projectId: targetDeployment.projectId,
+          appId: targetDeployment.appId,
           deploymentId: data.deploymentId,
         }),
       );
-      dismissSettingsBanner();
+      dismissSettingsBanner(targetEnvironment.id);
     },
     onError: (error) => {
       toast.error("Redeploy failed", { description: error.message });
@@ -52,7 +55,7 @@ export function PendingRedeployBanner() {
 
   useEffect(
     function getDismissedAutomatically() {
-      if (!visible || !currentDeploymentId) {
+      if (!visible) {
         return;
       }
       const timer = setTimeout(() => dismissSettingsBanner(), 10_000);
@@ -60,7 +63,7 @@ export function PendingRedeployBanner() {
         clearTimeout(timer);
       };
     },
-    [visible, currentDeploymentId],
+    [visible],
   );
 
   return (
@@ -91,7 +94,7 @@ export function PendingRedeployBanner() {
           <div className="flex flex-col gap-1 pr-5">
             <span className="text-sm font-semibold text-gray-12 leading-5">Changes detected</span>
             <span className="text-xs text-gray-11 leading-4">
-              Redeploy to apply your latest changes to production.
+              Redeploy to apply your latest changes to {targetEnvironment?.slug}.
             </span>
           </div>
           <Button
@@ -101,8 +104,8 @@ export function PendingRedeployBanner() {
             disabled={redeploy.isLoading}
             loading={redeploy.isLoading}
             onClick={() => {
-              if (currentDeployment) {
-                redeploy.mutate({ deploymentId: currentDeployment.id });
+              if (targetDeployment) {
+                redeploy.mutate({ deploymentId: targetDeployment.id });
               }
             }}
           >

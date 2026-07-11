@@ -55,6 +55,7 @@ export function EnvVarGroupRenameDialog({
           envVarIds: items.map((i) => i.id),
           key: values.key,
         }),
+        items.map((item) => item.environmentId),
       );
       await collection.envVars.utils.refetch();
       toast.success(`Renamed variable to "${values.key}" across ${items.length} environments`);

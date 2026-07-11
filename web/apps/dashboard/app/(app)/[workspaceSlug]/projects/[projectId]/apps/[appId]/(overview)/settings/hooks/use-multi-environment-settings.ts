@@ -25,17 +25,21 @@ export function useMultiEnvironmentSettings(): MultiEnvironmentSettings | null {
 
   const { data: productionData } = useLiveQuery(
     (q) =>
-      q
-        .from({ s: collection.environmentSettings })
-        .where(({ s }) => eq(s.environmentId, productionEnvId ?? "")),
+      productionEnvId
+        ? q
+            .from({ s: collection.environmentSettings })
+            .where(({ s }) => eq(s.environmentId, productionEnvId))
+        : undefined,
     [productionEnvId],
   );
 
   const { data: previewData } = useLiveQuery(
     (q) =>
-      q
-        .from({ s: collection.environmentSettings })
-        .where(({ s }) => eq(s.environmentId, previewEnvId ?? "")),
+      previewEnvId
+        ? q
+            .from({ s: collection.environmentSettings })
+            .where(({ s }) => eq(s.environmentId, previewEnvId))
+        : undefined,
     [previewEnvId],
   );
 
