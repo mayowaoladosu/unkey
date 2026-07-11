@@ -11,12 +11,12 @@ import (
 )
 
 const findDeploymentResourceByID = `-- name: FindDeploymentResourceByID :one
-SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE id = ?
+SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE id = ?
 `
 
 // FindDeploymentResourceByID
 //
-//	SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE id = ?
+//	SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE id = ?
 func (q *Queries) FindDeploymentResourceByID(ctx context.Context, id string) (DeploymentResource, error) {
 	row := q.db.QueryRowContext(ctx, findDeploymentResourceByID, id)
 	var i DeploymentResource
@@ -39,6 +39,8 @@ func (q *Queries) FindDeploymentResourceByID(ctx context.Context, id string) (De
 		&i.Schedule,
 		&i.Runtime,
 		&i.Handler,
+		&i.Bindings,
+		&i.AllowedCallers,
 		&i.CpuMillicores,
 		&i.MemoryMib,
 		&i.StorageMib,
@@ -48,12 +50,12 @@ func (q *Queries) FindDeploymentResourceByID(ctx context.Context, id string) (De
 }
 
 const findDeploymentResourceByK8sName = `-- name: FindDeploymentResourceByK8sName :one
-SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE k8s_name = ?
+SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE k8s_name = ?
 `
 
 // FindDeploymentResourceByK8sName
 //
-//	SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE k8s_name = ?
+//	SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE k8s_name = ?
 func (q *Queries) FindDeploymentResourceByK8sName(ctx context.Context, k8sName sql.NullString) (DeploymentResource, error) {
 	row := q.db.QueryRowContext(ctx, findDeploymentResourceByK8sName, k8sName)
 	var i DeploymentResource
@@ -76,6 +78,8 @@ func (q *Queries) FindDeploymentResourceByK8sName(ctx context.Context, k8sName s
 		&i.Schedule,
 		&i.Runtime,
 		&i.Handler,
+		&i.Bindings,
+		&i.AllowedCallers,
 		&i.CpuMillicores,
 		&i.MemoryMib,
 		&i.StorageMib,
@@ -85,7 +89,7 @@ func (q *Queries) FindDeploymentResourceByK8sName(ctx context.Context, k8sName s
 }
 
 const listDeploymentResourcesByDeployment = `-- name: ListDeploymentResourcesByDeployment :many
-SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at
+SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at
 FROM deployment_resources
 WHERE deployment_id = ?
 ORDER BY name ASC
@@ -93,7 +97,7 @@ ORDER BY name ASC
 
 // ListDeploymentResourcesByDeployment
 //
-//	SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at
+//	SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at
 //	FROM deployment_resources
 //	WHERE deployment_id = ?
 //	ORDER BY name ASC
@@ -125,6 +129,8 @@ func (q *Queries) ListDeploymentResourcesByDeployment(ctx context.Context, deplo
 			&i.Schedule,
 			&i.Runtime,
 			&i.Handler,
+			&i.Bindings,
+			&i.AllowedCallers,
 			&i.CpuMillicores,
 			&i.MemoryMib,
 			&i.StorageMib,

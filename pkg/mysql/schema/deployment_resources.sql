@@ -17,6 +17,8 @@ CREATE TABLE `deployment_resources` (
 	`schedule` varchar(128),
 	`runtime` varchar(64),
 	`handler` varchar(512),
+	`bindings` json NOT NULL DEFAULT (JSON_ARRAY()),
+	`allowed_callers` json NOT NULL DEFAULT (JSON_ARRAY()),
 	`cpu_millicores` int NOT NULL,
 	`memory_mib` int NOT NULL,
 	`storage_mib` int unsigned NOT NULL DEFAULT 0,

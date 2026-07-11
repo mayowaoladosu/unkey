@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 )
 
@@ -40,12 +41,19 @@ const (
 
 type RouteKind string
 
+type BindingProtocol string
+
 const (
 	RouteKindDeployment  RouteKind = "deployment"
 	RouteKindCommit      RouteKind = "commit"
 	RouteKindBranch      RouteKind = "branch"
 	RouteKindEnvironment RouteKind = "environment"
 	RouteKindLive        RouteKind = "live"
+)
+
+const (
+	BindingProtocolHTTP BindingProtocol = "http"
+	BindingProtocolTCP  BindingProtocol = "tcp"
 )
 
 type Source struct {
@@ -77,6 +85,15 @@ type Output struct {
 	Command          []string   `json:"command,omitempty"`
 	Schedule         string     `json:"schedule,omitempty"`
 	Public           bool       `json:"public,omitempty"`
+	Bindings         []Binding  `json:"bindings,omitempty"`
+}
+
+// Binding grants one workload a typed private endpoint to another service or
+// function in the same immutable deployment.
+type Binding struct {
+	Name     string          `json:"name"`
+	Resource string          `json:"resource"`
+	Protocol BindingProtocol `json:"protocol,omitempty"`
 }
 
 type Runtime struct {
@@ -152,6 +169,15 @@ func Compile(plan Plan) (Compiled, error) {
 	}
 
 	outputs := slices.Clone(plan.Outputs)
+	for i := range outputs {
+		outputs[i].Bindings = slices.Clone(outputs[i].Bindings)
+		slices.SortFunc(outputs[i].Bindings, func(a, b Binding) int {
+			if a.Name != b.Name {
+				return compare(a.Name, b.Name)
+			}
+			return compare(a.Resource, b.Resource)
+		})
+	}
 	slices.SortFunc(outputs, func(a, b Output) int {
 		if a.Kind != b.Kind {
 			return compare(string(a.Kind), string(b.Kind))
@@ -225,16 +251,16 @@ func validate(plan Plan) error {
 	if len(plan.Outputs) == 0 {
 		return fmt.Errorf("deployment manifest requires at least one output")
 	}
-	outputNames := make(map[string]struct{}, len(plan.Outputs))
+	outputsByName := make(map[string]Output, len(plan.Outputs))
 	publicOutputs := 0
 	for _, output := range plan.Outputs {
 		if output.Name == "" {
 			return fmt.Errorf("deployment output requires a name")
 		}
-		if _, exists := outputNames[output.Name]; exists {
+		if _, exists := outputsByName[output.Name]; exists {
 			return fmt.Errorf("deployment output name %q is duplicated", output.Name)
 		}
-		outputNames[output.Name] = struct{}{}
+		outputsByName[output.Name] = output
 		if output.Public {
 			publicOutputs++
 		}
@@ -271,6 +297,35 @@ func validate(plan Plan) error {
 	}
 	if publicOutputs > 1 {
 		return fmt.Errorf("deployment manifest supports at most one public output")
+	}
+	bindingName := regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
+	for _, output := range plan.Outputs {
+		if output.Kind == OutputKindStatic && len(output.Bindings) > 0 {
+			return fmt.Errorf("static output %q cannot consume private bindings", output.Name)
+		}
+		seenBindings := make(map[string]struct{}, len(output.Bindings))
+		for _, binding := range output.Bindings {
+			if !bindingName.MatchString(binding.Name) {
+				return fmt.Errorf("binding name %q on output %q must be an uppercase environment prefix", binding.Name, output.Name)
+			}
+			if _, exists := seenBindings[binding.Name]; exists {
+				return fmt.Errorf("binding name %q is duplicated on output %q", binding.Name, output.Name)
+			}
+			seenBindings[binding.Name] = struct{}{}
+			target, exists := outputsByName[binding.Resource]
+			if !exists {
+				return fmt.Errorf("binding %q on output %q references unknown resource %q", binding.Name, output.Name, binding.Resource)
+			}
+			if binding.Resource == output.Name {
+				return fmt.Errorf("binding %q on output %q cannot reference itself", binding.Name, output.Name)
+			}
+			if target.Kind != OutputKindContainer && target.Kind != OutputKindFunction {
+				return fmt.Errorf("binding %q on output %q must target a service or function", binding.Name, output.Name)
+			}
+			if binding.Protocol != "" && binding.Protocol != BindingProtocolHTTP && binding.Protocol != BindingProtocolTCP {
+				return fmt.Errorf("binding %q on output %q has unsupported protocol %q", binding.Name, output.Name, binding.Protocol)
+			}
+		}
 	}
 	return nil
 }

@@ -202,9 +202,15 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 
 	// --- Starting ---
 	err = w.DeploymentStep(ctx, db.DeploymentStepsStepStarting, deployment, func(stepCtx restate.ObjectContext) error {
+		var portErr error
+		if len(manifest.Outputs) == 0 {
+			portErr = assert.All(
+				assert.Greater(deployment.Port, int32(0), "Port must be greater than 0"),
+				assert.LessOrEqual(deployment.Port, int32(65535), "Port cannot exceed 65535"),
+			)
+		}
 		if err := assert.All(
-			assert.Greater(deployment.Port, int32(0), "Port must be greater than 0"),
-			assert.LessOrEqual(deployment.Port, int32(65535), "Port cannot exceed 65535"),
+			portErr,
 			assert.Greater(deployment.CpuMillicores, int32(0), "CPU millicores must be greater than 0"),
 			assert.Greater(deployment.MemoryMib, int32(0), "MemoryMib must be greater than 0"),
 		); err != nil {
@@ -324,6 +330,9 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 
 	// --- Network ---
 	err = w.DeploymentStep(ctx, db.DeploymentStepsStepNetwork, deployment, func(stepCtx restate.ObjectContext) error {
+		if inferredPublicOutput(manifest.Outputs) == "" {
+			return nil
+		}
 		return w.configureRouting(stepCtx, workspace, project, app, environment, deployment)
 	})
 	if err != nil {

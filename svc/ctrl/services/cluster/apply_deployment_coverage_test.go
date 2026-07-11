@@ -49,20 +49,22 @@ func fullDeploymentRow() deploymentRow {
 			},
 		},
 		resource: &db.DeploymentResource{
-			ID:            "resource_sentinel",
-			Name:          "web-sentinel",
-			Kind:          db.DeploymentResourcesKindService,
-			K8sName:       sql.NullString{Valid: true, String: "k8s-name-sentinel"},
-			Image:         sql.NullString{Valid: true, String: "registry.io/sentinel:v1"},
-			Command:       json.RawMessage(`["/sentinel-app","serve"]`),
-			Port:          8080,
-			Public:        true,
-			Schedule:      sql.NullString{Valid: true, String: "*/5 * * * *"},
-			Runtime:       sql.NullString{Valid: true, String: "nodejs22"},
-			Handler:       sql.NullString{Valid: true, String: "src/index.handler"},
-			CpuMillicores: 250,
-			MemoryMib:     256,
-			StorageMib:    2048,
+			ID:             "resource_sentinel",
+			Name:           "web-sentinel",
+			Kind:           db.DeploymentResourcesKindService,
+			K8sName:        sql.NullString{Valid: true, String: "k8s-name-sentinel"},
+			Image:          sql.NullString{Valid: true, String: "registry.io/sentinel:v1"},
+			Command:        json.RawMessage(`["/sentinel-app","serve"]`),
+			Port:           8080,
+			Public:         true,
+			Schedule:       sql.NullString{Valid: true, String: "*/5 * * * *"},
+			Runtime:        sql.NullString{Valid: true, String: "nodejs22"},
+			Handler:        sql.NullString{Valid: true, String: "src/index.handler"},
+			Bindings:       json.RawMessage(`[{"name":"API","resourceId":"resource_api","resourceName":"api","protocol":"http","host":"api-service","port":8080}]`),
+			AllowedCallers: json.RawMessage(`["resource_worker"]`),
+			CpuMillicores:  250,
+			MemoryMib:      256,
+			StorageMib:     2048,
 		},
 		k8sNamespace:    sql.NullString{Valid: true, String: "ns-sentinel"},
 		environmentSlug: "production",
@@ -173,6 +175,15 @@ var producerFieldAssertions = map[string]func(t *testing.T, a *ctrlv1.ApplyDeplo
 	},
 	"handler": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
 		require.Equal(t, "src/index.handler", a.GetHandler())
+	},
+	"bindings": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Len(t, a.GetBindings(), 1)
+		require.Equal(t, "API", a.GetBindings()[0].GetName())
+		require.Equal(t, "resource_api", a.GetBindings()[0].GetResourceId())
+		require.Equal(t, "api-service", a.GetBindings()[0].GetHost())
+	},
+	"allowed_callers": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, []string{"resource_worker"}, a.GetAllowedCallers())
 	},
 }
 

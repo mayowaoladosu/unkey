@@ -111,6 +111,9 @@ func TestCompileSupportsOneImageServicesWorkersAndCron(t *testing.T) {
 				Kind:    OutputKindWorker,
 				Name:    "emails",
 				Command: []string{"node", "worker.js"},
+				Bindings: []Binding{
+					{Name: "WEB", Resource: "web", Protocol: BindingProtocolHTTP},
+				},
 			},
 			{
 				Kind:     OutputKindCron,
@@ -130,6 +133,7 @@ func TestCompileSupportsOneImageServicesWorkersAndCron(t *testing.T) {
 	require.Equal(t, OutputKindContainer, compiled.Manifest.Outputs[0].Kind)
 	require.Equal(t, OutputKindCron, compiled.Manifest.Outputs[1].Kind)
 	require.Equal(t, OutputKindWorker, compiled.Manifest.Outputs[2].Kind)
+	require.Equal(t, []Binding{{Name: "WEB", Resource: "web", Protocol: BindingProtocolHTTP}}, compiled.Manifest.Outputs[2].Bindings)
 
 	_, err = Compile(Plan{
 		Source: Source{Kind: SourceKindDockerImage, DockerImage: "example.com/app:latest"},
@@ -149,4 +153,14 @@ func TestCompileSupportsOneImageServicesWorkersAndCron(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "requires a command")
+
+	_, err = Compile(Plan{
+		Source: Source{Kind: SourceKindDockerImage, DockerImage: "example.com/app:latest"},
+		Build:  Build{Strategy: BuildStrategyPrebuilt},
+		Outputs: []Output{
+			{Kind: OutputKindContainer, Name: "web", Port: 3000},
+			{Kind: OutputKindWorker, Name: "worker", Command: []string{"run"}, Bindings: []Binding{{Name: "API", Resource: "missing"}}},
+		},
+	})
+	require.ErrorContains(t, err, "references unknown resource")
 }

@@ -30,11 +30,15 @@ INSERT INTO deployment_resources (
   schedule,
   runtime,
   handler,
+  bindings,
+  allowed_callers,
   cpu_millicores,
   memory_mib,
   storage_mib,
   created_at
 ) VALUES (
+  ?,
+  ?,
   ?,
   ?,
   ?,
@@ -78,6 +82,8 @@ type InsertDeploymentResourceParams struct {
 	Schedule         sql.NullString                      `db:"schedule"`
 	Runtime          sql.NullString                      `db:"runtime"`
 	Handler          sql.NullString                      `db:"handler"`
+	Bindings         json.RawMessage                     `db:"bindings"`
+	AllowedCallers   json.RawMessage                     `db:"allowed_callers"`
 	CpuMillicores    int32                               `db:"cpu_millicores"`
 	MemoryMib        int32                               `db:"memory_mib"`
 	StorageMib       uint32                              `db:"storage_mib"`
@@ -104,11 +110,15 @@ type InsertDeploymentResourceParams struct {
 //	  schedule,
 //	  runtime,
 //	  handler,
+//	  bindings,
+//	  allowed_callers,
 //	  cpu_millicores,
 //	  memory_mib,
 //	  storage_mib,
 //	  created_at
 //	) VALUES (
+//	  ?,
+//	  ?,
 //	  ?,
 //	  ?,
 //	  ?,
@@ -151,6 +161,8 @@ func (q *Queries) InsertDeploymentResource(ctx context.Context, arg InsertDeploy
 		arg.Schedule,
 		arg.Runtime,
 		arg.Handler,
+		arg.Bindings,
+		arg.AllowedCallers,
 		arg.CpuMillicores,
 		arg.MemoryMib,
 		arg.StorageMib,

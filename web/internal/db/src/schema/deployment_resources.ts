@@ -37,6 +37,20 @@ export const deploymentResources = mysqlTable(
     schedule: varchar("schedule", { length: 128 }),
     runtime: varchar("runtime", { length: 64 }),
     handler: varchar("handler", { length: 512 }),
+    bindings: json("bindings")
+      .$type<
+        Array<{
+          name: string;
+          resourceId: string;
+          resourceName: string;
+          protocol: "http" | "tcp";
+          host: string;
+          port: number;
+        }>
+      >()
+      .notNull()
+      .default(sql`(JSON_ARRAY())`),
+    allowedCallers: json("allowed_callers").$type<string[]>().notNull().default(sql`(JSON_ARRAY())`),
     cpuMillicores: int("cpu_millicores").notNull(),
     memoryMib: int("memory_mib").notNull(),
     storageMib: int("storage_mib", { unsigned: true }).notNull().default(0),

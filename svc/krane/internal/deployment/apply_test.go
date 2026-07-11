@@ -94,6 +94,15 @@ func fullApplyRequest(t *testing.T) *ctrlv1.ApplyDeployment {
 		Schedule:                      testSchedule,
 		Runtime:                       ptr.P(testRuntime),
 		Handler:                       ptr.P(testHandler),
+		Bindings: []*ctrlv1.PrivateBinding{{
+			Name:         "API",
+			ResourceId:   "resource_api",
+			ResourceName: "api",
+			Protocol:     "http",
+			Host:         "api-service",
+			Port:         8081,
+		}},
+		AllowedCallers: []string{"resource_worker"},
 	}
 }
 
@@ -307,13 +316,27 @@ var fieldAssertions = map[string]func(t *testing.T, rs *appsv1.ReplicaSet){
 		require.True(t, ok)
 		require.Equal(t, testHandler, v)
 	},
+	"bindings": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		container := mainContainer(t, rs)
+		for name, expected := range map[string]string{
+			"API_HOST":     "api-service",
+			"API_PORT":     "8081",
+			"API_PROTOCOL": "http",
+			"API_URL":      "http://api-service:8081",
+		} {
+			actual, ok := envValue(container, name)
+			require.True(t, ok)
+			require.Equal(t, expected, actual)
+		}
+	},
 }
 
 // fieldsRenderedElsewhere lists proto fields that intentionally do not surface
 // in the ReplicaSet, with the reason.
 var fieldsRenderedElsewhere = map[string]string{
-	"autoscaling": "rendered into a HorizontalPodAutoscaler by ensureHPAExists, not the ReplicaSet",
-	"public":      "controls Service and Cilium ingress materialization outside the ReplicaSet renderer",
+	"autoscaling":     "rendered into a HorizontalPodAutoscaler by ensureHPAExists, not the ReplicaSet",
+	"public":          "controls Service and Cilium ingress materialization outside the ReplicaSet renderer",
+	"allowed_callers": "rendered into the Cilium ingress policy outside the ReplicaSet renderer",
 }
 
 // labelDeploymentIDKey returns the label key used for the deployment id by

@@ -9,7 +9,7 @@ import (
 )
 
 // bulkInsertDeploymentResource is the base query for bulk insert
-const bulkInsertDeploymentResource = `INSERT INTO deployment_resources ( id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at ) VALUES %s ON DUPLICATE KEY UPDATE id = id`
+const bulkInsertDeploymentResource = `INSERT INTO deployment_resources ( id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, bindings, allowed_callers, cpu_millicores, memory_mib, storage_mib, created_at ) VALUES %s ON DUPLICATE KEY UPDATE id = id`
 
 // InsertDeploymentResources performs bulk insert in a single query
 func (q *BulkQueries) InsertDeploymentResources(ctx context.Context, db DBTX, args []InsertDeploymentResourceParams) error {
@@ -21,7 +21,7 @@ func (q *BulkQueries) InsertDeploymentResources(ctx context.Context, db DBTX, ar
 	// Build the bulk insert query
 	valueClauses := make([]string, len(args))
 	for i := range args {
-		valueClauses[i] = "( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"
+		valueClauses[i] = "( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"
 	}
 
 	bulkQuery := fmt.Sprintf(bulkInsertDeploymentResource, strings.Join(valueClauses, ", "))
@@ -46,6 +46,8 @@ func (q *BulkQueries) InsertDeploymentResources(ctx context.Context, db DBTX, ar
 		allArgs = append(allArgs, arg.Schedule)
 		allArgs = append(allArgs, arg.Runtime)
 		allArgs = append(allArgs, arg.Handler)
+		allArgs = append(allArgs, arg.Bindings)
+		allArgs = append(allArgs, arg.AllowedCallers)
 		allArgs = append(allArgs, arg.CpuMillicores)
 		allArgs = append(allArgs, arg.MemoryMib)
 		allArgs = append(allArgs, arg.StorageMib)

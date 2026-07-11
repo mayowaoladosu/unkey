@@ -273,6 +273,17 @@ enum DeploymentResourceKind {
   DEPLOYMENT_RESOURCE_KIND_CRON = 4;
 }
 
+// PrivateBinding is a resolved, immutable endpoint grant from one resource to
+// another service or function in the same deployment.
+message PrivateBinding {
+  string name = 1;
+  string resource_id = 2;
+  string resource_name = 3;
+  string protocol = 4;
+  string host = 5;
+  int32 port = 6;
+}
+
 // ApplyDeployment contains the desired configuration for a deployment.
 //
 // The cluster agent will ensure a deployment exists with this exact configuration, creating it if
@@ -362,6 +373,8 @@ message ApplyDeployment {
   string schedule = 34;
   optional string runtime = 35;
   optional string handler = 36;
+  repeated PrivateBinding bindings = 37;
+  repeated string allowed_callers = 38;
 }
 
 // AutoscalingPolicy configures horizontal pod autoscaling for a deployment.

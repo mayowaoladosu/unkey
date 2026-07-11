@@ -133,7 +133,10 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 		return fmt.Errorf("failed to ensure HPA: %w", err)
 	}
 
-	if req.GetPublic() && servesHTTP(req) {
+	if servesHTTP(req) {
+		if err := c.ensureWorkloadService(ctx, req, replicaSetOwnerRef(applied)); err != nil {
+			return err
+		}
 		if err := c.ensureCiliumNetworkPolicy(ctx, req, applied); err != nil {
 			return fmt.Errorf("failed to ensure cilium network policy: %w", err)
 		}
@@ -285,6 +288,15 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 	}
 	if req.GetSchedule() != "" {
 		container.Env = append(container.Env, corev1.EnvVar{Name: "LAYER_RAIL_CRON_SCHEDULE", Value: req.GetSchedule()})
+	}
+	for _, binding := range req.GetBindings() {
+		prefix := binding.GetName()
+		container.Env = append(container.Env,
+			corev1.EnvVar{Name: prefix + "_HOST", Value: binding.GetHost()},
+			corev1.EnvVar{Name: prefix + "_PORT", Value: strconv.Itoa(int(binding.GetPort()))},
+			corev1.EnvVar{Name: prefix + "_PROTOCOL", Value: binding.GetProtocol()},
+			corev1.EnvVar{Name: prefix + "_URL", Value: fmt.Sprintf("%s://%s:%d", binding.GetProtocol(), binding.GetHost(), binding.GetPort())},
+		)
 	}
 
 	// Mount the deployment secret as env vars if present

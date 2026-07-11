@@ -1511,6 +1511,8 @@ type DeploymentResource struct {
 	Schedule         sql.NullString                      `db:"schedule"`
 	Runtime          sql.NullString                      `db:"runtime"`
 	Handler          sql.NullString                      `db:"handler"`
+	Bindings         json.RawMessage                     `db:"bindings"`
+	AllowedCallers   json.RawMessage                     `db:"allowed_callers"`
 	CpuMillicores    int32                               `db:"cpu_millicores"`
 	MemoryMib        int32                               `db:"memory_mib"`
 	StorageMib       uint32                              `db:"storage_mib"`

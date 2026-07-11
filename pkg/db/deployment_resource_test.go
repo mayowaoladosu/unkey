@@ -55,6 +55,8 @@ func TestDeploymentResourcesPersistIndependentWorkloads(t *testing.T) {
 			Port:             3000,
 			UpstreamProtocol: DeploymentResourcesUpstreamProtocolHttp1,
 			Public:           true,
+			Bindings:         json.RawMessage(`[]`),
+			AllowedCallers:   json.RawMessage(`["resource_worker"]`),
 			CpuMillicores:    250,
 			MemoryMib:        256,
 			CreatedAt:        now,
@@ -74,6 +76,8 @@ func TestDeploymentResourcesPersistIndependentWorkloads(t *testing.T) {
 			Port:             0,
 			UpstreamProtocol: DeploymentResourcesUpstreamProtocolHttp1,
 			Public:           false,
+			Bindings:         json.RawMessage(`[{"name":"WEB","resourceId":"` + webID + `","resourceName":"web","protocol":"http","host":"web-service","port":3000}]`),
+			AllowedCallers:   json.RawMessage(`[]`),
 			CpuMillicores:    250,
 			MemoryMib:        256,
 			CreatedAt:        now,
@@ -93,6 +97,7 @@ func TestDeploymentResourcesPersistIndependentWorkloads(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, web.Public)
 	require.JSONEq(t, `["node","server.js"]`, string(web.Command))
+	require.JSONEq(t, `["resource_worker"]`, string(web.AllowedCallers))
 
 	regionID := uid.New("region")
 	require.NoError(t, Query.InsertDeploymentTopology(ctx, database.RW(), InsertDeploymentTopologyParams{

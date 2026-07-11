@@ -250,6 +250,8 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 		schedule := ""
 		var runtime *string
 		var handler *string
+		bindings := []*ctrlv1.PrivateBinding{}
+		allowedCallers := []string{}
 		if row.resource != nil {
 			if err := json.Unmarshal(row.resource.Command, &command); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal command for deployment resource %q: %w", row.resource.ID, err)
@@ -271,6 +273,27 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 			if row.resource.Handler.Valid {
 				handler = &row.resource.Handler.String
 			}
+			var storedBindings []storedPrivateBinding
+			if len(row.resource.Bindings) > 0 {
+				if err := json.Unmarshal(row.resource.Bindings, &storedBindings); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal bindings for deployment resource %q: %w", row.resource.ID, err)
+				}
+			}
+			for _, binding := range storedBindings {
+				bindings = append(bindings, &ctrlv1.PrivateBinding{
+					Name:         binding.Name,
+					ResourceId:   binding.ResourceID,
+					ResourceName: binding.ResourceName,
+					Protocol:     binding.Protocol,
+					Host:         binding.Host,
+					Port:         binding.Port,
+				})
+			}
+			if len(row.resource.AllowedCallers) > 0 {
+				if err := json.Unmarshal(row.resource.AllowedCallers, &allowedCallers); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal allowed callers for deployment resource %q: %w", row.resource.ID, err)
+				}
+			}
 		}
 
 		apply := &ctrlv1.ApplyDeployment{
@@ -282,6 +305,8 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 			Schedule:                      schedule,
 			Runtime:                       runtime,
 			Handler:                       handler,
+			Bindings:                      bindings,
+			AllowedCallers:                allowedCallers,
 			K8SNamespace:                  row.k8sNamespace.String,
 			K8SName:                       k8sName,
 			WorkspaceId:                   row.d.WorkspaceID,
@@ -348,6 +373,15 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 	default:
 		return nil, fmt.Errorf("unknown DeploymentTopologyDesiredStatus: %v", row.dt.DesiredStatus)
 	}
+}
+
+type storedPrivateBinding struct {
+	Name         string `json:"name"`
+	ResourceID   string `json:"resourceId"`
+	ResourceName string `json:"resourceName"`
+	Protocol     string `json:"protocol"`
+	Host         string `json:"host"`
+	Port         int32  `json:"port"`
 }
 
 func deploymentResourceKindToProto(kind db.DeploymentResourcesKind) ctrlv1.DeploymentResourceKind {

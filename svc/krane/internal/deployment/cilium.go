@@ -23,6 +23,31 @@ import (
 // ReplicaSet so it is garbage-collected automatically when the deployment
 // is deleted.
 func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet) error {
+	policy := buildCiliumNetworkPolicy(req, rs)
+	policyName := policy.GetName()
+
+	gvr := schema.GroupVersionResource{
+		Group:    "cilium.io",
+		Version:  "v2",
+		Resource: "ciliumnetworkpolicies",
+	}
+
+	// Server-side apply so concurrent reconciles converge instead of
+	// fighting over field ownership.
+	_, err := c.dynamicClient.Resource(gvr).Namespace(req.GetK8SNamespace()).Apply(
+		ctx,
+		policyName,
+		policy,
+		metav1.ApplyOptions{FieldManager: fieldManagerKrane},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to apply cilium network policy: %w", err)
+	}
+
+	return nil
+}
+
+func buildCiliumNetworkPolicy(req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet) *unstructured.Unstructured {
 	policyName := fmt.Sprintf("%s-frontline-ingress", req.GetK8SName())
 	endpointLabels := map[string]interface{}{
 		labels.LabelKeyDeploymentID: req.GetDeploymentId(),
@@ -30,8 +55,19 @@ func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.
 	if req.GetResourceId() != "" {
 		endpointLabels[labels.LabelKeyResourceID] = req.GetResourceId()
 	}
+	ingress := make([]interface{}, 0, len(req.GetAllowedCallers())+1)
+	if req.GetPublic() {
+		ingress = append(ingress, ciliumIngressRule(req.GetPort(), map[string]interface{}{
+			labels.LabelKeyNamespace: frontlineNamespace,
+		}))
+	}
+	for _, callerID := range req.GetAllowedCallers() {
+		ingress = append(ingress, ciliumIngressRule(req.GetPort(), map[string]interface{}{
+			labels.LabelKeyResourceID: callerID,
+		}))
+	}
 
-	policy := &unstructured.Unstructured{
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "cilium.io/v2",
 			"kind":       "CiliumNetworkPolicy",
@@ -63,48 +99,26 @@ func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.
 				"endpointSelector": map[string]interface{}{
 					"matchLabels": endpointLabels,
 				},
-				"ingress": []interface{}{
+				"ingress": ingress,
+			},
+		},
+	}
+}
+
+func ciliumIngressRule(port int32, fromLabels map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"fromEndpoints": []interface{}{
+			map[string]interface{}{"matchLabels": fromLabels},
+		},
+		"toPorts": []interface{}{
+			map[string]interface{}{
+				"ports": []interface{}{
 					map[string]interface{}{
-						"fromEndpoints": []interface{}{
-							map[string]interface{}{
-								"matchLabels": map[string]interface{}{
-									labels.LabelKeyNamespace: frontlineNamespace,
-								},
-							},
-						},
-						"toPorts": []interface{}{
-							map[string]interface{}{
-								"ports": []interface{}{
-									map[string]interface{}{
-										"port":     strconv.Itoa(int(req.GetPort())),
-										"protocol": "TCP",
-									},
-								},
-							},
-						},
+						"port":     strconv.Itoa(int(port)),
+						"protocol": "TCP",
 					},
 				},
 			},
 		},
 	}
-
-	gvr := schema.GroupVersionResource{
-		Group:    "cilium.io",
-		Version:  "v2",
-		Resource: "ciliumnetworkpolicies",
-	}
-
-	// Server-side apply so concurrent reconciles converge instead of
-	// fighting over field ownership.
-	_, err := c.dynamicClient.Resource(gvr).Namespace(req.GetK8SNamespace()).Apply(
-		ctx,
-		policyName,
-		policy,
-		metav1.ApplyOptions{FieldManager: fieldManagerKrane},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to apply cilium network policy: %w", err)
-	}
-
-	return nil
 }

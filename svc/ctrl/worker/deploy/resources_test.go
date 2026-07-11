@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ func TestResourceMappingAndPublicOutputInference(t *testing.T) {
 		{Kind: deploymanifest.OutputKindContainer, Name: "web", Port: 3000},
 		{Kind: deploymanifest.OutputKindContainer, Name: "admin", Port: 3001},
 	}
-	require.Equal(t, "web", inferredPublicOutput(outputs))
+	require.Empty(t, inferredPublicOutput(outputs), "multi-resource manifests require an explicit public output")
 	outputs[2].Public = true
 	require.Equal(t, "admin", inferredPublicOutput(outputs))
 
@@ -30,4 +31,35 @@ func TestResourceMappingAndPublicOutputInference(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 	}
+}
+
+func TestResolvePrivateBindingsBuildsEndpointAndInboundPolicy(t *testing.T) {
+	outputs := []deploymanifest.Output{
+		{Kind: deploymanifest.OutputKindContainer, Name: "api", Port: 8080},
+		{
+			Kind:    deploymanifest.OutputKindWorker,
+			Name:    "emails",
+			Command: []string{"node", "worker.js"},
+			Bindings: []deploymanifest.Binding{{
+				Name:     "API",
+				Resource: "api",
+			}},
+		},
+	}
+	identities := map[string]materializedResourceIdentity{
+		"api":    {id: "resource_api", k8sName: sql.NullString{Valid: true, String: "deploy-api"}, port: 8080},
+		"emails": {id: "resource_emails", k8sName: sql.NullString{Valid: true, String: "deploy-emails"}},
+	}
+
+	bindings, callers, err := resolvePrivateBindings(outputs, identities)
+	require.NoError(t, err)
+	require.Equal(t, []resolvedPrivateBinding{{
+		Name:         "API",
+		ResourceID:   "resource_api",
+		ResourceName: "api",
+		Protocol:     deploymanifest.BindingProtocolHTTP,
+		Host:         "deploy-api",
+		Port:         8080,
+	}}, bindings["emails"])
+	require.Equal(t, []string{"resource_emails"}, callers["resource_api"])
 }
