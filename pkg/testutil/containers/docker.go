@@ -570,8 +570,9 @@ func sortedMapKeys(values map[string]string) []string {
 
 // testContainerScope returns the logical owner for reusable containers.
 //
-// mise sets this to the worktree root. Direct test invocations fall back to
-// runfiles paths when the surrounding test runner provides them.
+// mise sets this to the worktree root. Test runners may provide runfiles paths;
+// direct multi-package `go test` invocations fall back to the source repository
+// root so every package shares one service set instead of starting its own.
 func testContainerScope() string {
 	if scope := os.Getenv(containerScopeEnv); scope != "" {
 		return scope
@@ -582,11 +583,7 @@ func testContainerScope() string {
 	if scope := os.Getenv("TEST_SRCDIR"); scope != "" {
 		return scope
 	}
-	wd, err := os.Getwd()
-	if err == nil {
-		return wd
-	}
-	return "unknown"
+	return sourceRepoRoot()
 }
 
 // testContainerScopeHash returns a compact Docker-safe scope identifier.

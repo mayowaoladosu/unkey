@@ -3,6 +3,7 @@ package containers
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -10,6 +11,18 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/stretchr/testify/require"
 )
+
+func TestContainerScopeDefaultsToRepositoryRoot(t *testing.T) {
+	t.Setenv(containerScopeEnv, "")
+	t.Setenv("BUILD_WORKSPACE_DIRECTORY", "")
+	t.Setenv("TEST_SRCDIR", "")
+
+	expected, err := filepath.Abs(sourceRepoRoot())
+	require.NoError(t, err)
+	actual, err := filepath.Abs(testContainerScope())
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+}
 
 func TestCreateOrAttachReusableContainer_AttachesAfterConflict(t *testing.T) {
 	t.Parallel()
