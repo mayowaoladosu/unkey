@@ -2084,6 +2084,14 @@ type Querier interface {
 	//  SET invocation_id = ?, updated_at = ?
 	//  WHERE id = ?
 	UpdateDeploymentInvocationID(ctx context.Context, arg UpdateDeploymentInvocationIDParams) error
+	//UpdateDeploymentResourceTopologyDesiredStatus
+	//
+	//  UPDATE deployment_topology
+	//  SET desired_status = ?, updated_at = ?
+	//  WHERE deployment_id = ?
+	//    AND resource_id = ?
+	//    AND region_id = ?
+	UpdateDeploymentResourceTopologyDesiredStatus(ctx context.Context, arg UpdateDeploymentResourceTopologyDesiredStatusParams) error
 	//UpdateDeploymentStatus
 	//
 	//  UPDATE deployments

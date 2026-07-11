@@ -556,6 +556,9 @@ func (w *Workflow) buildImage(
 		}
 		deployment.Image = sql.NullString{Valid: true, String: dockerImage}
 	}
+	if _, err := w.materializeDeploymentResources(ctx, *deployment, manifest); err != nil {
+		return fault.Wrap(err, fault.Public("Deployment resources could not be materialized."))
+	}
 
 	return nil
 }
@@ -598,6 +601,25 @@ func (w *Workflow) createTopologies(
 	workspace db.Workspace,
 	deployment db.Deployment,
 ) ([]db.InsertDeploymentTopologyParams, error) {
+	resources, err := restate.Run(ctx, func(runCtx restate.RunContext) ([]db.DeploymentResource, error) {
+		return w.db.ListDeploymentResourcesByDeployment(runCtx, deployment.ID)
+	}, restate.WithName("find deployment resources for topology"), restate.WithMaxRetryAttempts(runMaxAttempts))
+	if err != nil {
+		return nil, fault.Wrap(err, fault.Public("Failed to read deployment resources."))
+	}
+	runtimeResources := make([]db.DeploymentResource, 0, len(resources))
+	for _, resource := range resources {
+		if resource.Kind != db.DeploymentResourcesKindStatic {
+			runtimeResources = append(runtimeResources, resource)
+		}
+	}
+	if len(runtimeResources) == 0 {
+		return nil, fault.Wrap(
+			restate.TerminalError(fmt.Errorf("deployment %s has no runtime resources", deployment.ID), 400),
+			fault.Public("No runtime resources were found for this deployment."),
+		)
+	}
+
 	// Read regional settings to determine per-region replica counts.
 	// If no regional settings exist, fail with a terminal error.
 	regionalSettings, err := restate.Run(ctx, func(runCtx restate.RunContext) ([]db.FindAppRegionalSettingsByAppAndEnvRow, error) {
@@ -657,9 +679,15 @@ func (w *Workflow) createTopologies(
 		if rs.AutoscalingReplicasMax.Valid {
 			maxReplicas = rs.AutoscalingReplicasMax.Int32
 		}
-		allocatedResources.TotalCpuMillicores += int64(deployment.CpuMillicores * maxReplicas)
-		allocatedResources.TotalMemoryMib += int64(deployment.MemoryMib * maxReplicas)
-		allocatedResources.TotalStorageMib += int64(deployment.StorageMib) * int64(maxReplicas)
+		for _, resource := range runtimeResources {
+			resourceReplicas := maxReplicas
+			if resource.Kind == db.DeploymentResourcesKindCron {
+				resourceReplicas = 1
+			}
+			allocatedResources.TotalCpuMillicores += int64(resource.CpuMillicores * resourceReplicas)
+			allocatedResources.TotalMemoryMib += int64(resource.MemoryMib * resourceReplicas)
+			allocatedResources.TotalStorageMib += int64(resource.StorageMib) * int64(resourceReplicas)
+		}
 	}
 	if allocatedResources.TotalCpuMillicores > int64(quota.AllocatedCpuMillicoresTotal) {
 		return nil, fault.Wrap(
@@ -680,43 +708,51 @@ func (w *Workflow) createTopologies(
 		)
 	}
 
-	topologies := make([]db.InsertDeploymentTopologyParams, 0, len(regionalSettings))
+	topologies := make([]db.InsertDeploymentTopologyParams, 0, len(regionalSettings)*len(runtimeResources))
 
-	for _, rs := range regionalSettings {
+	for _, resource := range runtimeResources {
+		for _, rs := range regionalSettings {
 
-		// Snapshot autoscaling policy values. When no policy is attached,
-		// default to min=1, max=1 (single replica). Once all regional settings
-		// have an autoscaling policy this fallback can be removed.
-		autoscalingMin := uint32(1)
-		autoscalingMax := uint32(1)
-		if rs.AutoscalingReplicasMin.Valid {
-			autoscalingMin = uint32(rs.AutoscalingReplicasMin.Int32)
-		}
-		if rs.AutoscalingReplicasMax.Valid {
-			autoscalingMax = uint32(rs.AutoscalingReplicasMax.Int32)
-		}
+			// Snapshot autoscaling policy values. When no policy is attached,
+			// default to min=1, max=1 (single replica). Once all regional settings
+			// have an autoscaling policy this fallback can be removed.
+			autoscalingMin := uint32(1)
+			autoscalingMax := uint32(1)
+			if rs.AutoscalingReplicasMin.Valid {
+				autoscalingMin = uint32(rs.AutoscalingReplicasMin.Int32)
+			}
+			if rs.AutoscalingReplicasMax.Valid {
+				autoscalingMax = uint32(rs.AutoscalingReplicasMax.Int32)
+			}
 
-		// Clamp to satisfy HPA invariants: min >= 1 and max >= min.
-		if autoscalingMin < 1 {
-			autoscalingMin = 1
-		}
-		if autoscalingMax < autoscalingMin {
-			autoscalingMax = autoscalingMin
-		}
+			// Clamp to satisfy HPA invariants: min >= 1 and max >= min.
+			if autoscalingMin < 1 {
+				autoscalingMin = 1
+			}
+			if autoscalingMax < autoscalingMin {
+				autoscalingMax = autoscalingMin
+			}
 
-		// CreatedAt is filled in below inside the Run so the timestamp stays
-		// stable across Restate replays.
-		//nolint: exhaustruct
-		topologies = append(topologies, db.InsertDeploymentTopologyParams{
-			WorkspaceID:                workspace.ID,
-			DeploymentID:               deployment.ID,
-			RegionID:                   rs.RegionID,
-			AutoscalingReplicasMin:     autoscalingMin,
-			AutoscalingReplicasMax:     autoscalingMax,
-			AutoscalingThresholdCpu:    rs.AutoscalingThresholdCpu,
-			AutoscalingThresholdMemory: rs.AutoscalingThresholdMemory,
-			DesiredStatus:              db.DeploymentTopologyDesiredStatusRunning,
-		})
+			if resource.Kind == db.DeploymentResourcesKindCron {
+				autoscalingMin = 1
+				autoscalingMax = 1
+			}
+
+			// CreatedAt is filled in below inside the Run so the timestamp stays
+			// stable across Restate replays.
+			//nolint: exhaustruct
+			topologies = append(topologies, db.InsertDeploymentTopologyParams{
+				WorkspaceID:                workspace.ID,
+				DeploymentID:               deployment.ID,
+				ResourceID:                 resource.ID,
+				RegionID:                   rs.RegionID,
+				AutoscalingReplicasMin:     autoscalingMin,
+				AutoscalingReplicasMax:     autoscalingMax,
+				AutoscalingThresholdCpu:    rs.AutoscalingThresholdCpu,
+				AutoscalingThresholdMemory: rs.AutoscalingThresholdMemory,
+				DesiredStatus:              db.DeploymentTopologyDesiredStatusRunning,
+			})
+		}
 	}
 
 	err = restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
@@ -731,10 +767,11 @@ func (w *Workflow) createTopologies(
 			}
 			for _, topo := range topologies {
 				err := db.NewQueries(tx).InsertDeploymentChange(txCtx, db.InsertDeploymentChangeParams{
-					ResourceType: db.DeploymentChangesResourceTypeDeploymentTopology,
-					ResourceID:   topo.DeploymentID,
-					RegionID:     topo.RegionID,
-					CreatedAt:    now,
+					ResourceType:         db.DeploymentChangesResourceTypeDeploymentTopology,
+					ResourceID:           topo.DeploymentID,
+					DeploymentResourceID: topo.ResourceID,
+					RegionID:             topo.RegionID,
+					CreatedAt:            now,
 				})
 				if err != nil {
 					return err
@@ -757,12 +794,13 @@ func (w *Workflow) createTopologies(
 	// lag, and preserves the topology row for debugging.
 	for _, topo := range topologies {
 		compensation.Add(
-			fmt.Sprintf("stop deployment topology %s/%s", topo.DeploymentID, topo.RegionID),
+			fmt.Sprintf("stop deployment topology %s/%s/%s", topo.DeploymentID, topo.ResourceID, topo.RegionID),
 			func(runCtx restate.RunContext) error {
 				return db.Tx(runCtx, w.db.RW(), func(txCtx context.Context, tx db.DBTX) error {
 					now := time.Now().UnixMilli()
-					err := db.NewQueries(tx).UpdateDeploymentTopologyDesiredStatus(txCtx, db.UpdateDeploymentTopologyDesiredStatusParams{
+					err := db.NewQueries(tx).UpdateDeploymentResourceTopologyDesiredStatus(txCtx, db.UpdateDeploymentResourceTopologyDesiredStatusParams{
 						DeploymentID:  topo.DeploymentID,
+						ResourceID:    topo.ResourceID,
 						RegionID:      topo.RegionID,
 						DesiredStatus: db.DeploymentTopologyDesiredStatusStopped,
 						UpdatedAt:     sql.NullInt64{Valid: true, Int64: now},
@@ -771,10 +809,11 @@ func (w *Workflow) createTopologies(
 						return err
 					}
 					return db.NewQueries(tx).InsertDeploymentChange(txCtx, db.InsertDeploymentChangeParams{
-						ResourceType: db.DeploymentChangesResourceTypeDeploymentTopology,
-						ResourceID:   topo.DeploymentID,
-						RegionID:     topo.RegionID,
-						CreatedAt:    now,
+						ResourceType:         db.DeploymentChangesResourceTypeDeploymentTopology,
+						ResourceID:           topo.DeploymentID,
+						DeploymentResourceID: topo.ResourceID,
+						RegionID:             topo.RegionID,
+						CreatedAt:            now,
 					})
 				})
 			},
