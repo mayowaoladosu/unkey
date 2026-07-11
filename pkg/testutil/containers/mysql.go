@@ -65,6 +65,9 @@ func MySQL(t testing.TB, opts ...MySQLOpt) MySQLConfig {
 			"MYSQL_PASSWORD":      mysqlPassword,
 		},
 		Cmd: []string{
+			// Match the dev cluster and leave headroom for packages whose tests
+			// intentionally run many independent API harnesses in parallel.
+			"--max-connections=1000",
 			// Disable binary logging (not needed for tests)
 			"--skip-log-bin",
 			"--disable-log-bin",

@@ -142,6 +142,7 @@ func NewHarness(t *testing.T, configs ...HarnessConfig) *Harness {
 		Tags:        sqlcomment.Disabled(),
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
 
 	caches, err := caches.New(caches.Config{
 		NodeID: "",
@@ -221,6 +222,7 @@ func NewHarness(t *testing.T, configs ...HarnessConfig) *Harness {
 		Region:  "test-region",
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, ratelimitService.Close()) })
 
 	ulSvc, err := usagelimiter.NewRedisWithCounter(usagelimiter.RedisConfig{
 		FindKeyCredits: func(ctx context.Context, keyID string) (int64, bool, error) {
@@ -242,6 +244,7 @@ func NewHarness(t *testing.T, configs ...HarnessConfig) *Harness {
 		TTL:     60 * time.Second,
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, ulSvc.Close()) })
 
 	testVault := vaulttestutil.StartTestVaultWithMemory(t)
 	v := vault.NewConnectVaultServiceClient(testVault.Client)
