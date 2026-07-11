@@ -190,13 +190,19 @@ local_resource(
 
 local_resource(
     'github-credentials',
-    '''if [ -f ./.env.github ] && [ -f ./.github-private-key.pem ]; then set -a && source ./.env.github && set +a && kubectl -n unkey create secret generic github-credentials \
+    '''if [ -f ./.env.github ] && [ -f ./.github-private-key.pem ]; then set -a && . ./.env.github && set +a && kubectl -n unkey create secret generic github-credentials \
       --from-literal=UNKEY_GITHUB_APP_ID="$UNKEY_GITHUB_APP_ID" \
       --from-literal=UNKEY_GITHUB_APP_WEBHOOK_SECRET="$UNKEY_GITHUB_APP_WEBHOOK_SECRET" \
       --from-literal=NEXT_PUBLIC_GITHUB_APP_NAME="$NEXT_PUBLIC_GITHUB_APP_NAME" \
       --from-literal=UNKEY_ALLOW_UNAUTHENTICATED_DEPLOYMENTS="$UNKEY_ALLOW_UNAUTHENTICATED_DEPLOYMENTS" \
       --from-file=UNKEY_GITHUB_PRIVATE_KEY_PEM=./.github-private-key.pem \
-      -o yaml --dry-run=client | kubectl apply -f -; else echo "Skipping github-credentials (missing .env.github or .github-private-key.pem)"; fi''',
+      -o yaml --dry-run=client | kubectl apply -f -; else kubectl -n unkey create secret generic github-credentials \
+      --from-literal=UNKEY_GITHUB_APP_ID=0 \
+      --from-literal=UNKEY_GITHUB_APP_WEBHOOK_SECRET= \
+      --from-literal=NEXT_PUBLIC_GITHUB_APP_NAME= \
+      --from-literal=UNKEY_ALLOW_UNAUTHENTICATED_DEPLOYMENTS=true \
+      --from-literal=UNKEY_GITHUB_PRIVATE_KEY_PEM= \
+      -o yaml --dry-run=client | kubectl apply -f -; fi''',
     resource_deps=['namespace'],
     deps=['./.env.github', './.github-private-key.pem'],
     labels=['setup'],
@@ -454,7 +460,7 @@ local_resource(
     'dashboard',
     serve_cmd='''
       set -a
-      [ -f ./.env.github ] && source ./.env.github
+      [ -f ./.env.github ] && . ./.env.github
       [ -f ./.github-private-key.pem ] && export UNKEY_GITHUB_PRIVATE_KEY_PEM="$(cat ./.github-private-key.pem)"
       export GITHUB_APP_ID="$UNKEY_GITHUB_APP_ID"
       set +a
