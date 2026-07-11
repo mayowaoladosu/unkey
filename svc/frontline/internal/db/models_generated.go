@@ -183,6 +183,93 @@ func (ns NullAppEnvironmentVariablesType) Value() (driver.Value, error) {
 	return string(ns.AppEnvironmentVariablesType), nil
 }
 
+type AppFrameworkDetectionsBuildStrategy string
+
+const (
+	AppFrameworkDetectionsBuildStrategyDockerfile AppFrameworkDetectionsBuildStrategy = "dockerfile"
+	AppFrameworkDetectionsBuildStrategyZeroConfig AppFrameworkDetectionsBuildStrategy = "zero-config"
+	AppFrameworkDetectionsBuildStrategyUnknown    AppFrameworkDetectionsBuildStrategy = "unknown"
+)
+
+func (e *AppFrameworkDetectionsBuildStrategy) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AppFrameworkDetectionsBuildStrategy(s)
+	case string:
+		*e = AppFrameworkDetectionsBuildStrategy(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AppFrameworkDetectionsBuildStrategy: %T", src)
+	}
+	return nil
+}
+
+type NullAppFrameworkDetectionsBuildStrategy struct {
+	AppFrameworkDetectionsBuildStrategy AppFrameworkDetectionsBuildStrategy
+	Valid                               bool // Valid is true if AppFrameworkDetectionsBuildStrategy is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAppFrameworkDetectionsBuildStrategy) Scan(value interface{}) error {
+	if value == nil {
+		ns.AppFrameworkDetectionsBuildStrategy, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AppFrameworkDetectionsBuildStrategy.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAppFrameworkDetectionsBuildStrategy) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AppFrameworkDetectionsBuildStrategy), nil
+}
+
+type AppFrameworkDetectionsConfidence string
+
+const (
+	AppFrameworkDetectionsConfidenceNone   AppFrameworkDetectionsConfidence = "none"
+	AppFrameworkDetectionsConfidenceLow    AppFrameworkDetectionsConfidence = "low"
+	AppFrameworkDetectionsConfidenceMedium AppFrameworkDetectionsConfidence = "medium"
+	AppFrameworkDetectionsConfidenceHigh   AppFrameworkDetectionsConfidence = "high"
+)
+
+func (e *AppFrameworkDetectionsConfidence) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AppFrameworkDetectionsConfidence(s)
+	case string:
+		*e = AppFrameworkDetectionsConfidence(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AppFrameworkDetectionsConfidence: %T", src)
+	}
+	return nil
+}
+
+type NullAppFrameworkDetectionsConfidence struct {
+	AppFrameworkDetectionsConfidence AppFrameworkDetectionsConfidence
+	Valid                            bool // Valid is true if AppFrameworkDetectionsConfidence is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAppFrameworkDetectionsConfidence) Scan(value interface{}) error {
+	if value == nil {
+		ns.AppFrameworkDetectionsConfidence, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AppFrameworkDetectionsConfidence.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAppFrameworkDetectionsConfidence) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AppFrameworkDetectionsConfidence), nil
+}
+
 type AppRuntimeSettingsShutdownSignal string
 
 const (
@@ -355,6 +442,50 @@ func (ns NullCustomDomainsVerificationStatus) Value() (driver.Value, error) {
 	return string(ns.CustomDomainsVerificationStatus), nil
 }
 
+type DeploymentArtifactsKind string
+
+const (
+	DeploymentArtifactsKindContainerImage DeploymentArtifactsKind = "container_image"
+	DeploymentArtifactsKindStaticBundle   DeploymentArtifactsKind = "static_bundle"
+	DeploymentArtifactsKindFunctionBundle DeploymentArtifactsKind = "function_bundle"
+	DeploymentArtifactsKindSourceMap      DeploymentArtifactsKind = "source_map"
+)
+
+func (e *DeploymentArtifactsKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentArtifactsKind(s)
+	case string:
+		*e = DeploymentArtifactsKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentArtifactsKind: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentArtifactsKind struct {
+	DeploymentArtifactsKind DeploymentArtifactsKind
+	Valid                   bool // Valid is true if DeploymentArtifactsKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentArtifactsKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentArtifactsKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentArtifactsKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentArtifactsKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentArtifactsKind), nil
+}
+
 type DeploymentChangesResourceType string
 
 const (
@@ -396,6 +527,49 @@ func (ns NullDeploymentChangesResourceType) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.DeploymentChangesResourceType), nil
+}
+
+type DeploymentManifestsOutputMode string
+
+const (
+	DeploymentManifestsOutputModeContainer DeploymentManifestsOutputMode = "container"
+	DeploymentManifestsOutputModeStatic    DeploymentManifestsOutputMode = "static"
+	DeploymentManifestsOutputModeMixed     DeploymentManifestsOutputMode = "mixed"
+)
+
+func (e *DeploymentManifestsOutputMode) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentManifestsOutputMode(s)
+	case string:
+		*e = DeploymentManifestsOutputMode(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentManifestsOutputMode: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentManifestsOutputMode struct {
+	DeploymentManifestsOutputMode DeploymentManifestsOutputMode
+	Valid                         bool // Valid is true if DeploymentManifestsOutputMode is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentManifestsOutputMode) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentManifestsOutputMode, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentManifestsOutputMode.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentManifestsOutputMode) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentManifestsOutputMode), nil
 }
 
 type DeploymentStepsStep string
@@ -925,6 +1099,30 @@ type AppEnvironmentVariable struct {
 	UpdatedAt        sql.NullInt64               `db:"updated_at"`
 }
 
+type AppFrameworkDetection struct {
+	Pk                 uint64                              `db:"pk"`
+	WorkspaceID        string                              `db:"workspace_id"`
+	ProjectID          string                              `db:"project_id"`
+	AppID              string                              `db:"app_id"`
+	RepositoryFullName string                              `db:"repository_full_name"`
+	Branch             string                              `db:"branch"`
+	TreeSha            string                              `db:"tree_sha"`
+	Fingerprint        string                              `db:"fingerprint"`
+	DetectionVersion   uint64                              `db:"detection_version"`
+	DetectedPresetID   sql.NullString                      `db:"detected_preset_id"`
+	DetectedPresetName sql.NullString                      `db:"detected_preset_name"`
+	Confidence         AppFrameworkDetectionsConfidence    `db:"confidence"`
+	BuildStrategy      AppFrameworkDetectionsBuildStrategy `db:"build_strategy"`
+	Detection          json.RawMessage                     `db:"detection"`
+	Defaults           json.RawMessage                     `db:"defaults"`
+	DetectedAt         int64                               `db:"detected_at"`
+	AppliedFingerprint sql.NullString                      `db:"applied_fingerprint"`
+	AppliedDefaults    []byte                              `db:"applied_defaults"`
+	AppliedAt          sql.NullInt64                       `db:"applied_at"`
+	CreatedAt          int64                               `db:"created_at"`
+	UpdatedAt          sql.NullInt64                       `db:"updated_at"`
+}
+
 type AppRegionalSetting struct {
 	Pk                            uint64         `db:"pk"`
 	WorkspaceID                   string         `db:"workspace_id"`
@@ -1078,12 +1276,45 @@ type Deployment struct {
 	UpdatedAt                     sql.NullInt64               `db:"updated_at"`
 }
 
+type DeploymentArtifact struct {
+	Pk            uint64                  `db:"pk"`
+	ID            string                  `db:"id"`
+	DeploymentID  string                  `db:"deployment_id"`
+	WorkspaceID   string                  `db:"workspace_id"`
+	ProjectID     string                  `db:"project_id"`
+	AppID         string                  `db:"app_id"`
+	EnvironmentID string                  `db:"environment_id"`
+	Name          string                  `db:"name"`
+	Kind          DeploymentArtifactsKind `db:"kind"`
+	StorageKey    string                  `db:"storage_key"`
+	Digest        string                  `db:"digest"`
+	SizeBytes     uint64                  `db:"size_bytes"`
+	ContentType   string                  `db:"content_type"`
+	Metadata      json.RawMessage         `db:"metadata"`
+	CreatedAt     int64                   `db:"created_at"`
+}
+
 type DeploymentChange struct {
 	Pk           uint64                        `db:"pk"`
 	ResourceType DeploymentChangesResourceType `db:"resource_type"`
 	ResourceID   string                        `db:"resource_id"`
 	RegionID     string                        `db:"region_id"`
 	CreatedAt    int64                         `db:"created_at"`
+}
+
+type DeploymentManifest struct {
+	Pk            uint64                        `db:"pk"`
+	DeploymentID  string                        `db:"deployment_id"`
+	WorkspaceID   string                        `db:"workspace_id"`
+	ProjectID     string                        `db:"project_id"`
+	AppID         string                        `db:"app_id"`
+	EnvironmentID string                        `db:"environment_id"`
+	SchemaVersion uint64                        `db:"schema_version"`
+	Fingerprint   string                        `db:"fingerprint"`
+	AdapterID     string                        `db:"adapter_id"`
+	OutputMode    DeploymentManifestsOutputMode `db:"output_mode"`
+	Manifest      json.RawMessage               `db:"manifest"`
+	CreatedAt     int64                         `db:"created_at"`
 }
 
 type DeploymentStep struct {

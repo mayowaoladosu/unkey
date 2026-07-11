@@ -18,6 +18,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/restate/compensation"
 	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/deploymanifest"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -120,6 +121,20 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Public("Failed to read from database. Please try again."))
 	}
+
+	var manifest deploymanifest.Manifest
+	manifestRow, err := restate.Run(ctx, func(runCtx restate.RunContext) (db.DeploymentManifest, error) {
+		return w.db.FindDeploymentManifestByDeploymentID(runCtx, deployment.ID)
+	}, restate.WithName("finding deployment manifest"), restate.WithMaxRetryAttempts(runMaxAttempts))
+	if err == nil {
+		manifest, err = deploymanifest.Parse(manifestRow.Manifest)
+		if err != nil {
+			return nil, fault.Wrap(restate.TerminalError(err), fault.Public("The deployment manifest is invalid."))
+		}
+	} else if !db.IsNotFound(err) {
+		return nil, fault.Wrap(err, fault.Public("Failed to read the deployment manifest."))
+	}
+	isStaticDeployment := isStaticOnlyDeployment(manifest)
 
 	// --- Deduplication: skip if a newer deployment is queued for the same app+env+branch ---
 	//
@@ -261,7 +276,7 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 
 	// --- Build ---
 	err = w.DeploymentStep(ctx, db.DeploymentStepsStepBuilding, deployment, func(stepCtx restate.ObjectContext) error {
-		return w.buildImage(stepCtx, req, &deployment)
+		return w.buildImage(stepCtx, req, &deployment, manifest)
 	})
 	if err != nil {
 		return nil, err
@@ -277,7 +292,13 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 	})
 
 	// --- Deploy ---
+	// Static-only outputs are already materialized by the build step. They still
+	// receive a completed deploying step for a consistent status timeline, but
+	// intentionally skip topology creation and instance readiness.
 	err = w.DeploymentStep(ctx, db.DeploymentStepsStepDeploying, deployment, func(stepCtx restate.ObjectContext) error {
+		if isStaticDeployment {
+			return nil
+		}
 		topologies, err := w.createTopologies(stepCtx, compensation, workspace, deployment)
 		if err != nil {
 			return fault.Wrap(err, fault.Public("Regional deployment targets could not be prepared."))
@@ -360,11 +381,13 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 
 	// Scrape OpenAPI spec asynchronously. The handler reads the configured path
 	// from app_runtime_settings; deployment succeeds regardless of scrape outcome.
-	hydrav1.NewOpenapiServiceClient(ctx).ScrapeSpec().Send(
-		&hydrav1.ScrapeSpecRequest{
-			DeploymentId: deployment.ID,
-		},
-	)
+	if !isStaticDeployment {
+		hydrav1.NewOpenapiServiceClient(ctx).ScrapeSpec().Send(
+			&hydrav1.ScrapeSpecRequest{
+				DeploymentId: deployment.ID,
+			},
+		)
+	}
 
 	// Release the build slot on the happy path. The compensation only runs
 	// on error, so we release explicitly here. Release is idempotent, so a
@@ -386,8 +409,14 @@ func (w *Workflow) Deploy(ctx restate.ObjectContext, req *hydrav1.DeployRequest)
 //
 // Returns a terminal error for unknown source types and build failures that
 // cannot be retried (e.g. bad Dockerfile).
-func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequest, deployment *db.Deployment) error {
+func (w *Workflow) buildImage(
+	ctx restate.ObjectContext,
+	req *hydrav1.DeployRequest,
+	deployment *db.Deployment,
+	manifest deploymanifest.Manifest,
+) error {
 	dockerImage := ""
+	staticOutput, isStaticDeployment := findStaticOutput(manifest)
 
 	switch source := req.GetSource().(type) {
 	case *hydrav1.DeployRequest_DockerImage:
@@ -414,6 +443,9 @@ func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequ
 			DockerfilePath: strings.TrimSpace(source.Git.GetDockerfilePath()),
 			// Trimmed so a whitespace-only setting means "let Railpack auto-detect".
 			BuildCommand:                  strings.TrimSpace(source.Git.GetBuildCommand()),
+			StaticOutputDirectory:         staticOutput.Directory,
+			StaticOutputName:              staticOutput.Name,
+			StaticSPAFallback:             staticOutput.SPAFallback,
 			ProjectID:                     deployment.ProjectID,
 			AppID:                         deployment.AppID,
 			DeploymentID:                  deployment.ID,
@@ -428,7 +460,15 @@ func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequ
 		// app is built with Railpack (no Dockerfile required).
 		var build *buildResult
 		var err error
-		if params.DockerfilePath == "" {
+		if isStaticDeployment && manifest.Build.Strategy == deploymanifest.BuildStrategyStatic {
+			logger.Info(
+				"building plain static bundle",
+				"deployment_id", deployment.ID,
+				"repository", params.Repository,
+				"commit_sha", params.CommitSHA,
+			)
+			build, err = w.buildPlainStaticBundleFromGit(ctx, params)
+		} else if params.DockerfilePath == "" {
 			logger.Info(
 				"no dockerfile configured, building with railpack",
 				"deployment_id", deployment.ID,
@@ -448,11 +488,39 @@ func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequ
 				publicMsg = extractUserBuildError(err)
 			}
 			return fault.Wrap(
-				fmt.Errorf("failed to build docker image from git: %w", err),
+				fmt.Errorf("failed to build deployment from git: %w", err),
 				fault.Public(publicMsg),
 			)
 		}
 		dockerImage = build.ImageName
+		if build.StaticArtifact != nil {
+			err = restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
+				return w.db.RecordDeploymentArtifact(runCtx, db.RecordDeploymentArtifactParams{
+					ID:            uid.New("artifact"),
+					DeploymentID:  deployment.ID,
+					WorkspaceID:   deployment.WorkspaceID,
+					ProjectID:     deployment.ProjectID,
+					AppID:         deployment.AppID,
+					EnvironmentID: deployment.EnvironmentID,
+					Name:          staticOutput.Name,
+					Kind:          db.DeploymentArtifactsKindStaticBundle,
+					StorageKey:    build.StaticArtifact.StorageKey,
+					Digest:        build.StaticArtifact.Digest,
+					SizeBytes:     build.StaticArtifact.SizeBytes,
+					ContentType:   build.StaticArtifact.ContentType,
+					Metadata:      build.StaticArtifact.Metadata,
+					CreatedAt:     time.Now().UnixMilli(),
+				})
+			}, restate.WithName("record static deployment artifact"), restate.WithMaxRetryAttempts(runMaxAttempts))
+			if err != nil {
+				return fault.Wrap(err, fault.Public("Static deployment artifact could not be recorded."))
+			}
+		} else if isStaticDeployment {
+			return fault.Wrap(
+				restate.TerminalError(fmt.Errorf("static build did not produce an artifact")),
+				fault.Public("The static build completed without deployable output."),
+			)
+		}
 
 		err = restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
 			return w.db.UpdateDeploymentBuildID(runCtx, db.UpdateDeploymentBuildIDParams{
@@ -475,18 +543,42 @@ func (w *Workflow) buildImage(ctx restate.ObjectContext, req *hydrav1.DeployRequ
 		)
 	}
 
-	err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
-		return w.db.UpdateDeploymentImage(runCtx, db.UpdateDeploymentImageParams{
-			ID:        deployment.ID,
-			Image:     sql.NullString{Valid: true, String: dockerImage},
-			UpdatedAt: sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
-		})
-	}, restate.WithName("update deployment image"), restate.WithMaxRetryAttempts(runMaxAttempts))
-	if err != nil {
-		return fault.Wrap(err, fault.Public("Unable to save deployment image."))
+	if dockerImage != "" {
+		err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
+			return w.db.UpdateDeploymentImage(runCtx, db.UpdateDeploymentImageParams{
+				ID:        deployment.ID,
+				Image:     sql.NullString{Valid: true, String: dockerImage},
+				UpdatedAt: sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
+			})
+		}, restate.WithName("update deployment image"), restate.WithMaxRetryAttempts(runMaxAttempts))
+		if err != nil {
+			return fault.Wrap(err, fault.Public("Unable to save deployment image."))
+		}
+		deployment.Image = sql.NullString{Valid: true, String: dockerImage}
 	}
 
 	return nil
+}
+
+func findStaticOutput(manifest deploymanifest.Manifest) (deploymanifest.Output, bool) {
+	for _, output := range manifest.Outputs {
+		if output.Kind == deploymanifest.OutputKindStatic {
+			return output, true
+		}
+	}
+	return deploymanifest.Output{}, false
+}
+
+func isStaticOnlyDeployment(manifest deploymanifest.Manifest) bool {
+	if len(manifest.Outputs) == 0 {
+		return false
+	}
+	for _, output := range manifest.Outputs {
+		if output.Kind != deploymanifest.OutputKindStatic {
+			return false
+		}
+	}
+	return true
 }
 
 // createTopologies determines the target regions and replica counts, bulk-inserts

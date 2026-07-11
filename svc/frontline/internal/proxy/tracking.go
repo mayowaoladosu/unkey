@@ -7,7 +7,7 @@ import (
 	"github.com/unkeyed/unkey/pkg/zen"
 )
 
-// RequestTracking holds data collected during a local-instance request for
+// RequestTracking holds data collected during a locally served request for
 // ClickHouse logging. The handler initializes the deployment-scoped fields
 // once; InstanceID and Address are (re)written for each instance attempted
 // in the retry loop, so on success they reflect the instance that served
@@ -28,6 +28,9 @@ type RequestTracking struct {
 	ProjectID     string
 	AppID         string
 	EnvironmentID string
+	// DirectResponse is true when Frontline itself serves the response (for
+	// example an immutable static artifact) rather than selecting an instance.
+	DirectResponse bool
 
 	// Credential locations derived from the route's KeyAuth policies, set by
 	// the handler. The ClickHouse logging middleware redacts the value of any

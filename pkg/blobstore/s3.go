@@ -16,13 +16,13 @@ import (
 )
 
 type S3Config struct {
-	Endpoint        string
-	Region          string
-	Bucket          string
-	AccessKeyID     string
-	SecretAccessKey string
-	UsePathStyle    bool
-	CreateBucket    bool
+	Endpoint        string `toml:"endpoint" config:"required,nonempty"`
+	Region          string `toml:"region" config:"default=auto"`
+	Bucket          string `toml:"bucket" config:"required,nonempty"`
+	AccessKeyID     string `toml:"access_key_id" config:"required,nonempty"`
+	SecretAccessKey string `toml:"secret_access_key" config:"required,nonempty"`
+	UsePathStyle    bool   `toml:"use_path_style"`
+	CreateBucket    bool   `toml:"create_bucket"`
 }
 
 type s3Store struct {
@@ -85,7 +85,7 @@ func (s *s3Store) Put(ctx context.Context, key string, body []byte, metadata Met
 	return nil
 }
 
-func (s *s3Store) Get(ctx context.Context, key string) (Object, bool, error) {
+func (s *s3Store) Get(ctx context.Context, key string, maxBytes int64) (Object, bool, error) {
 	response, err := s.client.GetObject(ctx, &awss3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -98,9 +98,16 @@ func (s *s3Store) Get(ctx context.Context, key string) (Object, bool, error) {
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	body, err := io.ReadAll(response.Body)
+	reader := io.Reader(response.Body)
+	if maxBytes > 0 {
+		reader = io.LimitReader(response.Body, maxBytes+1)
+	}
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		return Object{}, false, fmt.Errorf("read blob %q: %w", key, err)
+	}
+	if maxBytes > 0 && int64(len(body)) > maxBytes {
+		return Object{}, false, fmt.Errorf("blob %q exceeds %d bytes", key, maxBytes)
 	}
 	return Object{
 		Body: body,

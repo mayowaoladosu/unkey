@@ -14,8 +14,8 @@ import (
 	"github.com/unkeyed/unkey/svc/frontline/internal/proxy"
 )
 
-// WithClickHouseLogging buffers a per-request record for ClickHouse on the
-// local-instance path. The proxy package populates the tracking struct
+// WithClickHouseLogging buffers a per-request record for ClickHouse on paths
+// served in this region. The proxy package populates the tracking struct
 // during proxy execution; this middleware reads it back and emits the row
 // after next() returns. Cross-region requests do not populate tracking and
 // are skipped — the peer frontline writes its own row.
@@ -30,11 +30,10 @@ func WithClickHouseLogging(buf *batch.BatchProcessor[schema.FrontlineRequest], c
 
 			err := next(ctx, s)
 
-			// Tracking is only populated on the local-instance path; the
-			// handler stamps DeploymentID/InstanceID before forwarding. If
-			// those are empty the request was forwarded cross-region and
-			// the peer logs it.
-			if !s.ShouldLogRequestToClickHouse() || tracking.DeploymentID == "" || tracking.InstanceID == "" {
+			// Container responses identify the serving instance. Direct edge
+			// responses have no instance but explicitly opt in. Everything else
+			// was forwarded cross-region and is logged by the peer.
+			if !shouldLogTracking(s.ShouldLogRequestToClickHouse(), tracking) {
 				return err
 			}
 
@@ -98,6 +97,10 @@ func WithClickHouseLogging(buf *batch.BatchProcessor[schema.FrontlineRequest], c
 			return err
 		}
 	}
+}
+
+func shouldLogTracking(enabled bool, tracking *proxy.RequestTracking) bool {
+	return enabled && tracking.DeploymentID != "" && (tracking.InstanceID != "" || tracking.DirectResponse)
 }
 
 func formatHeader(key, value string) string {

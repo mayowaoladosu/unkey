@@ -4,6 +4,7 @@ import (
 	hydrav1 "github.com/unkeyed/unkey/gen/proto/hydra/v1"
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/pkg/batch"
+	"github.com/unkeyed/unkey/pkg/blobstore"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
 	"github.com/unkeyed/unkey/pkg/clickhouse/schema"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
@@ -57,6 +58,7 @@ type Workflow struct {
 	clickhouse                      clickhouse.ClickHouse
 	buildSteps                      *batch.BatchProcessor[schema.BuildStepV1]
 	buildStepLogs                   *batch.BatchProcessor[schema.BuildStepLogV1]
+	artifactStore                   blobstore.Store
 	allowUnauthenticatedDeployments bool
 	dashboardURL                    string
 }
@@ -95,6 +97,10 @@ type Config struct {
 	// BuildStepLogs buffers build step log events for ClickHouse.
 	BuildStepLogs *batch.BatchProcessor[schema.BuildStepLogV1]
 
+	// ArtifactStore persists immutable static and function bundles. Container-only
+	// deployments do not require it.
+	ArtifactStore blobstore.Store
+
 	// AllowUnauthenticatedDeployments controls whether builds can skip GitHub authentication.
 	// Set to true only for local development with public repositories.
 	AllowUnauthenticatedDeployments bool
@@ -123,6 +129,7 @@ func New(cfg Config) *Workflow {
 		clickhouse:                      cfg.Clickhouse,
 		buildSteps:                      cfg.BuildSteps,
 		buildStepLogs:                   cfg.BuildStepLogs,
+		artifactStore:                   cfg.ArtifactStore,
 		allowUnauthenticatedDeployments: cfg.AllowUnauthenticatedDeployments,
 		dashboardURL:                    cfg.DashboardURL,
 	}

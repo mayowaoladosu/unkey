@@ -23,6 +23,7 @@ import (
 	"github.com/unkeyed/unkey/internal/services/usagelimiter"
 
 	"github.com/unkeyed/unkey/pkg/batch"
+	"github.com/unkeyed/unkey/pkg/blobstore"
 	"github.com/unkeyed/unkey/pkg/buildinfo"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
@@ -49,6 +50,7 @@ import (
 	"github.com/unkeyed/unkey/svc/frontline/internal/policies"
 	"github.com/unkeyed/unkey/svc/frontline/internal/proxy"
 	"github.com/unkeyed/unkey/svc/frontline/internal/router"
+	"github.com/unkeyed/unkey/svc/frontline/internal/staticassets"
 	"github.com/unkeyed/unkey/svc/frontline/routes"
 )
 
@@ -306,6 +308,24 @@ func Run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("unable to build policy engine: %w", err)
 	}
 
+	var staticAssets staticassets.Resolver
+	if cfg.ArtifactStorage != nil {
+		artifactStore, storageErr := blobstore.NewS3(ctx, *cfg.ArtifactStorage)
+		if storageErr != nil {
+			return fmt.Errorf("unable to create artifact storage: %w", storageErr)
+		}
+		staticAssets, storageErr = staticassets.New(staticassets.Config{
+			Store:      artifactStore,
+			MaxEntries: cfg.StaticArtifactCacheEntries,
+		})
+		if storageErr != nil {
+			return fmt.Errorf("unable to create static artifact service: %w", storageErr)
+		}
+		logger.Info("Static artifact delivery initialized", "cacheEntries", cfg.StaticArtifactCacheEntries)
+	} else {
+		logger.Warn("Artifact storage not configured, static deployments will be unavailable")
+	}
+
 	tlsConfig, err := buildTlsConfig(cfg, certManager)
 	if err != nil {
 		return fmt.Errorf("unable to build tls config: %w", err)
@@ -319,6 +339,7 @@ func Run(ctx context.Context, cfg Config) error {
 		FrontlineID:       cfg.InstanceID,
 		RouterService:     routerSvc,
 		ProxyService:      proxySvc,
+		StaticAssets:      staticAssets,
 		Engine:            policyEngine,
 		Clock:             clk,
 		AcmeClient:        acmeClient,

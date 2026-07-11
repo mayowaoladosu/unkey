@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"sync"
 )
 
@@ -30,12 +31,15 @@ func (s *memoryStore) Put(_ context.Context, key string, body []byte, metadata M
 	return nil
 }
 
-func (s *memoryStore) Get(_ context.Context, key string) (Object, bool, error) {
+func (s *memoryStore) Get(_ context.Context, key string, maxBytes int64) (Object, bool, error) {
 	s.mu.RLock()
 	object, found := s.objects[key]
 	s.mu.RUnlock()
 	if !found {
 		return Object{}, false, nil
+	}
+	if maxBytes > 0 && int64(len(object.Body)) > maxBytes {
+		return Object{}, false, fmt.Errorf("blob %q exceeds %d bytes", key, maxBytes)
 	}
 	object.Body = append([]byte(nil), object.Body...)
 	return object, true, nil

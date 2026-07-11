@@ -77,7 +77,7 @@ const (
 var railpackPrepareDockerfileTemplateRaw string
 
 var railpackPrepareDockerfileTemplate = template.Must(
-	template.New("railpack-prepare").Parse(railpackPrepareDockerfileTemplateRaw),
+	template.New("railpack-prepare").Parse(strings.ReplaceAll(railpackPrepareDockerfileTemplateRaw, "\r\n", "\n")),
 )
 
 // railpackWorkspaceRoot is the parent directory for all Railpack build
@@ -176,7 +176,11 @@ func (w *Workflow) buildRailpackImageFromGit(
 			"frontend_image", railpackFrontendImage,
 		)
 
-		// One machine, two solves: plan generation, then the image build.
+		var staticArtifact *materializedStaticArtifact
+
+		// One machine, two solves: plan generation, then the image build. Static
+		// adapters perform one additional local export from that image while the
+		// authenticated build machine is still available.
 		depotBuildID, err := w.withDepotBuildkit(runCtx, bctx.DepotProjectID, params, func(buildClient *client.Client) error {
 			prepareOptions, optErr := w.buildRailpackPrepareSolverOptions(bctx.GitContextURL, prepareDir, planDir, bctx.GithubToken, bctx.EnvVars, railpackConfig)
 			if optErr != nil {
@@ -193,7 +197,16 @@ func (w *Workflow) buildRailpackImageFromGit(
 			if optErr != nil {
 				return restate.TerminalError(fmt.Errorf("failed to build solver options: %w", optErr))
 			}
-			return w.solveWithStatus(runCtx, buildClient, params, buildOptions)
+			if solveErr := w.solveWithStatus(runCtx, buildClient, params, buildOptions); solveErr != nil {
+				return solveErr
+			}
+			if params.StaticOutputDirectory != "" {
+				staticArtifact, optErr = w.extractStaticBundleFromImage(runCtx, buildClient, params, bctx.ImageName)
+				if optErr != nil {
+					return optErr
+				}
+			}
+			return nil
 		})
 		if err != nil {
 			return nil, err
@@ -205,6 +218,7 @@ func (w *Workflow) buildRailpackImageFromGit(
 			ImageName:      bctx.ImageName,
 			DepotBuildID:   depotBuildID,
 			DepotProjectID: bctx.DepotProjectID,
+			StaticArtifact: staticArtifact,
 		}, nil
 	})
 }

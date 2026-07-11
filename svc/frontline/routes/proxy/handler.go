@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/unkeyed/unkey/pkg/clock"
 	"github.com/unkeyed/unkey/pkg/codes"
@@ -13,6 +16,7 @@ import (
 	"github.com/unkeyed/unkey/svc/frontline/internal/policies"
 	"github.com/unkeyed/unkey/svc/frontline/internal/proxy"
 	"github.com/unkeyed/unkey/svc/frontline/internal/router"
+	"github.com/unkeyed/unkey/svc/frontline/internal/staticassets"
 )
 
 type Handler struct {
@@ -20,6 +24,7 @@ type Handler struct {
 	ProxyService  proxy.Service
 	Engine        policies.Evaluator
 	Clock         clock.Clock
+	StaticAssets  staticassets.Resolver
 }
 
 func (h *Handler) Method() string {
@@ -41,7 +46,7 @@ func (h *Handler) Handle(ctx context.Context, sess *zen.Session) error {
 		return err
 	}
 
-	if decision.Destination != router.DestinationLocalInstance {
+	if decision.Destination == router.DestinationRemoteRegion {
 		return h.ProxyService.ForwardToRegion(ctx, sess, decision.RemoteRegionAddress)
 	}
 
@@ -90,6 +95,11 @@ func (h *Handler) Handle(ctx context.Context, sess *zen.Session) error {
 				req.Header.Set(policies.PrincipalHeader, principalJSON)
 			}
 		}
+	}
+
+	if decision.Destination == router.DestinationStaticArtifact {
+		tracking.DirectResponse = true
+		return h.serveStatic(ctx, sess, decision.StaticArtifact)
 	}
 
 	// Capture the request body for ClickHouse via TeeReader. Bytes flow
@@ -169,4 +179,78 @@ func (h *Handler) Handle(ctx context.Context, sess *zen.Session) error {
 		)
 	}
 	return forwardErr
+}
+
+func (h *Handler) serveStatic(ctx context.Context, sess *zen.Session, artifact router.StaticArtifact) error {
+	if h.StaticAssets == nil {
+		return fault.New("static artifact service is unavailable",
+			fault.Code(codes.Frontline.Proxy.ServiceUnavailable.URN()),
+			fault.Internal("frontline received a static route without artifact storage configured"),
+			fault.Public("Service temporarily unavailable"),
+		)
+	}
+
+	req := sess.Request()
+	if req.Method != http.MethodGet && req.Method != http.MethodHead {
+		sess.ResponseWriter().Header().Set("Allow", "GET, HEAD")
+		sess.ResponseWriter().WriteHeader(http.StatusMethodNotAllowed)
+		return nil
+	}
+
+	file, found, err := h.StaticAssets.Resolve(ctx, staticassets.ArtifactRef{
+		StorageKey:  artifact.StorageKey,
+		Digest:      artifact.Digest,
+		SPAFallback: artifact.SPAFallback,
+	}, req.URL.EscapedPath())
+	if err != nil {
+		return fault.Wrap(err,
+			fault.Code(codes.Frontline.Proxy.ServiceUnavailable.URN()),
+			fault.Internal("unable to resolve immutable static artifact"),
+			fault.Public("Service temporarily unavailable"),
+		)
+	}
+	if !found {
+		writeStaticError(sess, http.StatusNotFound, "Not Found\n", req.Method == http.MethodHead)
+		return nil
+	}
+
+	response := sess.ResponseWriter()
+	etag := `"` + file.ETag + `"`
+	response.Header().Set("Content-Type", file.ContentType)
+	response.Header().Set("Cache-Control", file.CacheControl)
+	response.Header().Set("ETag", etag)
+	response.Header().Set("X-Content-Type-Options", "nosniff")
+	response.Header().Set("Content-Length", strconv.Itoa(len(file.Body)))
+	if etagMatches(req.Header.Get("If-None-Match"), etag) {
+		response.Header().Del("Content-Length")
+		response.WriteHeader(http.StatusNotModified)
+		return nil
+	}
+	response.WriteHeader(http.StatusOK)
+	if req.Method == http.MethodHead {
+		return nil
+	}
+	_, err = response.Write(file.Body)
+	return err
+}
+
+func etagMatches(header string, etag string) bool {
+	for value := range strings.SplitSeq(header, ",") {
+		candidate := strings.TrimSpace(value)
+		if candidate == "*" || candidate == etag || strings.TrimPrefix(candidate, "W/") == etag {
+			return true
+		}
+	}
+	return false
+}
+
+func writeStaticError(sess *zen.Session, status int, body string, head bool) {
+	response := sess.ResponseWriter()
+	response.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	response.Header().Set("X-Content-Type-Options", "nosniff")
+	response.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	response.WriteHeader(status)
+	if !head {
+		_, _ = io.WriteString(response, body)
+	}
 }

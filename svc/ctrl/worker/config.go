@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/unkeyed/unkey/pkg/assert"
+	"github.com/unkeyed/unkey/pkg/blobstore"
 	"github.com/unkeyed/unkey/pkg/clock"
 	"github.com/unkeyed/unkey/pkg/config"
 )
@@ -277,6 +278,10 @@ type Config struct {
 
 	// Registry configures container registry authentication.
 	Registry RegistryConfig `toml:"registry"`
+
+	// ArtifactStorage stores immutable static and function deployment bundles.
+	// It is optional for container-only installations.
+	ArtifactStorage *blobstore.S3Config `toml:"artifact_storage"`
 
 	// ClickHouse configures ClickHouse connections.
 	ClickHouse ClickHouseConfig `toml:"clickhouse"`

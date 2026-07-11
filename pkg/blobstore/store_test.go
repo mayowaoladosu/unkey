@@ -19,7 +19,7 @@ func TestMemoryStoreRoundTripReturnsIndependentBytes(t *testing.T) {
 	}))
 	original[0] = 'X'
 
-	object, found, err := store.Get(ctx, "deployments/d_1/static.tar.gz")
+	object, found, err := store.Get(ctx, "deployments/d_1/static.tar.gz", 1<<20)
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, []byte("immutable artifact"), object.Body)
@@ -27,10 +27,13 @@ func TestMemoryStoreRoundTripReturnsIndependentBytes(t *testing.T) {
 	require.NotEmpty(t, object.ETag)
 
 	object.Body[0] = 'Y'
-	again, found, err := store.Get(ctx, "deployments/d_1/static.tar.gz")
+	again, found, err := store.Get(ctx, "deployments/d_1/static.tar.gz", 1<<20)
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, []byte("immutable artifact"), again.Body)
+
+	_, _, err = store.Get(ctx, "deployments/d_1/static.tar.gz", 4)
+	require.ErrorContains(t, err, "exceeds")
 }
 
 func TestS3StoreRoundTrip(t *testing.T) {
@@ -53,13 +56,13 @@ func TestS3StoreRoundTrip(t *testing.T) {
 
 	key := "deployments/d_1/static.tar.gz"
 	require.NoError(t, store.Put(ctx, key, []byte("bundle"), Metadata{ContentType: "application/gzip"}))
-	object, found, err := store.Get(ctx, key)
+	object, found, err := store.Get(ctx, key, 1<<20)
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, []byte("bundle"), object.Body)
 	require.Equal(t, "application/gzip", object.Metadata.ContentType)
 
-	_, found, err = store.Get(ctx, "missing")
+	_, found, err = store.Get(ctx, "missing", 1<<20)
 	require.NoError(t, err)
 	require.False(t, found)
 }

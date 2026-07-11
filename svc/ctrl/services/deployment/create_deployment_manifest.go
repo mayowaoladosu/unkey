@@ -111,9 +111,10 @@ func compileDeploymentManifest(
 				build.StaticOutputDirectory = *detected.Output.Directory
 				outputs = []deploymanifest.Output{
 					{
-						Kind:      deploymanifest.OutputKindStatic,
-						Name:      outputName,
-						Directory: *detected.Output.Directory,
+						Kind:        deploymanifest.OutputKindStatic,
+						Name:        outputName,
+						Directory:   *detected.Output.Directory,
+						SPAFallback: provenance.FrameworkPreset == "vite",
 					},
 				}
 			}

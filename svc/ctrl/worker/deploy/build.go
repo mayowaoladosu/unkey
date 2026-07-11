@@ -169,6 +169,7 @@ type buildResult struct {
 	ImageName      string
 	DepotBuildID   string
 	DepotProjectID string
+	StaticArtifact *materializedStaticArtifact
 }
 
 // gitBuildParams holds the inputs for building a container image from a Git
@@ -185,6 +186,9 @@ type gitBuildParams struct {
 	// Empty means auto-detect. Only consumed by the Railpack build path;
 	// Dockerfile builds ignore it.
 	BuildCommand                  string
+	StaticOutputDirectory         string
+	StaticOutputName              string
+	StaticSPAFallback             bool
 	ProjectID                     string
 	AppID                         string
 	DeploymentID                  string

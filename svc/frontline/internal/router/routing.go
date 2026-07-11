@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 
@@ -9,6 +10,10 @@ import (
 	"github.com/unkeyed/unkey/pkg/fault"
 	"github.com/unkeyed/unkey/svc/frontline/internal/db"
 )
+
+type staticArtifactMetadata struct {
+	SPAFallback bool `json:"spaFallback"`
+}
 
 var regionProximity = map[string][]string{
 	// US East
@@ -56,6 +61,33 @@ func (s *service) selectDestination(
 	instances []db.FindInstancesByDeploymentIDRow,
 	policies []*frontlinev1.Policy,
 ) (RouteDecision, error) {
+	if route.StaticStorageKey.Valid && route.StaticDigest.Valid {
+		metadata := staticArtifactMetadata{}
+		if len(route.StaticMetadata) > 0 {
+			if err := json.Unmarshal(route.StaticMetadata, &metadata); err != nil {
+				return RouteDecision{}, fault.New("invalid static artifact metadata",
+					fault.Code(codes.Frontline.Internal.ConfigLoadFailed.URN()),
+					fault.Internal(err.Error()),
+					fault.Public("Static deployment configuration is invalid"),
+				)
+			}
+		}
+		return RouteDecision{
+			Destination:      DestinationStaticArtifact,
+			DeploymentID:     route.DeploymentID,
+			EnvironmentID:    route.EnvironmentID,
+			WorkspaceID:      route.WorkspaceID,
+			ProjectID:        route.ProjectID,
+			AppID:            route.AppID,
+			UpstreamProtocol: route.UpstreamProtocol,
+			Policies:         policies,
+			StaticArtifact: StaticArtifact{
+				StorageKey:  route.StaticStorageKey.String,
+				Digest:      route.StaticDigest.String,
+				SPAFallback: metadata.SPAFallback,
+			},
+		}, nil
+	}
 	if len(instances) == 0 {
 		return RouteDecision{}, fault.New("no instances",
 			fault.Code(codes.Frontline.Routing.NoRunningInstances.URN()),

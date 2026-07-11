@@ -21,6 +21,7 @@ import (
 	"github.com/unkeyed/unkey/gen/proto/vault/v1/vaultv1connect"
 	"github.com/unkeyed/unkey/gen/rpc/vault"
 	"github.com/unkeyed/unkey/pkg/batch"
+	"github.com/unkeyed/unkey/pkg/blobstore"
 	"github.com/unkeyed/unkey/pkg/buildinfo"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/pkg/clickhouse"
@@ -235,6 +236,15 @@ func Run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("invalid build platform: %w", err)
 	}
 
+	var artifactStore blobstore.Store
+	if cfg.ArtifactStorage != nil {
+		artifactStore, err = blobstore.NewS3(ctx, *cfg.ArtifactStorage)
+		if err != nil {
+			return fmt.Errorf("unable to create deployment artifact store: %w", err)
+		}
+		logger.Info("Deployment artifact store initialized", "bucket", cfg.ArtifactStorage.Bucket)
+	}
+
 	restateSrv.Bind(hydrav1.NewDeployServiceServer(deploy.New(deploy.Config{
 		DB:            database,
 		DefaultDomain: cfg.DefaultDomain,
@@ -247,6 +257,7 @@ func Run(ctx context.Context, cfg Config) error {
 		Clickhouse:                      ch,
 		BuildSteps:                      buildSteps,
 		BuildStepLogs:                   buildStepLogs,
+		ArtifactStore:                   artifactStore,
 		AllowUnauthenticatedDeployments: ptr.SafeDeref(cfg.GitHub).AllowUnauthenticatedDeployments,
 		DashboardURL:                    cfg.DashboardURL,
 	}),

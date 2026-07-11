@@ -11,6 +11,7 @@ import (
 const (
 	decisionLocal  = "local"
 	decisionRemote = "remote"
+	decisionStatic = "static"
 )
 
 // routingDecisionsTotal counts where each request was routed. The

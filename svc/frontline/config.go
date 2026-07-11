@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/unkeyed/unkey/pkg/blobstore"
 	"github.com/unkeyed/unkey/pkg/config"
 )
 
@@ -100,6 +101,14 @@ type Config struct {
 	// Redis configures the Redis connection for distributed rate limiting
 	// and usage limiting. Optional — falls back to in-memory when empty.
 	Redis RedisConfig `toml:"redis"`
+
+	// ArtifactStorage configures the S3-compatible store containing immutable
+	// static deployment bundles. It is optional for container-only installations.
+	ArtifactStorage *blobstore.S3Config `toml:"artifact_storage"`
+
+	// StaticArtifactCacheEntries bounds decompressed immutable bundles retained
+	// by each Frontline process.
+	StaticArtifactCacheEntries int `toml:"static_artifact_cache_entries" config:"default=32,min=1"`
 
 	// RequestTimeout is the maximum duration for proxied requests before the
 	// context is cancelled and a 504 is returned.

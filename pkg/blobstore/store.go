@@ -17,5 +17,5 @@ type Object struct {
 
 type Store interface {
 	Put(ctx context.Context, key string, body []byte, metadata Metadata) error
-	Get(ctx context.Context, key string) (Object, bool, error)
+	Get(ctx context.Context, key string, maxBytes int64) (Object, bool, error)
 }

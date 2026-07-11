@@ -7,24 +7,42 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 const findFrontlineRouteByFQDN = `-- name: FindFrontlineRouteByFQDN :one
 SELECT
   fr.environment_id,
   fr.deployment_id,
+  d.workspace_id,
+  d.project_id,
+  d.app_id,
   d.sentinel_config,
-  d.upstream_protocol
+  d.upstream_protocol,
+  da.name AS static_output_name,
+  da.storage_key AS static_storage_key,
+  da.digest AS static_digest,
+  da.metadata AS static_metadata
 FROM frontline_routes fr
 INNER JOIN deployments d ON fr.deployment_id = d.id
+LEFT JOIN deployment_artifacts da
+  ON da.deployment_id = d.id
+  AND da.kind = 'static_bundle'
 WHERE fr.fully_qualified_domain_name = ?
 `
 
 type FindFrontlineRouteByFQDNRow struct {
 	EnvironmentID    string                      `db:"environment_id"`
 	DeploymentID     string                      `db:"deployment_id"`
+	WorkspaceID      string                      `db:"workspace_id"`
+	ProjectID        string                      `db:"project_id"`
+	AppID            string                      `db:"app_id"`
 	SentinelConfig   []byte                      `db:"sentinel_config"`
 	UpstreamProtocol DeploymentsUpstreamProtocol `db:"upstream_protocol"`
+	StaticOutputName sql.NullString              `db:"static_output_name"`
+	StaticStorageKey sql.NullString              `db:"static_storage_key"`
+	StaticDigest     sql.NullString              `db:"static_digest"`
+	StaticMetadata   []byte                      `db:"static_metadata"`
 }
 
 // FindFrontlineRouteByFQDN resolves a hostname to the routing data frontline
@@ -35,10 +53,20 @@ type FindFrontlineRouteByFQDNRow struct {
 //	SELECT
 //	  fr.environment_id,
 //	  fr.deployment_id,
+//	  d.workspace_id,
+//	  d.project_id,
+//	  d.app_id,
 //	  d.sentinel_config,
-//	  d.upstream_protocol
+//	  d.upstream_protocol,
+//	  da.name AS static_output_name,
+//	  da.storage_key AS static_storage_key,
+//	  da.digest AS static_digest,
+//	  da.metadata AS static_metadata
 //	FROM frontline_routes fr
 //	INNER JOIN deployments d ON fr.deployment_id = d.id
+//	LEFT JOIN deployment_artifacts da
+//	  ON da.deployment_id = d.id
+//	  AND da.kind = 'static_bundle'
 //	WHERE fr.fully_qualified_domain_name = ?
 func (q *Queries) FindFrontlineRouteByFQDN(ctx context.Context, fqdn string) (FindFrontlineRouteByFQDNRow, error) {
 	row := q.db.QueryRowContext(ctx, findFrontlineRouteByFQDN, fqdn)
@@ -46,8 +74,15 @@ func (q *Queries) FindFrontlineRouteByFQDN(ctx context.Context, fqdn string) (Fi
 	err := row.Scan(
 		&i.EnvironmentID,
 		&i.DeploymentID,
+		&i.WorkspaceID,
+		&i.ProjectID,
+		&i.AppID,
 		&i.SentinelConfig,
 		&i.UpstreamProtocol,
+		&i.StaticOutputName,
+		&i.StaticStorageKey,
+		&i.StaticDigest,
+		&i.StaticMetadata,
 	)
 	return i, err
 }

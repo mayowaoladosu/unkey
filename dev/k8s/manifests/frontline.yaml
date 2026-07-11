@@ -12,6 +12,16 @@ data:
     https_port = 7443
     apex_domain = "unkey.local"
     ctrl_addr = "http://ctrl-api.unkey.svc.cluster.local:7091"
+    static_artifact_cache_entries = 32
+
+    [artifact_storage]
+    endpoint = "http://s3.unkey.svc.cluster.local:3902"
+    region = "auto"
+    bucket = "vault"
+    access_key_id = "minio_root_user"
+    secret_access_key = "minio_root_password"
+    use_path_style = true
+    create_bucket = false
 
     [database]
     primary = "unkey:password@tcp(mysql.unkey.svc.cluster.local:3306)/unkey?parseTime=true&interpolateParams=true"
@@ -94,7 +104,7 @@ spec:
             [
               "sh",
               "-c",
-              "until nc -z mysql.unkey.svc.cluster.local 3306 && nc -z ctrl-api.unkey.svc.cluster.local 7091 && nc -z vault.unkey.svc.cluster.local 8060; do sleep 2; done",
+              "until nc -z mysql.unkey.svc.cluster.local 3306 && nc -z ctrl-api.unkey.svc.cluster.local 7091 && nc -z vault.unkey.svc.cluster.local 8060 && nc -z s3.unkey.svc.cluster.local 3902; do sleep 2; done",
             ]
 ---
 apiVersion: v1

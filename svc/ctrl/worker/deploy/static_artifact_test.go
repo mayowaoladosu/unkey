@@ -31,7 +31,7 @@ func TestMaterializeStaticDirectoryUploadsResolvableBundle(t *testing.T) {
 	require.Equal(t, "application/gzip", artifact.ContentType)
 	require.Positive(t, artifact.SizeBytes)
 
-	stored, found, err := store.Get(context.Background(), artifact.StorageKey)
+	stored, found, err := store.Get(context.Background(), artifact.StorageKey, staticbundle.DefaultLimits().MaxArchiveBytes)
 	require.NoError(t, err)
 	require.True(t, found)
 	archive, err := staticbundle.Open(stored.Body, staticbundle.DefaultLimits())

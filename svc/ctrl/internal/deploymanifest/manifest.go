@@ -70,6 +70,7 @@ type Output struct {
 	Port             int32      `json:"port,omitempty"`
 	UpstreamProtocol string     `json:"upstreamProtocol,omitempty"`
 	Directory        string     `json:"directory,omitempty"`
+	SPAFallback      bool       `json:"spaFallback,omitempty"`
 	Runtime          string     `json:"runtime,omitempty"`
 	Handler          string     `json:"handler,omitempty"`
 }

@@ -43,9 +43,12 @@ func (s *service) Route(ctx context.Context, hostname string) (RouteDecision, er
 		return RouteDecision{}, err
 	}
 
-	instances, err := s.getInstances(ctx, route.DeploymentID)
-	if err != nil {
-		return RouteDecision{}, err
+	var instances []db.FindInstancesByDeploymentIDRow
+	if !route.StaticStorageKey.Valid {
+		instances, err = s.getInstances(ctx, route.DeploymentID)
+		if err != nil {
+			return RouteDecision{}, err
+		}
 	}
 
 	policies, err := s.getPolicies(ctx, route)
@@ -60,6 +63,8 @@ func (s *service) Route(ctx context.Context, hostname string) (RouteDecision, er
 
 	if decision.Destination == DestinationLocalInstance {
 		routingDecisionsTotal.WithLabelValues(decisionLocal, s.regionPlatform).Inc()
+	} else if decision.Destination == DestinationStaticArtifact {
+		routingDecisionsTotal.WithLabelValues(decisionStatic, s.regionPlatform).Inc()
 	} else {
 		routingDecisionsTotal.WithLabelValues(decisionRemote, decision.RemoteRegionAddress).Inc()
 	}

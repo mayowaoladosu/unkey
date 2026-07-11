@@ -18,7 +18,16 @@ const (
 	// DestinationRemoteRegion forwards to a peer frontline in another
 	// region. The peer redoes the full hostname → engine → instance chain.
 	DestinationRemoteRegion Destination = "region"
+	// DestinationStaticArtifact serves an immutable deployment bundle directly
+	// from Frontline without allocating an application container.
+	DestinationStaticArtifact Destination = "static"
 )
+
+type StaticArtifact struct {
+	StorageKey  string
+	Digest      string
+	SPAFallback bool
+}
 
 // RouteDecision is the output of Route.
 //
@@ -41,6 +50,7 @@ type RouteDecision struct {
 	RemoteRegionAddress string
 	UpstreamProtocol    db.DeploymentsUpstreamProtocol
 	Policies            []*frontlinev1.Policy
+	StaticArtifact      StaticArtifact
 }
 
 type Service interface {

@@ -12,6 +12,7 @@ import (
 	"github.com/unkeyed/unkey/svc/frontline/internal/policies"
 	"github.com/unkeyed/unkey/svc/frontline/internal/proxy"
 	"github.com/unkeyed/unkey/svc/frontline/internal/router"
+	"github.com/unkeyed/unkey/svc/frontline/internal/staticassets"
 )
 
 type Services struct {
@@ -20,6 +21,7 @@ type Services struct {
 	FrontlineID       string
 	RouterService     router.Service
 	ProxyService      proxy.Service
+	StaticAssets      staticassets.Resolver
 	Engine            policies.Evaluator
 	Clock             clock.Clock
 	AcmeClient        ctrl.AcmeServiceClient

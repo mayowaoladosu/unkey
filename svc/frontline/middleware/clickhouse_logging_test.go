@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/unkeyed/unkey/svc/frontline/internal/proxy"
 )
 
 func TestFormatHeaders_RedactsAuthorization(t *testing.T) {
@@ -65,4 +66,14 @@ func TestToSet(t *testing.T) {
 	set := toSet([]string{"a", "b"})
 	require.Contains(t, set, "a")
 	require.Contains(t, set, "b")
+}
+
+func TestShouldLogTrackingIncludesDirectStaticResponses(t *testing.T) {
+	require.True(t, shouldLogTracking(true, &proxy.RequestTracking{
+		DeploymentID:  "d_static",
+		DirectResponse: true,
+	}))
+	require.False(t, shouldLogTracking(true, &proxy.RequestTracking{
+		DeploymentID: "d_remote",
+	}))
 }
