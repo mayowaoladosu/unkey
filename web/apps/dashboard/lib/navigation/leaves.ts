@@ -2,6 +2,7 @@ import {
 	ArrowDottedRotateAnticlockwise,
 	ArrowOppositeDirectionY,
 	BracketsSquareDots,
+	CloudUp,
 	Cube,
 	Fingerprint,
 	Gauge,
@@ -31,6 +32,13 @@ export function buildWorkspaceSections(
 		isActive: top === "portal",
 	};
 	return [
+		{
+			key: "deploy",
+			label: "Deploy",
+			href: routes.deploy.root({ workspaceSlug: slug }),
+			icon: CloudUp,
+			isActive: top === "deploy",
+		},
 		{
 			key: "projects",
 			label: "Projects",

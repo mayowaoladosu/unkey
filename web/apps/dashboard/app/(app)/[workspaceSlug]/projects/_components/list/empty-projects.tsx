@@ -2,9 +2,9 @@ import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { ArrowRight, BookBookmark, Code, Cube, Earth, Github, HeartPulse } from "@unkey/icons";
 import { Button } from "@unkey/ui";
 import { cn } from "@unkey/ui/src/lib/utils";
-import { useSearchParams } from "next/navigation";
-import { type ReactNode, useState } from "react";
-import { CreateProjectDialog } from "../create-project-dialog";
+import { routes } from "@/lib/navigation/routes";
+import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 
 type IconBoxProps = {
   children?: ReactNode;
@@ -54,8 +54,7 @@ const ProjectIconRow = () => (
 
 export function EmptyProjects() {
   const workspace = useWorkspaceNavigation();
-  const searchParams = useSearchParams();
-  const [isDialogOpen, setIsDialogOpen] = useState(searchParams.get("new") === "true");
+  const router = useRouter();
 
   return (
     <div className="grow w-full flex justify-center items-center p-12">
@@ -64,18 +63,18 @@ export function EmptyProjects() {
 
         <h2 className="text-accent-12 font-semibold text-2xl leading-8 mb-1">Projects</h2>
         <p className="text-accent-11 text-sm leading-6 max-w-md text-balance mb-6">
-          Build, deploy and scale your API inside Unkey. Create a project to get started, free
-          during beta.
+          Import a repository or container image, review the detected build and resources, then
+          ship the first production deployment.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
           <Button
             variant="primary"
             size="md"
-            onClick={() => setIsDialogOpen(true)}
+            onClick={() => router.push(routes.deploy.root({ workspaceSlug: workspace.slug }))}
             className="w-full max-w-[200px] sm:w-auto sm:max-w-none"
           >
-            Create your first project
+            Deploy your first project
             <ArrowRight />
           </Button>
           <a
@@ -91,12 +90,6 @@ export function EmptyProjects() {
           </a>
         </div>
       </div>
-
-      <CreateProjectDialog
-        isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        workspaceSlug={workspace.slug}
-      />
     </div>
   );
 }

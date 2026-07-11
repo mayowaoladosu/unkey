@@ -49,10 +49,23 @@ export const projectRoutes = {
   },
 
   apps: {
-    new({ step, appId, ...scope }: ProjectScope & { step?: string; appId?: string }): Route {
+    new({
+      step,
+      appId,
+      source,
+      image,
+      ...scope
+    }: ProjectScope & {
+      step?: string;
+      appId?: string;
+      source?: "github" | "image";
+      image?: string;
+    }): Route {
       return buildRoute("/[workspaceSlug]/projects/[projectId]/apps/new", projectParams(scope), {
         step,
         appId,
+        source,
+        image,
       });
     },
 

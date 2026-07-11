@@ -7,6 +7,7 @@ import { apiRoutes } from "./apis";
 import { auditRoutes } from "./audit";
 import { authRoutes } from "./auth";
 import { authorizationRoutes } from "./authorization";
+import { deployRoutes } from "./deploy";
 import { identityRoutes } from "./identities";
 import { logRoutes } from "./logs";
 import { portalRoutes } from "./portal";
@@ -18,6 +19,7 @@ import { workspaceRoutes } from "./workspaces";
 export { buildRoute } from "./shared";
 
 export const routes = {
+  deploy: deployRoutes,
   projects: projectRoutes,
   ratelimits: ratelimitRoutes,
   settings: settingsRoutes,
