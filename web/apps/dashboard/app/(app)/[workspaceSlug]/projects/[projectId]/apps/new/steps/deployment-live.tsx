@@ -36,6 +36,7 @@ const DeploymentLiveStepContent = ({ projectId, appId }: { projectId: string; ap
     projectId,
     appId,
     deploymentId: deployment.id,
+    welcome: true,
   });
 
   useEffect(() => {

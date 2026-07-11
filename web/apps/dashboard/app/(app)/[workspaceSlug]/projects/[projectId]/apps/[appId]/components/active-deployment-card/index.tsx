@@ -105,6 +105,13 @@ export function ActiveDeploymentCard({
                 text={isRolledBack ? "Rolled Back" : "Current"}
               />
             )}
+            {deployment.prNumber !== null ? (
+              <GitHubLink href={githubUrl.pull(repoFullName, deployment.prNumber)}>
+                <span className="rounded-full border border-accentA-5 bg-accentA-3 px-2 py-0.5 text-[10px] font-medium text-accent-11">
+                  Preview #{deployment.prNumber}
+                </span>
+              </GitHubLink>
+            ) : null}
           </div>
           <div className="flex items-center gap-3 min-w-0">
             {deployment.gitCommitMessage && (

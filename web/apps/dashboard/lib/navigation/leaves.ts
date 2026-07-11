@@ -229,39 +229,40 @@ export function buildDeploymentLinks(
 ): ResolvedNavLink[] {
 	const base = `/${slug}/projects/${projectId}/apps/${appId}/deployments/${deploymentId}`;
 	const active = (suffix: string) => pathname === `${base}${suffix}`;
+	const scope = { workspaceSlug: slug, projectId, appId, deploymentId };
 	return [
 		{
 			key: "deployment-overview",
 			label: "Overview",
-			href: base,
+			href: routes.projects.apps.deployment(scope),
 			icon: Cube,
 			isActive: active(""),
 		},
 		{
 			key: "deployment-logs",
 			label: "Logs & Events",
-			href: `${base}/logs`,
+			href: routes.projects.apps.deploymentLogs(scope),
 			icon: Layers3,
 			isActive: active("/logs"),
 		},
 		{
 			key: "deployment-resources",
 			label: "Resources",
-			href: `${base}/resources`,
+			href: routes.projects.apps.deploymentResources(scope),
 			icon: Nodes,
 			isActive: active("/resources"),
 		},
 		{
 			key: "deployment-source",
 			label: "Source & Build",
-			href: `${base}/source`,
+			href: routes.projects.apps.deploymentSource(scope),
 			icon: BracketsSquareDots,
 			isActive: active("/source"),
 		},
 		{
 			key: "deployment-network",
 			label: "Network",
-			href: `${base}/network`,
+			href: routes.projects.apps.deploymentNetwork(scope),
 			icon: ArrowOppositeDirectionY,
 			isActive: active("/network"),
 		},

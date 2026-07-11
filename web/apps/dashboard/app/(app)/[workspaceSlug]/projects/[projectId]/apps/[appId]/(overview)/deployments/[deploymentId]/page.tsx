@@ -15,14 +15,16 @@ import { DeploymentProgress } from "./(deployment-progress)/deployment-progress"
 import { DeploymentSkipped } from "./(deployment-progress)/deployment-skipped";
 import { DeploymentNetworkSection } from "./(overview)/components/sections/deployment-network-section";
 import { DeploymentResourcesSection } from "./(overview)/components/sections/deployment-resources-section";
+import { DeploymentReadyHero } from "./(overview)/components/deployment-ready-hero";
 import { useDeployment } from "./layout-provider";
 import { useDeploymentStatus } from "./use-deployment-status";
 
 export default function DeploymentOverview() {
   const searchParams = useSearchParams();
   const build = searchParams.get("build");
+  const welcome = searchParams.get("welcome") === "true";
   const { deployment } = useDeployment();
-  const { refetchDomains } = useProjectData();
+  const { environments, refetchDomains } = useProjectData();
   const router = useRouter();
   const workspace = useWorkspaceNavigation();
 
@@ -69,7 +71,26 @@ export default function DeploymentOverview() {
     ))
     .with("ready", () => (
       <div key="ready" className="flex flex-col gap-5 animate-fade-slide-in">
-        <DeploymentDomainsCard />
+        {welcome ? (
+          <DeploymentReadyHero
+            environmentSlug={
+              environments.find((environment) => environment.id === deployment.environmentId)
+                ?.slug ?? "production"
+            }
+            onDismiss={() =>
+              router.replace(
+                routes.projects.apps.deployment({
+                  workspaceSlug: workspace.slug,
+                  projectId: deployment.projectId,
+                  appId: deployment.appId,
+                  deploymentId: deployment.id,
+                }),
+              )
+            }
+          />
+        ) : (
+          <DeploymentDomainsCard />
+        )}
         <DeploymentResourcesSection />
         <DeploymentNetworkSection />
       </div>

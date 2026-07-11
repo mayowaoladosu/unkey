@@ -70,6 +70,21 @@ describe("routes.projects.apps.new", () => {
       routes.projects.apps.new({ workspaceSlug: ws, projectId, step: "select-repo", appId }),
     ).toBe("/acme/projects/proj_123/apps/new?step=select-repo&appId=app_456");
   });
+
+  it("carries a prebuilt image into configuration", () => {
+    expect(
+      routes.projects.apps.new({
+        workspaceSlug: ws,
+        projectId,
+        step: "configure-deployment",
+        appId,
+        source: "image",
+        image: "ghcr.io/acme/api:latest",
+      }),
+    ).toBe(
+      "/acme/projects/proj_123/apps/new?step=configure-deployment&appId=app_456&source=image&image=ghcr.io/acme/api:latest",
+    );
+  });
 });
 
 describe("app-scoped paths", () => {
@@ -93,6 +108,28 @@ describe("app-scoped paths", () => {
   it("flags a build deployment", () => {
     expect(routes.projects.apps.deployment({ ...scope, deploymentId, build: true })).toBe(
       "/acme/projects/proj_123/apps/app_456/deployments/d_789?build=true",
+    );
+  });
+
+  it("flags the first-deploy welcome handoff", () => {
+    expect(routes.projects.apps.deployment({ ...scope, deploymentId, welcome: true })).toBe(
+      "/acme/projects/proj_123/apps/app_456/deployments/d_789?welcome=true",
+    );
+  });
+
+  it("builds every deployment workspace destination", () => {
+    const deploymentScope = { ...scope, deploymentId };
+    expect(routes.projects.apps.deploymentLogs(deploymentScope)).toBe(
+      "/acme/projects/proj_123/apps/app_456/deployments/d_789/logs",
+    );
+    expect(routes.projects.apps.deploymentResources(deploymentScope)).toBe(
+      "/acme/projects/proj_123/apps/app_456/deployments/d_789/resources",
+    );
+    expect(routes.projects.apps.deploymentSource(deploymentScope)).toBe(
+      "/acme/projects/proj_123/apps/app_456/deployments/d_789/source",
+    );
+    expect(routes.projects.apps.deploymentNetwork(deploymentScope)).toBe(
+      "/acme/projects/proj_123/apps/app_456/deployments/d_789/network",
     );
   });
 

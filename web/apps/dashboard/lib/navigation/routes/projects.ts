@@ -107,12 +107,41 @@ export const projectRoutes = {
     deployment({
       deploymentId,
       build,
+      welcome,
       ...scope
-    }: AppScope & { deploymentId: string; build?: boolean }): Route {
+    }: AppScope & { deploymentId: string; build?: boolean; welcome?: boolean }): Route {
       return buildRoute(
         "/[workspaceSlug]/projects/[projectId]/apps/[appId]/deployments/[deploymentId]",
         { ...appParams(scope), deploymentId },
-        { build: build || undefined },
+        { build: build || undefined, welcome: welcome || undefined },
+      );
+    },
+
+    deploymentLogs(scope: AppScope & { deploymentId: string }): Route {
+      return buildRoute(
+        "/[workspaceSlug]/projects/[projectId]/apps/[appId]/deployments/[deploymentId]/logs",
+        { ...appParams(scope), deploymentId: scope.deploymentId },
+      );
+    },
+
+    deploymentResources(scope: AppScope & { deploymentId: string }): Route {
+      return buildRoute(
+        "/[workspaceSlug]/projects/[projectId]/apps/[appId]/deployments/[deploymentId]/resources",
+        { ...appParams(scope), deploymentId: scope.deploymentId },
+      );
+    },
+
+    deploymentSource(scope: AppScope & { deploymentId: string }): Route {
+      return buildRoute(
+        "/[workspaceSlug]/projects/[projectId]/apps/[appId]/deployments/[deploymentId]/source",
+        { ...appParams(scope), deploymentId: scope.deploymentId },
+      );
+    },
+
+    deploymentNetwork(scope: AppScope & { deploymentId: string }): Route {
+      return buildRoute(
+        "/[workspaceSlug]/projects/[projectId]/apps/[appId]/deployments/[deploymentId]/network",
+        { ...appParams(scope), deploymentId: scope.deploymentId },
       );
     },
 

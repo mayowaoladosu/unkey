@@ -5,6 +5,8 @@ import { shortenId } from "@/lib/shorten-id";
 import {
 	ArrowDottedRotateAnticlockwise,
 	Ban,
+	Bolt,
+	Minus,
 } from "@unkey/icons";
 import {
 	Button,
@@ -19,6 +21,9 @@ import {
 	isCancellableDeploymentStatus,
 	isRedeployableDeploymentStatus,
 } from "../components/table/components/actions/deployment-action-eligibility";
+import { StopDialog } from "../components/table/components/actions/stop-dialog";
+import { WakeDialog } from "../components/table/components/actions/wake-dialog";
+import { useProjectData } from "../../data-provider";
 import { useDeployment } from "./layout-provider";
 import { useDeploymentStatus } from "./use-deployment-status";
 
@@ -54,11 +59,18 @@ function DeploymentDetailHeaderContent({
 	deployment,
 }: { deployment: Deployment }) {
 	const { derivedStatus } = useDeploymentStatus(deployment);
+	const { environments } = useProjectData();
 	const [isRedeployOpen, setIsRedeployOpen] = useState(false);
 	const [isCancelOpen, setIsCancelOpen] = useState(false);
+	const [isStopOpen, setIsStopOpen] = useState(false);
+	const [isWakeOpen, setIsWakeOpen] = useState(false);
 	const [cancelled, setCancelled] = useState(false);
 	const canCancel = isCancellableDeploymentStatus(derivedStatus) && !cancelled;
 	const canRedeploy = isRedeployableDeploymentStatus(derivedStatus);
+	const environment = environments.find((item) => item.id === deployment.environmentId);
+	const isNonProduction = environment !== undefined && environment.slug !== "production";
+	const canStop = isNonProduction && derivedStatus === "ready";
+	const canWake = isNonProduction && derivedStatus === "stopped";
 
 	const title = deployment.gitCommitMessage || shortenId(deployment.id);
 
@@ -70,6 +82,18 @@ function DeploymentDetailHeaderContent({
 				</PageHeaderTitle>
 			</PageHeaderContent>
 			<PageHeaderActions>
+				{canWake && (
+					<Button variant="primary" onClick={() => setIsWakeOpen(true)}>
+						<Bolt iconSize="sm-medium" />
+						Wake deployment
+					</Button>
+				)}
+				{canStop && (
+					<Button variant="outline" onClick={() => setIsStopOpen(true)}>
+						<Minus iconSize="sm-medium" />
+						Stop deployment
+					</Button>
+				)}
 				{canCancel && (
 					<Button variant="outline" onClick={() => setIsCancelOpen(true)}>
 						<Ban iconSize="sm-medium" />
@@ -95,6 +119,20 @@ function DeploymentDetailHeaderContent({
 					isOpen={isCancelOpen}
 					onClose={() => setIsCancelOpen(false)}
 					onCancelled={() => setCancelled(true)}
+					deployment={deployment}
+				/>
+			)}
+			{canStop && (
+				<StopDialog
+					isOpen={isStopOpen}
+					onClose={() => setIsStopOpen(false)}
+					deployment={deployment}
+				/>
+			)}
+			{canWake && (
+				<WakeDialog
+					isOpen={isWakeOpen}
+					onClose={() => setIsWakeOpen(false)}
 					deployment={deployment}
 				/>
 			)}

@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
  */
 const AREAS = [
   "apis",
+  "deploy",
   "projects",
   "ratelimits",
   "settings",
