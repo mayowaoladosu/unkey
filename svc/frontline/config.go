@@ -114,6 +114,10 @@ type Config struct {
 	// context is cancelled and a 504 is returned.
 	RequestTimeout time.Duration `toml:"request_timeout" config:"default=15m"`
 
+	// RouteCachePollInterval bounds alias promotion and rollback convergence
+	// across Frontline replicas without putting a database read on every request.
+	RouteCachePollInterval time.Duration `toml:"route_cache_poll_interval" config:"default=500ms"`
+
 	Observability config.Observability `toml:"observability"`
 
 	// Vault configures the encryption/decryption service. See [config.VaultConfig].

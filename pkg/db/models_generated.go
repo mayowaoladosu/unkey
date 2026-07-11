@@ -1498,6 +1498,11 @@ type FrontlineRoute struct {
 	UpdatedAt                sql.NullInt64         `db:"updated_at"`
 }
 
+type FrontlineRouteRevision struct {
+	ID       uint8  `db:"id"`
+	Revision uint64 `db:"revision"`
+}
+
 type GithubAppInstallation struct {
 	Pk             uint64        `db:"pk"`
 	WorkspaceID    string        `db:"workspace_id"`

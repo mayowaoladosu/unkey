@@ -1,9 +1,14 @@
 import { relations } from "drizzle-orm";
-import { bigint, index, mysqlEnum, mysqlTable, varchar } from "drizzle-orm/mysql-core";
+import { bigint, index, mysqlEnum, mysqlTable, tinyint, varchar } from "drizzle-orm/mysql-core";
 import { deploymentTargets } from "./deployment_targets";
 import { deployments } from "./deployments";
 import { projects } from "./projects";
 import { lifecycleDates } from "./util/lifecycle_dates";
+
+export const frontlineRouteRevisions = mysqlTable("frontline_route_revisions", {
+  id: tinyint("id", { unsigned: true }).primaryKey(),
+  revision: bigint("revision", { mode: "number", unsigned: true }).notNull(),
+});
 
 export const frontlineRoutes = mysqlTable(
   "frontline_routes",

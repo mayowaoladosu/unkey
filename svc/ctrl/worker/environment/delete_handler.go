@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -63,7 +64,13 @@ func (s *Service) Delete(
 	}
 
 	if err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
-		return s.db.DeleteFrontlineRoutesByEnvironmentId(runCtx, envID)
+		return db.Tx(runCtx, s.db.RW(), func(txCtx context.Context, tx db.DBTX) error {
+			queries := db.NewQueries(tx)
+			if deleteErr := queries.DeleteFrontlineRoutesByEnvironmentId(txCtx, envID); deleteErr != nil {
+				return deleteErr
+			}
+			return queries.BumpFrontlineRouteRevision(txCtx)
+		})
 	}, restate.WithName("delete frontline routes")); err != nil {
 		return nil, fmt.Errorf("delete frontline routes: %w", err)
 	}

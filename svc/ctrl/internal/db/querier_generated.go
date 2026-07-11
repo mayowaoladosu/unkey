@@ -19,6 +19,12 @@ type Querier interface {
 	//    updated_at = ?
 	//  WHERE id = ?
 	AssignDeploymentTarget(ctx context.Context, arg AssignDeploymentTargetParams) error
+	//BumpFrontlineRouteRevision
+	//
+	//  INSERT INTO frontline_route_revisions (id, revision)
+	//  VALUES (1, 1)
+	//  ON DUPLICATE KEY UPDATE revision = revision + 1
+	BumpFrontlineRouteRevision(ctx context.Context) error
 	//CompareAndSwapDeploymentStatus
 	//
 	//  UPDATE deployments

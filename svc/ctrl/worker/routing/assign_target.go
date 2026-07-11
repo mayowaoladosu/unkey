@@ -72,6 +72,9 @@ func assignFrontlineRoute(
 	}); err != nil {
 		return fmt.Errorf("reassign frontline route %q: %w", routeID, err)
 	}
+	if err := queries.BumpFrontlineRouteRevision(ctx); err != nil {
+		return fmt.Errorf("bump frontline route revision: %w", err)
+	}
 	return nil
 }
 

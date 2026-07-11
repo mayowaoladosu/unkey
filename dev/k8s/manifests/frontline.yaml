@@ -13,6 +13,7 @@ data:
     apex_domain = "unkey.local"
     ctrl_addr = "http://ctrl-api.unkey.svc.cluster.local:7091"
     static_artifact_cache_entries = 32
+    route_cache_poll_interval = "500ms"
 
     [artifact_storage]
     endpoint = "http://s3.unkey.svc.cluster.local:3902"

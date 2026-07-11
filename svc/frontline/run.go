@@ -286,6 +286,13 @@ func Run(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("unable to create router service: %w", err)
 	}
+	routeCachePollInterval := cfg.RouteCachePollInterval
+	if routeCachePollInterval <= 0 {
+		routeCachePollInterval = 500 * time.Millisecond
+	}
+	r.Go(func(ctx context.Context) error {
+		return routerSvc.WatchRouteChanges(ctx, routeCachePollInterval)
+	})
 
 	upstreamTransports := proxy.NewTransportRegistry()
 

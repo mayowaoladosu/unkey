@@ -236,26 +236,30 @@ func (s *Service) DeleteCustomDomain(
 
 	// Delete in transaction: frontline route, ACME challenge, custom domain
 	err = db.Tx(ctx, s.db.RW(), func(txCtx context.Context, tx db.DBTX) error {
+		queries := db.NewQueries(tx)
 		// Delete the frontline route only if it belongs to this caller's project.
 		// frontline_routes enforces UNIQUE(fully_qualified_domain_name), so exactly
 		// one route exists per FQDN, owned by whichever project verified it. Scoping
 		// the delete by project_id prevents deleting a route that another workspace
 		// legitimately owns when this workspace merely holds an unverified custom
 		// domain row for the same FQDN.
-		if deleteErr := db.NewQueries(tx).DeleteFrontlineRouteByFQDNAndProject(txCtx, db.DeleteFrontlineRouteByFQDNAndProjectParams{
+		if deleteErr := queries.DeleteFrontlineRouteByFQDNAndProject(txCtx, db.DeleteFrontlineRouteByFQDNAndProjectParams{
 			Fqdn:      req.Msg.GetDomain(),
 			ProjectID: domain.ProjectID,
 		}); deleteErr != nil && !db.IsNotFound(deleteErr) {
 			return fmt.Errorf("failed to delete frontline route: %w", deleteErr)
 		}
+		if bumpErr := queries.BumpFrontlineRouteRevision(txCtx); bumpErr != nil {
+			return fmt.Errorf("failed to bump frontline route revision: %w", bumpErr)
+		}
 
 		// Delete ACME challenge if exists
-		if deleteErr := db.NewQueries(tx).DeleteAcmeChallengeByDomainID(txCtx, domain.ID); deleteErr != nil && !db.IsNotFound(deleteErr) {
+		if deleteErr := queries.DeleteAcmeChallengeByDomainID(txCtx, domain.ID); deleteErr != nil && !db.IsNotFound(deleteErr) {
 			return fmt.Errorf("failed to delete ACME challenge: %w", deleteErr)
 		}
 
 		// Delete custom domain
-		if deleteErr := db.NewQueries(tx).DeleteCustomDomainByID(txCtx, domain.ID); deleteErr != nil {
+		if deleteErr := queries.DeleteCustomDomainByID(txCtx, domain.ID); deleteErr != nil {
 			return fmt.Errorf("failed to delete custom domain: %w", deleteErr)
 		}
 

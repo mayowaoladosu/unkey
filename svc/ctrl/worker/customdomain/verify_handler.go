@@ -390,6 +390,9 @@ func (s *Service) onVerificationSuccess(
 		if deleteErr := s.db.DeleteFrontlineRouteByFQDN(stepCtx, dom.Domain); deleteErr != nil && !db.IsNotFound(deleteErr) {
 			return deleteErr
 		}
+		if bumpErr := s.db.BumpFrontlineRouteRevision(stepCtx); bumpErr != nil {
+			return bumpErr
+		}
 
 		// Delete old ACME challenge
 		if deleteErr := s.db.DeleteAcmeChallengeByDomainID(stepCtx, oldDom.ID); deleteErr != nil && !db.IsNotFound(deleteErr) {
@@ -415,7 +418,7 @@ func (s *Service) onVerificationSuccess(
 			deploymentID = app.CurrentDeploymentID.String
 		}
 
-		return restate.Void{}, s.db.InsertFrontlineRoute(stepCtx, db.InsertFrontlineRouteParams{
+		if insertErr := s.db.InsertFrontlineRoute(stepCtx, db.InsertFrontlineRouteParams{
 			ID:                       uid.New(uid.FrontlineRoutePrefix),
 			ProjectID:                dom.ProjectID,
 			AppID:                    dom.AppID,
@@ -425,7 +428,10 @@ func (s *Service) onVerificationSuccess(
 			Sticky:                   db.FrontlineRoutesStickyLive,
 			CreatedAt:                now,
 			UpdatedAt:                sql.NullInt64{Valid: true, Int64: now},
-		})
+		}); insertErr != nil {
+			return restate.Void{}, insertErr
+		}
+		return restate.Void{}, s.db.BumpFrontlineRouteRevision(stepCtx)
 	}, restate.WithName("create frontline route"))
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Internal("failed to create frontline route"))

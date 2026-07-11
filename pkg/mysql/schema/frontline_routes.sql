@@ -1,3 +1,9 @@
+CREATE TABLE `frontline_route_revisions` (
+	`id` tinyint unsigned NOT NULL,
+	`revision` bigint unsigned NOT NULL,
+	CONSTRAINT `frontline_route_revisions_pk` PRIMARY KEY(`id`)
+);
+
 CREATE TABLE `frontline_routes` (
 	`pk` bigint unsigned AUTO_INCREMENT NOT NULL,
 	`id` varchar(128) NOT NULL,

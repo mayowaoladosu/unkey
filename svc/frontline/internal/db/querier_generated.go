@@ -66,6 +66,15 @@ type Querier interface {
 	//    AND da.kind = 'static_bundle'
 	//  WHERE fr.fully_qualified_domain_name = ?
 	FindFrontlineRouteByFQDN(ctx context.Context, fqdn string) (FindFrontlineRouteByFQDNRow, error)
+	//FindFrontlineRouteRevision
+	//
+	//  SELECT CAST(
+	//    COALESCE(
+	//      (SELECT revision FROM frontline_route_revisions WHERE id = 1),
+	//      0
+	//    ) AS SIGNED
+	//  ) AS revision
+	FindFrontlineRouteRevision(ctx context.Context) (int64, error)
 	// FindInstancesByDeploymentID returns all instances for a given deployment
 	// with region metadata for instance-aware routing decisions.
 	//

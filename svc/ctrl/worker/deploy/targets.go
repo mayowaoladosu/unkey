@@ -135,6 +135,9 @@ func ensureFrontlineRoute(
 		}); err != nil {
 			return ensuredFrontlineRoute{}, err
 		}
+		if err := queries.BumpFrontlineRouteRevision(ctx); err != nil {
+			return ensuredFrontlineRoute{}, err
+		}
 		return ensuredFrontlineRoute{
 			ID:         routeID,
 			NeedsMove:  false,
