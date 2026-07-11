@@ -11,7 +11,7 @@ import (
 
 const findInstanceByPodName = `-- name: FindInstanceByPodName :one
 SELECT
- pk, id, deployment_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
+ pk, id, deployment_id, resource_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
 FROM instances
   WHERE k8s_name = ? AND region_id = ?
 `
@@ -24,7 +24,7 @@ type FindInstanceByPodNameParams struct {
 // FindInstanceByPodName
 //
 //	SELECT
-//	 pk, id, deployment_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
+//	 pk, id, deployment_id, resource_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
 //	FROM instances
 //	  WHERE k8s_name = ? AND region_id = ?
 func (q *Queries) FindInstanceByPodName(ctx context.Context, db DBTX, arg FindInstanceByPodNameParams) (Instance, error) {
@@ -34,6 +34,7 @@ func (q *Queries) FindInstanceByPodName(ctx context.Context, db DBTX, arg FindIn
 		&i.Pk,
 		&i.ID,
 		&i.DeploymentID,
+		&i.ResourceID,
 		&i.WorkspaceID,
 		&i.ProjectID,
 		&i.AppID,

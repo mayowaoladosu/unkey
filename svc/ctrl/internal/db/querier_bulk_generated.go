@@ -26,6 +26,7 @@ type BulkQuerier interface {
 	InsertDeploymentChanges(ctx context.Context, args []InsertDeploymentChangeParams) error
 	InsertDeployments(ctx context.Context, args []InsertDeploymentParams) error
 	InsertDeploymentManifests(ctx context.Context, args []InsertDeploymentManifestParams) error
+	InsertDeploymentResources(ctx context.Context, args []InsertDeploymentResourceParams) error
 	InsertDeploymentSteps(ctx context.Context, args []InsertDeploymentStepParams) error
 	RecordDeploymentTargetAssignment(ctx context.Context, args []RecordDeploymentTargetAssignmentParams) error
 	InsertDeploymentTargets(ctx context.Context, args []InsertDeploymentTargetParams) error

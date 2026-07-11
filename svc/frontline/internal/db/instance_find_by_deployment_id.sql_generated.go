@@ -13,18 +13,21 @@ import (
 
 const findInstancesByDeploymentID = `-- name: FindInstancesByDeploymentID :many
 SELECT
-  i.pk, i.id, i.deployment_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
+  i.pk, i.id, i.deployment_id, i.resource_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
   r.name AS region_name,
   r.platform AS region_platform
 FROM instances i
 INNER JOIN regions r ON i.region_id = r.id
+LEFT JOIN deployment_resources dr ON i.resource_id = dr.id
 WHERE i.deployment_id = ?
+  AND (i.resource_id = '' OR dr.public = true)
 `
 
 type FindInstancesByDeploymentIDRow struct {
 	Pk              uint64                 `db:"pk"`
 	ID              string                 `db:"id"`
 	DeploymentID    string                 `db:"deployment_id"`
+	ResourceID      string                 `db:"resource_id"`
 	WorkspaceID     string                 `db:"workspace_id"`
 	ProjectID       string                 `db:"project_id"`
 	AppID           string                 `db:"app_id"`
@@ -44,12 +47,14 @@ type FindInstancesByDeploymentIDRow struct {
 // with region metadata for instance-aware routing decisions.
 //
 //	SELECT
-//	  i.pk, i.id, i.deployment_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
+//	  i.pk, i.id, i.deployment_id, i.resource_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
 //	  r.name AS region_name,
 //	  r.platform AS region_platform
 //	FROM instances i
 //	INNER JOIN regions r ON i.region_id = r.id
+//	LEFT JOIN deployment_resources dr ON i.resource_id = dr.id
 //	WHERE i.deployment_id = ?
+//	  AND (i.resource_id = '' OR dr.public = true)
 func (q *Queries) FindInstancesByDeploymentID(ctx context.Context, deploymentID string) ([]FindInstancesByDeploymentIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, findInstancesByDeploymentID, deploymentID)
 	if err != nil {
@@ -63,6 +68,7 @@ func (q *Queries) FindInstancesByDeploymentID(ctx context.Context, deploymentID 
 			&i.Pk,
 			&i.ID,
 			&i.DeploymentID,
+			&i.ResourceID,
 			&i.WorkspaceID,
 			&i.ProjectID,
 			&i.AppID,

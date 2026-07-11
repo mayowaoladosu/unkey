@@ -76,6 +76,10 @@ type Querier interface {
 	//  DELETE FROM instances
 	//  WHERE deployment_id = ? AND region_id = ?
 	DeleteDeploymentInstances(ctx context.Context, arg DeleteDeploymentInstancesParams) error
+	//DeleteDeploymentResourcesByEnvironment
+	//
+	//  DELETE FROM deployment_resources WHERE environment_id = ?
+	DeleteDeploymentResourcesByEnvironment(ctx context.Context, environmentID string) error
 	//DeleteDeploymentStepsByEnvironmentId
 	//
 	//  DELETE ds FROM deployment_steps ds
@@ -153,6 +157,12 @@ type Querier interface {
 	//
 	//  DELETE FROM projects WHERE id = ?
 	DeleteProjectById(ctx context.Context, id string) error
+	//DeleteResourceInstances
+	//
+	//  DELETE FROM instances
+	//  WHERE resource_id = ?
+	//    AND region_id = ?
+	DeleteResourceInstances(ctx context.Context, arg DeleteResourceInstancesParams) error
 	//EndActiveDeploymentStepsForDeployments
 	//
 	//  UPDATE `deployment_steps`
@@ -370,6 +380,36 @@ type Querier interface {
 	//  INNER JOIN `regions` r ON dt.region_id = r.id
 	//  WHERE dt.deployment_id = ?
 	FindDeploymentRegions(ctx context.Context, deploymentID string) ([]Region, error)
+	//FindDeploymentResourceByID
+	//
+	//  SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE id = ?
+	FindDeploymentResourceByID(ctx context.Context, id string) (DeploymentResource, error)
+	//FindDeploymentResourceByK8sName
+	//
+	//  SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at FROM deployment_resources WHERE k8s_name = ?
+	FindDeploymentResourceByK8sName(ctx context.Context, k8sName sql.NullString) (DeploymentResource, error)
+	//FindDeploymentResourceTopology
+	//
+	//  SELECT
+	//      dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+	//      d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.`trigger`, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
+	//      dr.pk, dr.id, dr.deployment_id, dr.workspace_id, dr.project_id, dr.app_id, dr.environment_id, dr.name, dr.kind, dr.k8s_name, dr.image, dr.command, dr.port, dr.upstream_protocol, dr.public, dr.schedule, dr.runtime, dr.handler, dr.cpu_millicores, dr.memory_mib, dr.storage_mib, dr.created_at,
+	//      w.k8s_namespace,
+	//      e.slug AS environment_slug,
+	//      r.name AS region_name,
+	//      grc.repository_full_name AS git_repo
+	//  FROM deployment_topology dt
+	//  INNER JOIN deployments d ON dt.deployment_id = d.id
+	//  INNER JOIN deployment_resources dr ON dt.resource_id = dr.id
+	//  INNER JOIN workspaces w ON d.workspace_id = w.id
+	//  INNER JOIN regions r ON dt.region_id = r.id
+	//  INNER JOIN environments e ON d.environment_id = e.id
+	//  LEFT JOIN github_repo_connections grc ON d.app_id = grc.app_id
+	//  WHERE dt.deployment_id = ?
+	//    AND dt.resource_id = ?
+	//    AND dt.region_id = ?
+	//  LIMIT 1
+	FindDeploymentResourceTopology(ctx context.Context, arg FindDeploymentResourceTopologyParams) (FindDeploymentResourceTopologyRow, error)
 	//FindDeploymentTargetByID
 	//
 	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at FROM deployment_targets WHERE id = ?
@@ -387,7 +427,7 @@ type Querier interface {
 	// joined data needed for the Watch stream. Used by the unified WatchDeploymentChanges RPC.
 	//
 	//  SELECT
-	//      dt.pk, dt.workspace_id, dt.deployment_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+	//      dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
 	//      d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.`trigger`, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
 	//      w.k8s_namespace,
 	//      e.slug AS environment_slug,
@@ -399,7 +439,9 @@ type Querier interface {
 	//  INNER JOIN `regions` r ON dt.region_id = r.id
 	//  INNER JOIN `environments` e ON d.environment_id = e.id
 	//  LEFT JOIN `github_repo_connections` grc ON d.app_id = grc.app_id
-	//  WHERE dt.deployment_id = ? AND dt.region_id = ?
+	//  WHERE dt.deployment_id = ?
+	//      AND dt.region_id = ?
+	//      AND dt.resource_id = ''
 	//  LIMIT 1
 	FindDeploymentTopologyByDeploymentAndRegion(ctx context.Context, arg FindDeploymentTopologyByDeploymentAndRegionParams) (FindDeploymentTopologyByDeploymentAndRegionRow, error)
 	// Returns the per-region minimum replica requirement for a deployment.
@@ -503,17 +545,24 @@ type Querier interface {
 	//FindInstancesByDeploymentId
 	//
 	//  SELECT
-	//   pk, id, deployment_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
+	//   pk, id, deployment_id, resource_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
 	//  FROM instances
 	//  WHERE deployment_id = ?
 	FindInstancesByDeploymentId(ctx context.Context, deploymentid string) ([]Instance, error)
 	//FindInstancesByDeploymentIdAndRegionID
 	//
 	//  SELECT
-	//   pk, id, deployment_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
+	//   pk, id, deployment_id, resource_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
 	//  FROM instances
 	//  WHERE deployment_id = ? AND region_id = ?
 	FindInstancesByDeploymentIdAndRegionID(ctx context.Context, arg FindInstancesByDeploymentIdAndRegionIDParams) ([]Instance, error)
+	//FindInstancesByResourceAndRegion
+	//
+	//  SELECT pk, id, deployment_id, resource_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, storage_mib, status, container_status
+	//  FROM instances
+	//  WHERE resource_id = ?
+	//    AND region_id = ?
+	FindInstancesByResourceAndRegion(ctx context.Context, arg FindInstancesByResourceAndRegionParams) ([]Instance, error)
 	//FindKeyByID
 	//
 	//  SELECT pk, id, key_auth_id, hash, start, workspace_id, for_workspace_id, name, owner_id, identity_id, meta, expires, created_at_m, updated_at_m, deleted_at_m, refill_day, refill_amount, last_refill_at, enabled, remaining_requests, environment, last_used_at, pending_migration_id FROM `keys` k
@@ -908,9 +957,11 @@ type Querier interface {
 	//  INSERT INTO `deployment_changes` (
 	//      resource_type,
 	//      resource_id,
+	//      deployment_resource_id,
 	//      region_id,
 	//      created_at
 	//  ) VALUES (
+	//      ?,
 	//      ?,
 	//      ?,
 	//      ?,
@@ -946,6 +997,55 @@ type Querier interface {
 	//      ?
 	//  )
 	InsertDeploymentManifest(ctx context.Context, arg InsertDeploymentManifestParams) error
+	//InsertDeploymentResource
+	//
+	//  INSERT INTO deployment_resources (
+	//    id,
+	//    deployment_id,
+	//    workspace_id,
+	//    project_id,
+	//    app_id,
+	//    environment_id,
+	//    name,
+	//    kind,
+	//    k8s_name,
+	//    image,
+	//    command,
+	//    port,
+	//    upstream_protocol,
+	//    public,
+	//    schedule,
+	//    runtime,
+	//    handler,
+	//    cpu_millicores,
+	//    memory_mib,
+	//    storage_mib,
+	//    created_at
+	//  ) VALUES (
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?
+	//  )
+	//  ON DUPLICATE KEY UPDATE id = id
+	InsertDeploymentResource(ctx context.Context, arg InsertDeploymentResourceParams) error
 	//InsertDeploymentStep
 	//
 	//  INSERT INTO `deployment_steps` (
@@ -1004,6 +1104,7 @@ type Querier interface {
 	//  INSERT INTO `deployment_topology` (
 	//      workspace_id,
 	//      deployment_id,
+	//      resource_id,
 	//      region_id,
 	//      autoscaling_replicas_min,
 	//      autoscaling_replicas_max,
@@ -1012,6 +1113,7 @@ type Querier interface {
 	//      desired_status,
 	//      created_at
 	//  ) VALUES (
+	//      ?,
 	//      ?,
 	//      ?,
 	//      ?,
@@ -1360,7 +1462,7 @@ type Querier interface {
 	// Used by SyncDesiredState to reconcile krane agents with current desired state.
 	//
 	//  SELECT
-	//      dt.pk, dt.workspace_id, dt.deployment_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+	//      dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
 	//      d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.`trigger`, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
 	//      w.k8s_namespace,
 	//      e.slug AS environment_slug,
@@ -1372,7 +1474,10 @@ type Querier interface {
 	//  INNER JOIN `regions` r ON dt.region_id = r.id
 	//  INNER JOIN `environments` e ON d.environment_id = e.id
 	//  LEFT JOIN `github_repo_connections` grc ON d.app_id = grc.app_id
-	//  WHERE r.id = ? AND dt.pk > ? AND dt.desired_status = 'running'
+	//  WHERE r.id = ?
+	//      AND dt.pk > ?
+	//      AND dt.desired_status = 'running'
+	//      AND dt.resource_id = ''
 	//  ORDER BY dt.pk ASC
 	//  LIMIT ?
 	ListAllDeploymentTopologiesByRegion(ctx context.Context, arg ListAllDeploymentTopologiesByRegionParams) ([]ListAllDeploymentTopologiesByRegionRow, error)
@@ -1426,12 +1531,43 @@ type Querier interface {
 	// ListDeploymentChangesByRegionAll returns all deployment changes for a region with version > after_version.
 	// Used by the unified WatchDeploymentChanges stream. Does not filter by resource_type.
 	//
-	//  SELECT pk, resource_type, resource_id, region_id, created_at
+	//  SELECT pk, resource_type, resource_id, deployment_resource_id, region_id, created_at
 	//  FROM `deployment_changes`
 	//  WHERE pk > ? AND region_id = ?
 	//  ORDER BY pk ASC
 	//  LIMIT ?
 	ListDeploymentChangesByRegionAll(ctx context.Context, arg ListDeploymentChangesByRegionAllParams) ([]DeploymentChange, error)
+	//ListDeploymentResourceTopologiesByRegion
+	//
+	//  SELECT
+	//      dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+	//      d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.`trigger`, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
+	//      dr.pk, dr.id, dr.deployment_id, dr.workspace_id, dr.project_id, dr.app_id, dr.environment_id, dr.name, dr.kind, dr.k8s_name, dr.image, dr.command, dr.port, dr.upstream_protocol, dr.public, dr.schedule, dr.runtime, dr.handler, dr.cpu_millicores, dr.memory_mib, dr.storage_mib, dr.created_at,
+	//      w.k8s_namespace,
+	//      e.slug AS environment_slug,
+	//      r.name AS region_name,
+	//      grc.repository_full_name AS git_repo
+	//  FROM deployment_topology dt
+	//  INNER JOIN deployments d ON dt.deployment_id = d.id
+	//  INNER JOIN deployment_resources dr ON dt.resource_id = dr.id
+	//  INNER JOIN workspaces w ON d.workspace_id = w.id
+	//  INNER JOIN regions r ON dt.region_id = r.id
+	//  INNER JOIN environments e ON d.environment_id = e.id
+	//  LEFT JOIN github_repo_connections grc ON d.app_id = grc.app_id
+	//  WHERE r.id = ?
+	//    AND dt.pk > ?
+	//    AND dt.desired_status = 'running'
+	//    AND dt.resource_id != ''
+	//  ORDER BY dt.pk ASC
+	//  LIMIT ?
+	ListDeploymentResourceTopologiesByRegion(ctx context.Context, arg ListDeploymentResourceTopologiesByRegionParams) ([]ListDeploymentResourceTopologiesByRegionRow, error)
+	//ListDeploymentResourcesByDeployment
+	//
+	//  SELECT pk, id, deployment_id, workspace_id, project_id, app_id, environment_id, name, kind, k8s_name, image, command, port, upstream_protocol, public, schedule, runtime, handler, cpu_millicores, memory_mib, storage_mib, created_at
+	//  FROM deployment_resources
+	//  WHERE deployment_id = ?
+	//  ORDER BY name ASC
+	ListDeploymentResourcesByDeployment(ctx context.Context, deploymentID string) ([]DeploymentResource, error)
 	//ListDeploymentTargetAssignmentsByEnvironment
 	//
 	//  SELECT pk, id, target_id, workspace_id, project_id, app_id, environment_id, deployment_id, previous_deployment_id, reason, operation_id, created_at
@@ -2140,6 +2276,7 @@ type Querier interface {
 	//  INSERT INTO instances (
 	//  	id,
 	//  	deployment_id,
+	//  	resource_id,
 	//  	workspace_id,
 	//  	project_id,
 	//  	app_id,
@@ -2161,9 +2298,11 @@ type Querier interface {
 	//  	?,
 	//  	?,
 	//  	?,
+	//  	?,
 	//  	?
 	//  )
 	//  ON DUPLICATE KEY UPDATE
+	//  	resource_id = ?,
 	//  	address = ?,
 	//  	cpu_millicores = ?,
 	//  	memory_mib = ?,

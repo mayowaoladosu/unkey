@@ -2,6 +2,7 @@ CREATE TABLE `instances` (
 	`pk` bigint unsigned AUTO_INCREMENT NOT NULL,
 	`id` varchar(64) NOT NULL,
 	`deployment_id` varchar(255) NOT NULL,
+	`resource_id` varchar(128) NOT NULL DEFAULT '',
 	`workspace_id` varchar(255) NOT NULL,
 	`project_id` varchar(255) NOT NULL,
 	`app_id` varchar(64) NOT NULL,
@@ -19,6 +20,8 @@ CREATE TABLE `instances` (
 );
 
 CREATE INDEX `idx_deployment_id` ON `instances` (`deployment_id`);
+
+CREATE INDEX `instances_resource_idx` ON `instances` (`resource_id`);
 
 CREATE INDEX `idx_region` ON `instances` (`region_id`);
 

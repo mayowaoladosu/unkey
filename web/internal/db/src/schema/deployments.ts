@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/mysql-core";
 import { deploymentArtifacts } from "./deployment_artifacts";
 import { deploymentManifests } from "./deployment_manifests";
+import { deploymentResources } from "./deployment_resources";
 import { deploymentSteps } from "./deployment_steps";
 import { environments } from "./environments";
 import { instances } from "./instances";
@@ -164,6 +165,7 @@ export const deploymentsRelations = relations(deployments, ({ one, many }) => ({
   instances: many(instances),
   steps: many(deploymentSteps),
   artifacts: many(deploymentArtifacts),
+  resources: many(deploymentResources),
   manifest: one(deploymentManifests, {
     fields: [deployments.id],
     references: [deploymentManifests.deploymentId],

@@ -9,7 +9,8 @@ import (
 )
 
 // bulkUpsertInstance is the base query for bulk insert
-const bulkUpsertInstance = `INSERT INTO instances ( id, deployment_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, status ) VALUES %s ON DUPLICATE KEY UPDATE
+const bulkUpsertInstance = `INSERT INTO instances ( id, deployment_id, resource_id, workspace_id, project_id, app_id, region_id, k8s_name, address, cpu_millicores, memory_mib, status ) VALUES %s ON DUPLICATE KEY UPDATE
+	resource_id = ?,
 	address = ?,
 	cpu_millicores = ?,
 	memory_mib = ?,
@@ -26,7 +27,7 @@ func (q *BulkQueries) UpsertInstance(ctx context.Context, args []UpsertInstanceP
 	// Build the bulk insert query
 	valueClauses := make([]string, len(args))
 	for i := range args {
-		valueClauses[i] = "( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"
+		valueClauses[i] = "( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"
 	}
 
 	bulkQuery := fmt.Sprintf(bulkUpsertInstance, strings.Join(valueClauses, ", "))
@@ -36,6 +37,7 @@ func (q *BulkQueries) UpsertInstance(ctx context.Context, args []UpsertInstanceP
 	for _, arg := range args {
 		allArgs = append(allArgs, arg.ID)
 		allArgs = append(allArgs, arg.DeploymentID)
+		allArgs = append(allArgs, arg.ResourceID)
 		allArgs = append(allArgs, arg.WorkspaceID)
 		allArgs = append(allArgs, arg.ProjectID)
 		allArgs = append(allArgs, arg.AppID)
@@ -49,6 +51,7 @@ func (q *BulkQueries) UpsertInstance(ctx context.Context, args []UpsertInstanceP
 
 	// Add ON DUPLICATE KEY UPDATE parameters (only once, not per row)
 	if len(args) > 0 {
+		allArgs = append(allArgs, args[0].ResourceID)
 		allArgs = append(allArgs, args[0].Address)
 		allArgs = append(allArgs, args[0].CpuMillicores)
 		allArgs = append(allArgs, args[0].MemoryMib)

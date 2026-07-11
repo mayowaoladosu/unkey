@@ -12,7 +12,7 @@ import (
 
 const findDeploymentTopologyByDeploymentAndRegion = `-- name: FindDeploymentTopologyByDeploymentAndRegion :one
 SELECT
-    dt.pk, dt.workspace_id, dt.deployment_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+    dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
     d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.` + "`" + `trigger` + "`" + `, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
     w.k8s_namespace,
     e.slug AS environment_slug,
@@ -24,7 +24,9 @@ INNER JOIN ` + "`" + `workspaces` + "`" + ` w ON d.workspace_id = w.id
 INNER JOIN ` + "`" + `regions` + "`" + ` r ON dt.region_id = r.id
 INNER JOIN ` + "`" + `environments` + "`" + ` e ON d.environment_id = e.id
 LEFT JOIN ` + "`" + `github_repo_connections` + "`" + ` grc ON d.app_id = grc.app_id
-WHERE dt.deployment_id = ? AND dt.region_id = ?
+WHERE dt.deployment_id = ?
+    AND dt.region_id = ?
+    AND dt.resource_id = ''
 LIMIT 1
 `
 
@@ -46,7 +48,7 @@ type FindDeploymentTopologyByDeploymentAndRegionRow struct {
 // joined data needed for the Watch stream. Used by the unified WatchDeploymentChanges RPC.
 //
 //	SELECT
-//	    dt.pk, dt.workspace_id, dt.deployment_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+//	    dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
 //	    d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.`trigger`, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
 //	    w.k8s_namespace,
 //	    e.slug AS environment_slug,
@@ -58,7 +60,9 @@ type FindDeploymentTopologyByDeploymentAndRegionRow struct {
 //	INNER JOIN `regions` r ON dt.region_id = r.id
 //	INNER JOIN `environments` e ON d.environment_id = e.id
 //	LEFT JOIN `github_repo_connections` grc ON d.app_id = grc.app_id
-//	WHERE dt.deployment_id = ? AND dt.region_id = ?
+//	WHERE dt.deployment_id = ?
+//	    AND dt.region_id = ?
+//	    AND dt.resource_id = ''
 //	LIMIT 1
 func (q *Queries) FindDeploymentTopologyByDeploymentAndRegion(ctx context.Context, arg FindDeploymentTopologyByDeploymentAndRegionParams) (FindDeploymentTopologyByDeploymentAndRegionRow, error) {
 	row := q.db.QueryRowContext(ctx, findDeploymentTopologyByDeploymentAndRegion, arg.DeploymentID, arg.RegionID)
@@ -67,6 +71,7 @@ func (q *Queries) FindDeploymentTopologyByDeploymentAndRegion(ctx context.Contex
 		&i.DeploymentTopology.Pk,
 		&i.DeploymentTopology.WorkspaceID,
 		&i.DeploymentTopology.DeploymentID,
+		&i.DeploymentTopology.ResourceID,
 		&i.DeploymentTopology.RegionID,
 		&i.DeploymentTopology.AutoscalingReplicasMin,
 		&i.DeploymentTopology.AutoscalingReplicasMax,

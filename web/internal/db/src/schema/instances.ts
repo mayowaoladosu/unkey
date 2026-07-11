@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { deploymentResources } from "./deployment_resources";
 import { deployments } from "./deployments";
 import { projects } from "./projects";
 import { regions } from "./regions";
@@ -50,6 +51,7 @@ export const instances = mysqlTable(
     pk: bigint("pk", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
     id: varchar("id", { length: 64 }).notNull().unique(),
     deploymentId: varchar("deployment_id", { length: 255 }).notNull(),
+    resourceId: varchar("resource_id", { length: 128 }).notNull().default(""),
     workspaceId: varchar("workspace_id", { length: 255 }).notNull(),
     projectId: varchar("project_id", { length: 255 }).notNull(),
     appId: varchar("app_id", { length: 64 }).notNull(),
@@ -76,6 +78,7 @@ export const instances = mysqlTable(
   (table) => [
     uniqueIndex("unique_k8s_name_per_region").on(table.k8sName, table.regionId),
     index("idx_deployment_id").on(table.deploymentId),
+    index("instances_resource_idx").on(table.resourceId),
     index("idx_region").on(table.regionId),
   ],
 );
@@ -84,6 +87,10 @@ export const instancesRelations = relations(instances, ({ one }) => ({
   deployment: one(deployments, {
     fields: [instances.deploymentId],
     references: [deployments.id],
+  }),
+  resource: one(deploymentResources, {
+    fields: [instances.resourceId],
+    references: [deploymentResources.id],
   }),
   project: one(projects, {
     fields: [instances.projectId],

@@ -13,9 +13,11 @@ const insertDeploymentChange = `-- name: InsertDeploymentChange :exec
 INSERT INTO ` + "`" + `deployment_changes` + "`" + ` (
     resource_type,
     resource_id,
+    deployment_resource_id,
     region_id,
     created_at
 ) VALUES (
+    ?,
     ?,
     ?,
     ?,
@@ -24,10 +26,11 @@ INSERT INTO ` + "`" + `deployment_changes` + "`" + ` (
 `
 
 type InsertDeploymentChangeParams struct {
-	ResourceType DeploymentChangesResourceType `db:"resource_type"`
-	ResourceID   string                        `db:"resource_id"`
-	RegionID     string                        `db:"region_id"`
-	CreatedAt    int64                         `db:"created_at"`
+	ResourceType         DeploymentChangesResourceType `db:"resource_type"`
+	ResourceID           string                        `db:"resource_id"`
+	DeploymentResourceID string                        `db:"deployment_resource_id"`
+	RegionID             string                        `db:"region_id"`
+	CreatedAt            int64                         `db:"created_at"`
 }
 
 // InsertDeploymentChange
@@ -35,9 +38,11 @@ type InsertDeploymentChangeParams struct {
 //	INSERT INTO `deployment_changes` (
 //	    resource_type,
 //	    resource_id,
+//	    deployment_resource_id,
 //	    region_id,
 //	    created_at
 //	) VALUES (
+//	    ?,
 //	    ?,
 //	    ?,
 //	    ?,
@@ -47,6 +52,7 @@ func (q *Queries) InsertDeploymentChange(ctx context.Context, arg InsertDeployme
 	_, err := q.db.ExecContext(ctx, insertDeploymentChange,
 		arg.ResourceType,
 		arg.ResourceID,
+		arg.DeploymentResourceID,
 		arg.RegionID,
 		arg.CreatedAt,
 	)

@@ -14,5 +14,7 @@ INNER JOIN `workspaces` w ON d.workspace_id = w.id
 INNER JOIN `regions` r ON dt.region_id = r.id
 INNER JOIN `environments` e ON d.environment_id = e.id
 LEFT JOIN `github_repo_connections` grc ON d.app_id = grc.app_id
-WHERE dt.deployment_id = sqlc.arg(deployment_id) AND dt.region_id = sqlc.arg(region_id)
+WHERE dt.deployment_id = sqlc.arg(deployment_id)
+    AND dt.region_id = sqlc.arg(region_id)
+    AND dt.resource_id = ''
 LIMIT 1;

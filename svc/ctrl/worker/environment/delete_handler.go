@@ -124,6 +124,12 @@ func (s *Service) Delete(
 	}
 
 	if err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
+		return s.db.DeleteDeploymentResourcesByEnvironment(runCtx, envID)
+	}, restate.WithName("delete deployment resources")); err != nil {
+		return nil, fmt.Errorf("delete deployment resources: %w", err)
+	}
+
+	if err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
 		return s.db.DeleteDeploymentsByEnvironmentId(runCtx, envID)
 	}, restate.WithName("delete deployments")); err != nil {
 		return nil, fmt.Errorf("delete deployments: %w", err)

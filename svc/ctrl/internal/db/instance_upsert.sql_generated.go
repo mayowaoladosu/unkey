@@ -13,6 +13,7 @@ const upsertInstance = `-- name: UpsertInstance :exec
 INSERT INTO instances (
 	id,
 	deployment_id,
+	resource_id,
 	workspace_id,
 	project_id,
 	app_id,
@@ -34,9 +35,11 @@ VALUES (
 	?,
 	?,
 	?,
+	?,
 	?
 )
 ON DUPLICATE KEY UPDATE
+	resource_id = ?,
 	address = ?,
 	cpu_millicores = ?,
 	memory_mib = ?,
@@ -46,6 +49,7 @@ ON DUPLICATE KEY UPDATE
 type UpsertInstanceParams struct {
 	ID            string          `db:"id"`
 	DeploymentID  string          `db:"deployment_id"`
+	ResourceID    string          `db:"resource_id"`
 	WorkspaceID   string          `db:"workspace_id"`
 	ProjectID     string          `db:"project_id"`
 	AppID         string          `db:"app_id"`
@@ -62,6 +66,7 @@ type UpsertInstanceParams struct {
 //	INSERT INTO instances (
 //		id,
 //		deployment_id,
+//		resource_id,
 //		workspace_id,
 //		project_id,
 //		app_id,
@@ -83,9 +88,11 @@ type UpsertInstanceParams struct {
 //		?,
 //		?,
 //		?,
+//		?,
 //		?
 //	)
 //	ON DUPLICATE KEY UPDATE
+//		resource_id = ?,
 //		address = ?,
 //		cpu_millicores = ?,
 //		memory_mib = ?,
@@ -94,6 +101,7 @@ func (q *Queries) UpsertInstance(ctx context.Context, arg UpsertInstanceParams) 
 	_, err := q.db.ExecContext(ctx, upsertInstance,
 		arg.ID,
 		arg.DeploymentID,
+		arg.ResourceID,
 		arg.WorkspaceID,
 		arg.ProjectID,
 		arg.AppID,
@@ -103,6 +111,7 @@ func (q *Queries) UpsertInstance(ctx context.Context, arg UpsertInstanceParams) 
 		arg.CpuMillicores,
 		arg.MemoryMib,
 		arg.Status,
+		arg.ResourceID,
 		arg.Address,
 		arg.CpuMillicores,
 		arg.MemoryMib,

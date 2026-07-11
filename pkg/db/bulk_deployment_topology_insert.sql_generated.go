@@ -9,7 +9,7 @@ import (
 )
 
 // bulkInsertDeploymentTopology is the base query for bulk insert
-const bulkInsertDeploymentTopology = `INSERT INTO ` + "`" + `deployment_topology` + "`" + ` ( workspace_id, deployment_id, region_id, autoscaling_replicas_min, autoscaling_replicas_max, autoscaling_threshold_cpu, autoscaling_threshold_memory, desired_status, created_at ) VALUES %s`
+const bulkInsertDeploymentTopology = `INSERT INTO ` + "`" + `deployment_topology` + "`" + ` ( workspace_id, deployment_id, resource_id, region_id, autoscaling_replicas_min, autoscaling_replicas_max, autoscaling_threshold_cpu, autoscaling_threshold_memory, desired_status, created_at ) VALUES %s`
 
 // InsertDeploymentTopologies performs bulk insert in a single query
 func (q *BulkQueries) InsertDeploymentTopologies(ctx context.Context, db DBTX, args []InsertDeploymentTopologyParams) error {
@@ -21,7 +21,7 @@ func (q *BulkQueries) InsertDeploymentTopologies(ctx context.Context, db DBTX, a
 	// Build the bulk insert query
 	valueClauses := make([]string, len(args))
 	for i := range args {
-		valueClauses[i] = "( ?, ?, ?, ?, ?, ?, ?, ?, ? )"
+		valueClauses[i] = "( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"
 	}
 
 	bulkQuery := fmt.Sprintf(bulkInsertDeploymentTopology, strings.Join(valueClauses, ", "))
@@ -31,6 +31,7 @@ func (q *BulkQueries) InsertDeploymentTopologies(ctx context.Context, db DBTX, a
 	for _, arg := range args {
 		allArgs = append(allArgs, arg.WorkspaceID)
 		allArgs = append(allArgs, arg.DeploymentID)
+		allArgs = append(allArgs, arg.ResourceID)
 		allArgs = append(allArgs, arg.RegionID)
 		allArgs = append(allArgs, arg.AutoscalingReplicasMin)
 		allArgs = append(allArgs, arg.AutoscalingReplicasMax)

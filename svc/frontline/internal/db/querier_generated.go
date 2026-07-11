@@ -79,12 +79,14 @@ type Querier interface {
 	// with region metadata for instance-aware routing decisions.
 	//
 	//  SELECT
-	//    i.pk, i.id, i.deployment_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
+	//    i.pk, i.id, i.deployment_id, i.resource_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
 	//    r.name AS region_name,
 	//    r.platform AS region_platform
 	//  FROM instances i
 	//  INNER JOIN regions r ON i.region_id = r.id
+	//  LEFT JOIN deployment_resources dr ON i.resource_id = dr.id
 	//  WHERE i.deployment_id = ?
+	//    AND (i.resource_id = '' OR dr.public = true)
 	FindInstancesByDeploymentID(ctx context.Context, deploymentID string) ([]FindInstancesByDeploymentIDRow, error)
 	// FindOpenApiSpecByDeploymentID returns the scraped OpenAPI spec for a
 	// deployment. Frontline uses this to hydrate openapi policies that don't

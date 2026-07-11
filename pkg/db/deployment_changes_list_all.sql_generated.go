@@ -10,7 +10,7 @@ import (
 )
 
 const listDeploymentChangesByRegionAll = `-- name: ListDeploymentChangesByRegionAll :many
-SELECT pk, resource_type, resource_id, region_id, created_at
+SELECT pk, resource_type, resource_id, deployment_resource_id, region_id, created_at
 FROM ` + "`" + `deployment_changes` + "`" + `
 WHERE pk > ? AND region_id = ?
 ORDER BY pk ASC
@@ -26,7 +26,7 @@ type ListDeploymentChangesByRegionAllParams struct {
 // ListDeploymentChangesByRegionAll returns all deployment changes for a region with version > after_version.
 // Used by the unified WatchDeploymentChanges stream. Does not filter by resource_type.
 //
-//	SELECT pk, resource_type, resource_id, region_id, created_at
+//	SELECT pk, resource_type, resource_id, deployment_resource_id, region_id, created_at
 //	FROM `deployment_changes`
 //	WHERE pk > ? AND region_id = ?
 //	ORDER BY pk ASC
@@ -44,6 +44,7 @@ func (q *Queries) ListDeploymentChangesByRegionAll(ctx context.Context, db DBTX,
 			&i.Pk,
 			&i.ResourceType,
 			&i.ResourceID,
+			&i.DeploymentResourceID,
 			&i.RegionID,
 			&i.CreatedAt,
 		); err != nil {

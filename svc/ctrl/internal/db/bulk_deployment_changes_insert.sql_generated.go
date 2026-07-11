@@ -9,7 +9,7 @@ import (
 )
 
 // bulkInsertDeploymentChange is the base query for bulk insert
-const bulkInsertDeploymentChange = `INSERT INTO ` + "`" + `deployment_changes` + "`" + ` ( resource_type, resource_id, region_id, created_at ) VALUES %s`
+const bulkInsertDeploymentChange = `INSERT INTO ` + "`" + `deployment_changes` + "`" + ` ( resource_type, resource_id, deployment_resource_id, region_id, created_at ) VALUES %s`
 
 // InsertDeploymentChanges performs bulk insert in a single query
 
@@ -22,7 +22,7 @@ func (q *BulkQueries) InsertDeploymentChanges(ctx context.Context, args []Insert
 	// Build the bulk insert query
 	valueClauses := make([]string, len(args))
 	for i := range args {
-		valueClauses[i] = "( ?, ?, ?, ? )"
+		valueClauses[i] = "( ?, ?, ?, ?, ? )"
 	}
 
 	bulkQuery := fmt.Sprintf(bulkInsertDeploymentChange, strings.Join(valueClauses, ", "))
@@ -32,6 +32,7 @@ func (q *BulkQueries) InsertDeploymentChanges(ctx context.Context, args []Insert
 	for _, arg := range args {
 		allArgs = append(allArgs, arg.ResourceType)
 		allArgs = append(allArgs, arg.ResourceID)
+		allArgs = append(allArgs, arg.DeploymentResourceID)
 		allArgs = append(allArgs, arg.RegionID)
 		allArgs = append(allArgs, arg.CreatedAt)
 	}

@@ -2,6 +2,7 @@
 INSERT INTO `deployment_topology` (
     workspace_id,
     deployment_id,
+    resource_id,
     region_id,
     autoscaling_replicas_min,
     autoscaling_replicas_max,
@@ -12,6 +13,7 @@ INSERT INTO `deployment_topology` (
 ) VALUES (
     sqlc.arg(workspace_id),
     sqlc.arg(deployment_id),
+    sqlc.arg(resource_id),
     sqlc.arg(region_id),
     sqlc.arg(autoscaling_replicas_min),
     sqlc.arg(autoscaling_replicas_max),

@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { deploymentResources } from "./deployment_resources";
 import { deployments } from "./deployments";
 import { lifecycleDates } from "./util/lifecycle_dates";
 import { workspaces } from "./workspaces";
@@ -19,6 +20,7 @@ export const deploymentTopology = mysqlTable(
     pk: bigint("pk", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
     workspaceId: varchar("workspace_id", { length: 64 }).notNull(),
     deploymentId: varchar("deployment_id", { length: 64 }).notNull(),
+    resourceId: varchar("resource_id", { length: 128 }).notNull().default(""),
     regionId: varchar("region_id", { length: 64 }).notNull(),
 
     // HPA scaling configuration, snapshotted from the autoscaling policy at deploy time.
@@ -40,8 +42,13 @@ export const deploymentTopology = mysqlTable(
     ...lifecycleDates,
   },
   (table) => [
-    uniqueIndex("unique_region_per_deployment").on(table.deploymentId, table.regionId),
+    uniqueIndex("unique_region_per_deployment_resource").on(
+      table.deploymentId,
+      table.resourceId,
+      table.regionId,
+    ),
     index("workspace_idx").on(table.workspaceId),
+    index("deployment_topology_resource_idx").on(table.resourceId),
     index("status_idx").on(table.desiredStatus),
   ],
 );
@@ -54,5 +61,9 @@ export const deploymentTopologyRelations = relations(deploymentTopology, ({ one 
   delpoyment: one(deployments, {
     fields: [deploymentTopology.deploymentId],
     references: [deployments.id],
+  }),
+  resource: one(deploymentResources, {
+    fields: [deploymentTopology.resourceId],
+    references: [deploymentResources.id],
   }),
 }));

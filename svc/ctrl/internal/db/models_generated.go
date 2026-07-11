@@ -572,6 +572,93 @@ func (ns NullDeploymentManifestsOutputMode) Value() (driver.Value, error) {
 	return string(ns.DeploymentManifestsOutputMode), nil
 }
 
+type DeploymentResourcesKind string
+
+const (
+	DeploymentResourcesKindService  DeploymentResourcesKind = "service"
+	DeploymentResourcesKindFunction DeploymentResourcesKind = "function"
+	DeploymentResourcesKindWorker   DeploymentResourcesKind = "worker"
+	DeploymentResourcesKindCron     DeploymentResourcesKind = "cron"
+	DeploymentResourcesKindStatic   DeploymentResourcesKind = "static"
+)
+
+func (e *DeploymentResourcesKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentResourcesKind(s)
+	case string:
+		*e = DeploymentResourcesKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentResourcesKind: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentResourcesKind struct {
+	DeploymentResourcesKind DeploymentResourcesKind
+	Valid                   bool // Valid is true if DeploymentResourcesKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentResourcesKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentResourcesKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentResourcesKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentResourcesKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentResourcesKind), nil
+}
+
+type DeploymentResourcesUpstreamProtocol string
+
+const (
+	DeploymentResourcesUpstreamProtocolHttp1 DeploymentResourcesUpstreamProtocol = "http1"
+	DeploymentResourcesUpstreamProtocolH2c   DeploymentResourcesUpstreamProtocol = "h2c"
+)
+
+func (e *DeploymentResourcesUpstreamProtocol) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentResourcesUpstreamProtocol(s)
+	case string:
+		*e = DeploymentResourcesUpstreamProtocol(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentResourcesUpstreamProtocol: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentResourcesUpstreamProtocol struct {
+	DeploymentResourcesUpstreamProtocol DeploymentResourcesUpstreamProtocol
+	Valid                               bool // Valid is true if DeploymentResourcesUpstreamProtocol is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentResourcesUpstreamProtocol) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentResourcesUpstreamProtocol, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentResourcesUpstreamProtocol.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentResourcesUpstreamProtocol) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentResourcesUpstreamProtocol), nil
+}
+
 type DeploymentStepsStep string
 
 const (
@@ -1382,11 +1469,12 @@ type DeploymentArtifact struct {
 }
 
 type DeploymentChange struct {
-	Pk           uint64                        `db:"pk"`
-	ResourceType DeploymentChangesResourceType `db:"resource_type"`
-	ResourceID   string                        `db:"resource_id"`
-	RegionID     string                        `db:"region_id"`
-	CreatedAt    int64                         `db:"created_at"`
+	Pk                   uint64                        `db:"pk"`
+	ResourceType         DeploymentChangesResourceType `db:"resource_type"`
+	ResourceID           string                        `db:"resource_id"`
+	DeploymentResourceID string                        `db:"deployment_resource_id"`
+	RegionID             string                        `db:"region_id"`
+	CreatedAt            int64                         `db:"created_at"`
 }
 
 type DeploymentManifest struct {
@@ -1402,6 +1490,31 @@ type DeploymentManifest struct {
 	OutputMode    DeploymentManifestsOutputMode `db:"output_mode"`
 	Manifest      json.RawMessage               `db:"manifest"`
 	CreatedAt     int64                         `db:"created_at"`
+}
+
+type DeploymentResource struct {
+	Pk               uint64                              `db:"pk"`
+	ID               string                              `db:"id"`
+	DeploymentID     string                              `db:"deployment_id"`
+	WorkspaceID      string                              `db:"workspace_id"`
+	ProjectID        string                              `db:"project_id"`
+	AppID            string                              `db:"app_id"`
+	EnvironmentID    string                              `db:"environment_id"`
+	Name             string                              `db:"name"`
+	Kind             DeploymentResourcesKind             `db:"kind"`
+	K8sName          sql.NullString                      `db:"k8s_name"`
+	Image            sql.NullString                      `db:"image"`
+	Command          json.RawMessage                     `db:"command"`
+	Port             int32                               `db:"port"`
+	UpstreamProtocol DeploymentResourcesUpstreamProtocol `db:"upstream_protocol"`
+	Public           bool                                `db:"public"`
+	Schedule         sql.NullString                      `db:"schedule"`
+	Runtime          sql.NullString                      `db:"runtime"`
+	Handler          sql.NullString                      `db:"handler"`
+	CpuMillicores    int32                               `db:"cpu_millicores"`
+	MemoryMib        int32                               `db:"memory_mib"`
+	StorageMib       uint32                              `db:"storage_mib"`
+	CreatedAt        int64                               `db:"created_at"`
 }
 
 type DeploymentStep struct {
@@ -1451,6 +1564,7 @@ type DeploymentTopology struct {
 	Pk                         uint64                          `db:"pk"`
 	WorkspaceID                string                          `db:"workspace_id"`
 	DeploymentID               string                          `db:"deployment_id"`
+	ResourceID                 string                          `db:"resource_id"`
 	RegionID                   string                          `db:"region_id"`
 	AutoscalingReplicasMin     uint32                          `db:"autoscaling_replicas_min"`
 	AutoscalingReplicasMax     uint32                          `db:"autoscaling_replicas_max"`
@@ -1552,6 +1666,7 @@ type Instance struct {
 	Pk              uint64                 `db:"pk"`
 	ID              string                 `db:"id"`
 	DeploymentID    string                 `db:"deployment_id"`
+	ResourceID      string                 `db:"resource_id"`
 	WorkspaceID     string                 `db:"workspace_id"`
 	ProjectID       string                 `db:"project_id"`
 	AppID           string                 `db:"app_id"`

@@ -12,7 +12,7 @@ import (
 
 const listAllDeploymentTopologiesByRegion = `-- name: ListAllDeploymentTopologiesByRegion :many
 SELECT
-    dt.pk, dt.workspace_id, dt.deployment_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+    dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
     d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.` + "`" + `trigger` + "`" + `, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
     w.k8s_namespace,
     e.slug AS environment_slug,
@@ -24,7 +24,10 @@ INNER JOIN ` + "`" + `workspaces` + "`" + ` w ON d.workspace_id = w.id
 INNER JOIN ` + "`" + `regions` + "`" + ` r ON dt.region_id = r.id
 INNER JOIN ` + "`" + `environments` + "`" + ` e ON d.environment_id = e.id
 LEFT JOIN ` + "`" + `github_repo_connections` + "`" + ` grc ON d.app_id = grc.app_id
-WHERE r.id = ? AND dt.pk > ? AND dt.desired_status = 'running'
+WHERE r.id = ?
+    AND dt.pk > ?
+    AND dt.desired_status = 'running'
+    AND dt.resource_id = ''
 ORDER BY dt.pk ASC
 LIMIT ?
 `
@@ -48,7 +51,7 @@ type ListAllDeploymentTopologiesByRegionRow struct {
 // Used by SyncDesiredState to reconcile krane agents with current desired state.
 //
 //	SELECT
-//	    dt.pk, dt.workspace_id, dt.deployment_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
+//	    dt.pk, dt.workspace_id, dt.deployment_id, dt.resource_id, dt.region_id, dt.autoscaling_replicas_min, dt.autoscaling_replicas_max, dt.autoscaling_threshold_cpu, dt.autoscaling_threshold_memory, dt.desired_status, dt.created_at, dt.updated_at,
 //	    d.pk, d.id, d.k8s_name, d.workspace_id, d.project_id, d.environment_id, d.app_id, d.image, d.build_id, d.git_commit_sha, d.git_branch, d.git_commit_message, d.git_commit_author_handle, d.git_commit_author_avatar_url, d.git_commit_timestamp, d.sentinel_config, d.cpu_millicores, d.memory_mib, d.storage_mib, d.desired_state, d.encrypted_environment_variables, d.command, d.port, d.shutdown_signal, d.upstream_protocol, d.healthcheck, d.pr_number, d.fork_repository_full_name, d.github_deployment_id, d.invocation_id, d.status, d.`trigger`, d.triggered_by, d.trigger_reason, d.created_at, d.updated_at,
 //	    w.k8s_namespace,
 //	    e.slug AS environment_slug,
@@ -60,7 +63,10 @@ type ListAllDeploymentTopologiesByRegionRow struct {
 //	INNER JOIN `regions` r ON dt.region_id = r.id
 //	INNER JOIN `environments` e ON d.environment_id = e.id
 //	LEFT JOIN `github_repo_connections` grc ON d.app_id = grc.app_id
-//	WHERE r.id = ? AND dt.pk > ? AND dt.desired_status = 'running'
+//	WHERE r.id = ?
+//	    AND dt.pk > ?
+//	    AND dt.desired_status = 'running'
+//	    AND dt.resource_id = ''
 //	ORDER BY dt.pk ASC
 //	LIMIT ?
 func (q *Queries) ListAllDeploymentTopologiesByRegion(ctx context.Context, db DBTX, arg ListAllDeploymentTopologiesByRegionParams) ([]ListAllDeploymentTopologiesByRegionRow, error) {
@@ -76,6 +82,7 @@ func (q *Queries) ListAllDeploymentTopologiesByRegion(ctx context.Context, db DB
 			&i.DeploymentTopology.Pk,
 			&i.DeploymentTopology.WorkspaceID,
 			&i.DeploymentTopology.DeploymentID,
+			&i.DeploymentTopology.ResourceID,
 			&i.DeploymentTopology.RegionID,
 			&i.DeploymentTopology.AutoscalingReplicasMin,
 			&i.DeploymentTopology.AutoscalingReplicasMax,

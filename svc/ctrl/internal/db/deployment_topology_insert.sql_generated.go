@@ -14,6 +14,7 @@ const insertDeploymentTopology = `-- name: InsertDeploymentTopology :exec
 INSERT INTO ` + "`" + `deployment_topology` + "`" + ` (
     workspace_id,
     deployment_id,
+    resource_id,
     region_id,
     autoscaling_replicas_min,
     autoscaling_replicas_max,
@@ -30,6 +31,7 @@ INSERT INTO ` + "`" + `deployment_topology` + "`" + ` (
     ?,
     ?,
     ?,
+    ?,
     ?
 )
 `
@@ -37,6 +39,7 @@ INSERT INTO ` + "`" + `deployment_topology` + "`" + ` (
 type InsertDeploymentTopologyParams struct {
 	WorkspaceID                string                          `db:"workspace_id"`
 	DeploymentID               string                          `db:"deployment_id"`
+	ResourceID                 string                          `db:"resource_id"`
 	RegionID                   string                          `db:"region_id"`
 	AutoscalingReplicasMin     uint32                          `db:"autoscaling_replicas_min"`
 	AutoscalingReplicasMax     uint32                          `db:"autoscaling_replicas_max"`
@@ -51,6 +54,7 @@ type InsertDeploymentTopologyParams struct {
 //	INSERT INTO `deployment_topology` (
 //	    workspace_id,
 //	    deployment_id,
+//	    resource_id,
 //	    region_id,
 //	    autoscaling_replicas_min,
 //	    autoscaling_replicas_max,
@@ -67,12 +71,14 @@ type InsertDeploymentTopologyParams struct {
 //	    ?,
 //	    ?,
 //	    ?,
+//	    ?,
 //	    ?
 //	)
 func (q *Queries) InsertDeploymentTopology(ctx context.Context, arg InsertDeploymentTopologyParams) error {
 	_, err := q.db.ExecContext(ctx, insertDeploymentTopology,
 		arg.WorkspaceID,
 		arg.DeploymentID,
+		arg.ResourceID,
 		arg.RegionID,
 		arg.AutoscalingReplicasMin,
 		arg.AutoscalingReplicasMax,

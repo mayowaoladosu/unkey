@@ -3,6 +3,7 @@
 INSERT INTO instances (
 	id,
 	deployment_id,
+	resource_id,
 	workspace_id,
 	project_id,
 	app_id,
@@ -16,6 +17,7 @@ INSERT INTO instances (
 VALUES (
 	sqlc.arg(id),
 	sqlc.arg(deployment_id),
+	sqlc.arg(resource_id),
 	sqlc.arg(workspace_id),
 	sqlc.arg(project_id),
 	sqlc.arg(app_id),
@@ -27,6 +29,7 @@ VALUES (
 	sqlc.arg(status)
 )
 ON DUPLICATE KEY UPDATE
+	resource_id = sqlc.arg(resource_id),
 	address = sqlc.arg(address),
 	cpu_millicores = sqlc.arg(cpu_millicores),
 	memory_mib = sqlc.arg(memory_mib),
