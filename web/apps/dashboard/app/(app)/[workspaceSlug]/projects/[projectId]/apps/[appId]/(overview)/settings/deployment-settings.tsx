@@ -24,7 +24,6 @@ import { OpenapiSpecPath } from "./components/advanced-settings/openapi-spec-pat
 import { UpstreamProtocol } from "./components/advanced-settings/upstream-protocol";
 import { SettingsGroup } from "./components/shared/settings-group";
 
-// build is only required to invalidate other defaults. E.g onboarding settings, passes build=true to prevent expanding other sections.
 type DeploymentSection = "advanced" | "sentinel" | "runtime" | "build";
 
 type DeploymentSettingsProps = {
@@ -40,14 +39,16 @@ export const DeploymentSettings = ({
 }: DeploymentSettingsProps) => {
 	return (
 		<div className="flex flex-col gap-6">
-			<SettingCardGroup>
-				<GitHub readOnly={githubReadOnly} onBeforeNavigate={onBeforeNavigate} />
-				<RootDirectory />
-				<Dockerfile />
-				<BuildCommand />
-				<WatchPaths />
-				<AutoDeploy />
-			</SettingCardGroup>
+			{sections.build ? (
+				<SettingCardGroup>
+					<GitHub readOnly={githubReadOnly} onBeforeNavigate={onBeforeNavigate} />
+					<RootDirectory />
+					<Dockerfile />
+					<BuildCommand />
+					<WatchPaths />
+					<AutoDeploy />
+				</SettingCardGroup>
+			) : null}
 			<SettingsGroup
 				icon={<CircleHalfDottedClock iconSize="md-medium" />}
 				title="Runtime settings"

@@ -12,7 +12,6 @@ import { ConfigureDeploymentStep } from "./steps/configure-deployment";
 import { ConnectGithubStep } from "./steps/connect-github";
 import { CreateAppStep } from "./steps/create-app";
 import { DeploymentLiveStep } from "./steps/deployment-live";
-import { EnvVarsStep } from "./steps/env-vars";
 import { SelectRepo } from "./steps/select-repo";
 
 export default function AppSetupPage() {
@@ -32,6 +31,10 @@ export default function AppSetupPage() {
   // round-trip carries it back via the signed state and ?appId= so it survives
   // the full-page redirect.
   const initialAppId = searchParams.get("appId") ?? undefined;
+  const source =
+    searchParams.get("source") === "image"
+      ? { type: "image" as const, image: searchParams.get("image") ?? "" }
+      : { type: "github" as const };
 
   const [appId, setAppId] = useState<string | null>(initialAppId ?? null);
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
@@ -84,24 +87,17 @@ export default function AppSetupPage() {
           </OnboardingStepContainer>
         ) : null}
       </StepWizard.Step>
-      <StepWizard.Step id="configure-deployment" label="Configure deployment">
+      <StepWizard.Step id="configure-deployment" label="Configure and deploy">
         {appId ? (
           <OnboardingStepContainer>
             <OnboardingStepHeader
-              title="Configure deployment"
-              subtitle="Review the defaults. Edit anything you'd like to adjust."
-              allowBack
+              title="Review and deploy"
+              subtitle="Build, resources, secrets, regions, and routing are reviewed in one place."
             />
-            <ConfigureDeploymentStep projectId={projectId} appId={appId} />
-          </OnboardingStepContainer>
-        ) : null}
-      </StepWizard.Step>
-      <StepWizard.Step id="configure-env-vars" label="Configure environment variables">
-        {appId ? (
-          <OnboardingStepContainer>
-            <EnvVarsStep
+            <ConfigureDeploymentStep
               projectId={projectId}
               appId={appId}
+              source={source}
               onDeploymentCreated={setDeploymentId}
             />
           </OnboardingStepContainer>

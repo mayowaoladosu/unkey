@@ -8,6 +8,7 @@ type DeployActionProps = {
   projectId: string;
   appId: string;
   disabled?: boolean;
+  source?: { type: "github" } | { type: "image"; image: string };
   onDeploymentCreated: (deploymentId: string) => void;
 };
 
@@ -15,6 +16,7 @@ export const DeployAction = ({
   projectId,
   appId,
   disabled,
+  source = { type: "github" },
   onDeploymentCreated,
 }: DeployActionProps) => {
   const { goTo } = useStepWizard();
@@ -33,8 +35,13 @@ export const DeployAction = ({
     },
   });
 
+  const deployInput =
+    source.type === "image"
+      ? ({ projectId, appId, environmentSlug: "production", source: "image", image: source.image } as const)
+      : ({ projectId, appId, environmentSlug: "production", source: "default" } as const);
+
   return (
-    <div className="flex justify-end mt-6 flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Button
         type="button"
         variant="primary"
@@ -42,14 +49,14 @@ export const DeployAction = ({
         className="rounded-lg"
         disabled={deploy.isLoading || disabled}
         loading={deploy.isLoading}
-        onClick={() =>
-          deploy.mutate({ projectId, appId, environmentSlug: "production", source: "default" })
-        }
+        onClick={() => deploy.mutate(deployInput)}
       >
-        Deploy
+        Deploy to production
       </Button>
-      <span className="text-gray-10 text-[13px] text-center">
-        We'll build your image, provision infrastructure, and more.
+      <span className="text-gray-9 text-[11px] leading-5 text-center">
+        {source.type === "image"
+          ? "The image will be pulled, provisioned, health checked, and routed."
+          : "Source will be built, provisioned, health checked, and routed."}
       </span>
     </div>
   );

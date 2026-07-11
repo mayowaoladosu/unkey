@@ -9,15 +9,27 @@ import { ConfigureDeploymentFallback } from "./fallback";
 type ConfigureDeploymentStepProps = {
   projectId: string;
   appId: string;
+  source: { type: "github" } | { type: "image"; image: string };
+  onDeploymentCreated: (deploymentId: string) => void;
 };
 
-export const ConfigureDeploymentStep = ({ projectId, appId }: ConfigureDeploymentStepProps) => {
+export const ConfigureDeploymentStep = ({
+  projectId,
+  appId,
+  source,
+  onDeploymentCreated,
+}: ConfigureDeploymentStepProps) => {
   const [settingsStatus, setSettingsStatus] = useState<"loading" | "ready" | "error">("loading");
 
   return (
     <ProjectDataProvider projectId={projectId} appId={appId}>
       <OnboardingEnvironmentSettingsProvider onSettingsStatusChange={setSettingsStatus}>
-        <ConfigureDeploymentContent />
+        <ConfigureDeploymentContent
+          projectId={projectId}
+          appId={appId}
+          source={source}
+          onDeploymentCreated={onDeploymentCreated}
+        />
       </OnboardingEnvironmentSettingsProvider>
       <ConfigureDeploymentFallback settingsStatus={settingsStatus} />
     </ProjectDataProvider>
