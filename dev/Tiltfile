@@ -40,6 +40,15 @@ local_resource(
   labels=['setup'],
 )
 
+# The gVisor addon is unstable under Docker-backed Minikube on WSL. Keep the
+# production runtimeClassName contract intact while using runc for local E2E.
+local_resource(
+  'runtime-class',
+  'kubectl apply -f k8s/manifests/runtimeclass-local.yaml',
+  deps=['k8s/manifests/runtimeclass-local.yaml'],
+  labels=['setup'],
+)
+
 local_resource(
   'registry',
   '''
