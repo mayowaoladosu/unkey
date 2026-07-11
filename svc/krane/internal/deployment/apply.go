@@ -148,9 +148,11 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 		if err := c.ensureWorkloadService(ctx, req, replicaSetOwnerRef(applied)); err != nil {
 			return err
 		}
-		if err := c.ensureCiliumNetworkPolicy(ctx, req, applied); err != nil {
-			return fmt.Errorf("failed to ensure cilium network policy: %w", err)
-		}
+	}
+	// Every workload gets a policy, including portless workers. This keeps
+	// ingress default-deny and adds only its declared private binding egress.
+	if err := c.ensureCiliumNetworkPolicy(ctx, req, replicaSetOwnerRef(applied)); err != nil {
+		return fmt.Errorf("failed to ensure cilium network policy: %w", err)
 	}
 
 	status, err := c.buildDeploymentStatus(ctx, applied)

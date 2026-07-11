@@ -7,23 +7,24 @@ import (
 
 	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ensureCiliumNetworkPolicy creates or updates a CiliumNetworkPolicy that
-// permits frontline pods to reach this deployment on its container port.
-// Cilium's default-deny kicks in for any endpoint selected by a CNP, so
-// installing this policy is what unblocks ingress; without it, the
-// customer pods are reachable only from inside their own namespace.
+// grants public Frontline ingress, explicit private callers, and only the
+// private binding egress declared by this resource. Cilium's default-deny
+// applies in each direction selected by the policy.
 //
-// The policy is namespaced to the deployment's namespace and owned by the
-// ReplicaSet so it is garbage-collected automatically when the deployment
-// is deleted.
-func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet) error {
-	policy := buildCiliumNetworkPolicy(req, rs)
+// The policy is namespaced to the deployment's namespace and owned by its
+// ReplicaSet or CronJob so it is garbage-collected with the workload.
+func (c *Controller) ensureCiliumNetworkPolicy(
+	ctx context.Context,
+	req *ctrlv1.ApplyDeployment,
+	owner metav1.OwnerReference,
+) error {
+	policy := buildCiliumNetworkPolicy(req, owner)
 	policyName := policy.GetName()
 
 	gvr := schema.GroupVersionResource{
@@ -47,7 +48,7 @@ func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.
 	return nil
 }
 
-func buildCiliumNetworkPolicy(req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet) *unstructured.Unstructured {
+func buildCiliumNetworkPolicy(req *ctrlv1.ApplyDeployment, owner metav1.OwnerReference) *unstructured.Unstructured {
 	policyName := fmt.Sprintf("%s-frontline-ingress", req.GetK8SName())
 	endpointLabels := map[string]interface{}{
 		labels.LabelKeyDeploymentID: req.GetDeploymentId(),
@@ -64,6 +65,12 @@ func buildCiliumNetworkPolicy(req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet
 	for _, callerID := range req.GetAllowedCallers() {
 		ingress = append(ingress, ciliumIngressRule(req.GetPort(), map[string]interface{}{
 			labels.LabelKeyResourceID: callerID,
+		}))
+	}
+	egress := make([]interface{}, 0, len(req.GetBindings()))
+	for _, binding := range req.GetBindings() {
+		egress = append(egress, ciliumEgressRule(binding.GetPort(), map[string]interface{}{
+			labels.LabelKeyResourceID: binding.GetResourceId(),
 		}))
 	}
 
@@ -86,10 +93,10 @@ func buildCiliumNetworkPolicy(req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet
 					ComponentCiliumNetworkPolicy(),
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
-						"apiVersion":         "apps/v1",
-						"kind":               "ReplicaSet",
-						"name":               rs.Name,
-						"uid":                string(rs.UID),
+						"apiVersion":         owner.APIVersion,
+						"kind":               owner.Kind,
+						"name":               owner.Name,
+						"uid":                string(owner.UID),
 						"controller":         true,
 						"blockOwnerDeletion": true,
 					},
@@ -100,6 +107,7 @@ func buildCiliumNetworkPolicy(req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet
 					"matchLabels": endpointLabels,
 				},
 				"ingress": ingress,
+				"egress":  egress,
 			},
 		},
 	}
@@ -109,6 +117,24 @@ func ciliumIngressRule(port int32, fromLabels map[string]interface{}) map[string
 	return map[string]interface{}{
 		"fromEndpoints": []interface{}{
 			map[string]interface{}{"matchLabels": fromLabels},
+		},
+		"toPorts": []interface{}{
+			map[string]interface{}{
+				"ports": []interface{}{
+					map[string]interface{}{
+						"port":     strconv.Itoa(int(port)),
+						"protocol": "TCP",
+					},
+				},
+			},
+		},
+	}
+}
+
+func ciliumEgressRule(port int32, toLabels map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"toEndpoints": []interface{}{
+			map[string]interface{}{"matchLabels": toLabels},
 		},
 		"toPorts": []interface{}{
 			map[string]interface{}{

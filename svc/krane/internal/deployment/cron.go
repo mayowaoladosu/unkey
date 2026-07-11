@@ -33,6 +33,9 @@ func (c *Controller) applyCronJob(ctx context.Context, req *ctrlv1.ApplyDeployme
 			return fmt.Errorf("failed to patch cron owner references: %w", err)
 		}
 	}
+	if err := c.ensureCiliumNetworkPolicy(ctx, req, cronJobOwnerRef(applied)); err != nil {
+		return fmt.Errorf("failed to ensure cron cilium network policy: %w", err)
+	}
 	return c.reportDeploymentStatus(ctx, cronJobStatus(req))
 }
 
