@@ -1,8 +1,7 @@
 package routing
 
 import (
-	"database/sql"
-	"fmt"
+	"context"
 	"time"
 
 	restate "github.com/restatedev/sdk-go"
@@ -13,10 +12,9 @@ import (
 
 // AssignFrontlineRoutes reassigns a set of frontline routes to a new deployment.
 //
-// Each route in FrontlineRouteIds is updated to point at DeploymentId. The updates
-// are executed sequentially, with each wrapped in [restate.Run] for durability. If
-// any update fails, the operation returns an error and Restate will retry the
-// entire handler from the last successful checkpoint.
+// Each route, its explicit target pointer, and append-only assignment history
+// are updated in one database transaction wrapped by [restate.Run] for
+// durability. The invocation ID makes history insertion replay-idempotent.
 //
 // Returns an empty response on success. Database errors from the route updates
 // propagate directly to the caller.
@@ -26,20 +24,29 @@ func (s *Service) AssignFrontlineRoutes(ctx restate.ObjectContext, req *hydrav1.
 		"frontline_routes", req.GetFrontlineRouteIds(),
 	)
 
-	// Upsert each domain in the database
-	for _, frontlineRouteID := range req.GetFrontlineRouteIds() {
-		_, err := restate.Run(ctx, func(stepCtx restate.RunContext) (restate.Void, error) {
-			return restate.Void{}, s.db.ReassignFrontlineRoute(stepCtx, db.ReassignFrontlineRouteParams{
-				ID:           frontlineRouteID,
-				DeploymentID: req.GetDeploymentId(),
-				UpdatedAt:    sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
-			})
-
-		}, restate.WithName(fmt.Sprintf("reassign-%s", frontlineRouteID)))
-		if err != nil {
-			return nil, err
-		}
-
+	operationID := ctx.Request().ID
+	err := restate.RunVoid(ctx, func(stepCtx restate.RunContext) error {
+		return db.Tx(stepCtx, s.db.RW(), func(txCtx context.Context, tx db.DBTX) error {
+			queries := db.NewQueries(tx)
+			now := time.Now().UnixMilli()
+			for _, frontlineRouteID := range req.GetFrontlineRouteIds() {
+				if assignErr := assignFrontlineRoute(
+					txCtx,
+					queries,
+					frontlineRouteID,
+					req.GetDeploymentId(),
+					db.DeploymentTargetAssignmentsReasonDeploy,
+					operationID,
+					now,
+				); assignErr != nil {
+					return assignErr
+				}
+			}
+			return nil
+		})
+	}, restate.WithName("assign frontline routes and deployment targets"))
+	if err != nil {
+		return nil, err
 	}
 
 	return &hydrav1.AssignFrontlineRoutesResponse{}, nil

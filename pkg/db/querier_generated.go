@@ -665,6 +665,10 @@ type Querier interface {
 	//
 	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
 	FindFrontlineRouteByFQDN(ctx context.Context, db DBTX, fullyQualifiedDomainName string) (FrontlineRoute, error)
+	//FindFrontlineRouteByID
+	//
+	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE id = ?
+	FindFrontlineRouteByID(ctx context.Context, db DBTX, id string) (FrontlineRoute, error)
 	//FindFrontlineRouteForPromotion
 	//
 	//  SELECT
@@ -1851,6 +1855,7 @@ type Querier interface {
 	//      project_id,
 	//      app_id,
 	//      deployment_id,
+	//      target_id,
 	//      environment_id,
 	//      fully_qualified_domain_name,
 	//      sticky,
@@ -1858,6 +1863,7 @@ type Querier interface {
 	//      updated_at
 	//  )
 	//  VALUES (
+	//      ?,
 	//      ?,
 	//      ?,
 	//      ?,
@@ -2314,6 +2320,14 @@ type Querier interface {
 	//      ?
 	//  )
 	InsertWorkspace(ctx context.Context, db DBTX, arg InsertWorkspaceParams) error
+	//LinkFrontlineRouteTarget
+	//
+	//  UPDATE frontline_routes
+	//  SET
+	//    target_id = ?,
+	//    updated_at = ?
+	//  WHERE id = ?
+	LinkFrontlineRouteTarget(ctx context.Context, db DBTX, arg LinkFrontlineRouteTargetParams) error
 	// ListAllCiliumNetworkPoliciesByRegion returns cilium network policies for a region, paginated by pk.
 	// Used during full sync (version=0) to bootstrap krane agents with current state.
 	//
@@ -3105,6 +3119,10 @@ type Querier interface {
 	//  ORDER BY w.id ASC
 	//  LIMIT 100
 	ListWorkspacesForQuotaCheck(ctx context.Context, db DBTX, cursor string) ([]ListWorkspacesForQuotaCheckRow, error)
+	//LockDeploymentTargetByID
+	//
+	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at FROM deployment_targets WHERE id = ? FOR UPDATE
+	LockDeploymentTargetByID(ctx context.Context, db DBTX, id string) (DeploymentTarget, error)
 	// Acquires an exclusive lock on the environment row to prevent concurrent modifications.
 	// This serializes region reconciliation, which reads the current set then replaces it.
 	//

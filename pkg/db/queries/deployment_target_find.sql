@@ -1,6 +1,9 @@
 -- name: FindDeploymentTargetByID :one
 SELECT * FROM deployment_targets WHERE id = sqlc.arg(id);
 
+-- name: LockDeploymentTargetByID :one
+SELECT * FROM deployment_targets WHERE id = sqlc.arg(id) FOR UPDATE;
+
 -- name: FindDeploymentTargetByIdentity :one
 SELECT *
 FROM deployment_targets

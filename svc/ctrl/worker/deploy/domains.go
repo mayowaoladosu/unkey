@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
+	"github.com/unkeyed/unkey/svc/ctrl/internal/deploymenttarget"
 )
 
 // newDomain represents a domain to be created for a deployment, including its
@@ -18,6 +19,12 @@ type newDomain struct {
 	// remain pinned to their original deployment, while sticky domains automatically
 	// update to point to new deployments matching their criteria.
 	sticky db.FrontlineRoutesSticky
+
+	// targetKind and targetKey identify the mutable pointer behind branch,
+	// environment, and live aliases. Immutable commit and deployment URLs leave
+	// both empty and are never reassigned.
+	targetKind deploymenttarget.Kind
+	targetKey  string
 }
 
 // buildDomains generates the list of domains that should be assigned to a deployment.
@@ -102,9 +109,10 @@ func buildDomains(
 		short += disambiguator
 		domains = append(domains,
 			newDomain{
-				domain: fmt.Sprintf("%s-git-%s-%s.%s", prefix, short, workspaceSlug, apex),
-				//nolint: exhaustruct
-				sticky: db.FrontlineRoutesStickyNone,
+				domain:     fmt.Sprintf("%s-git-%s-%s.%s", prefix, short, workspaceSlug, apex),
+				sticky:     db.FrontlineRoutesStickyNone,
+				targetKind: "",
+				targetKey:  "",
 			},
 		)
 	}
@@ -113,8 +121,10 @@ func buildDomains(
 		domains = append(
 			domains,
 			newDomain{
-				domain: fmt.Sprintf("%s-git-%s-%s.%s", prefix, sluggify(branchName), workspaceSlug, apex),
-				sticky: db.FrontlineRoutesStickyBranch,
+				domain:     fmt.Sprintf("%s-git-%s-%s.%s", prefix, sluggify(branchName), workspaceSlug, apex),
+				sticky:     db.FrontlineRoutesStickyBranch,
+				targetKind: deploymenttarget.KindBranch,
+				targetKey:  branchName,
 			},
 		)
 	}
@@ -122,24 +132,29 @@ func buildDomains(
 	domains = append(
 		domains,
 		newDomain{
-			domain: fmt.Sprintf("%s-%s-%s.%s", prefix, environmentSlug, workspaceSlug, apex),
-			sticky: db.FrontlineRoutesStickyEnvironment,
+			domain:     fmt.Sprintf("%s-%s-%s.%s", prefix, environmentSlug, workspaceSlug, apex),
+			sticky:     db.FrontlineRoutesStickyEnvironment,
+			targetKind: deploymenttarget.KindEnvironment,
+			targetKey:  environmentSlug,
 		},
 	)
 
 	if environmentSlug == "production" {
 		domains = append(domains,
 			newDomain{
-				domain: fmt.Sprintf("%s-%s.%s", prefix, workspaceSlug, apex),
-				sticky: db.FrontlineRoutesStickyLive,
+				domain:     fmt.Sprintf("%s-%s.%s", prefix, workspaceSlug, apex),
+				sticky:     db.FrontlineRoutesStickyLive,
+				targetKind: deploymenttarget.KindLive,
+				targetKey:  "live",
 			})
 	}
 
 	// deployment-specific domain for stable public access.
 	domains = append(domains, newDomain{
-		domain: fmt.Sprintf("%s-%s-%s.%s", prefix, sluggify(deploymentID), workspaceSlug, apex),
-		//nolint: exhaustruct
-		sticky: db.FrontlineRoutesStickyDeployment,
+		domain:     fmt.Sprintf("%s-%s-%s.%s", prefix, sluggify(deploymentID), workspaceSlug, apex),
+		sticky:     db.FrontlineRoutesStickyDeployment,
+		targetKind: "",
+		targetKey:  "",
 	})
 
 	return domains

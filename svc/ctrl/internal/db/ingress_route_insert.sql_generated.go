@@ -16,6 +16,7 @@ INSERT INTO frontline_routes (
     project_id,
     app_id,
     deployment_id,
+    target_id,
     environment_id,
     fully_qualified_domain_name,
     sticky,
@@ -23,6 +24,7 @@ INSERT INTO frontline_routes (
     updated_at
 )
 VALUES (
+    ?,
     ?,
     ?,
     ?,
@@ -40,6 +42,7 @@ type InsertFrontlineRouteParams struct {
 	ProjectID                string                `db:"project_id"`
 	AppID                    string                `db:"app_id"`
 	DeploymentID             string                `db:"deployment_id"`
+	TargetID                 sql.NullString        `db:"target_id"`
 	EnvironmentID            string                `db:"environment_id"`
 	FullyQualifiedDomainName string                `db:"fully_qualified_domain_name"`
 	Sticky                   FrontlineRoutesSticky `db:"sticky"`
@@ -54,6 +57,7 @@ type InsertFrontlineRouteParams struct {
 //	    project_id,
 //	    app_id,
 //	    deployment_id,
+//	    target_id,
 //	    environment_id,
 //	    fully_qualified_domain_name,
 //	    sticky,
@@ -61,6 +65,7 @@ type InsertFrontlineRouteParams struct {
 //	    updated_at
 //	)
 //	VALUES (
+//	    ?,
 //	    ?,
 //	    ?,
 //	    ?,
@@ -77,6 +82,7 @@ func (q *Queries) InsertFrontlineRoute(ctx context.Context, arg InsertFrontlineR
 		arg.ProjectID,
 		arg.AppID,
 		arg.DeploymentID,
+		arg.TargetID,
 		arg.EnvironmentID,
 		arg.FullyQualifiedDomainName,
 		arg.Sticky,

@@ -832,35 +832,16 @@ func (w *Workflow) configureRouting(
 	existingRouteIDs := make([]string, 0)
 
 	for _, domain := range allDomains {
-		frontlineRouteID, getFrontlineRouteErr := restate.Run(ctx, func(runCtx restate.RunContext) (string, error) {
-			return db.TxWithResultRetry(runCtx, w.db.RW(), func(txCtx context.Context, tx db.DBTX) (string, error) {
-				found, err := db.NewQueries(tx).FindFrontlineRouteByFQDN(txCtx, domain.domain)
-				if err != nil {
-					if db.IsNotFound(err) {
-						err = db.NewQueries(tx).InsertFrontlineRoute(runCtx, db.InsertFrontlineRouteParams{
-							ID:                       uid.New(uid.FrontlineRoutePrefix),
-							ProjectID:                project.ID,
-							AppID:                    app.ID,
-							DeploymentID:             deployment.ID,
-							EnvironmentID:            deployment.EnvironmentID,
-							FullyQualifiedDomainName: domain.domain,
-							Sticky:                   domain.sticky,
-							CreatedAt:                time.Now().UnixMilli(),
-							UpdatedAt:                sql.NullInt64{Valid: false, Int64: 0},
-						})
-						return "", err
-
-					}
-					return "", err
-				}
-				return found.ID, nil
+		route, getFrontlineRouteErr := restate.Run(ctx, func(runCtx restate.RunContext) (ensuredFrontlineRoute, error) {
+			return db.TxWithResultRetry(runCtx, w.db.RW(), func(txCtx context.Context, tx db.DBTX) (ensuredFrontlineRoute, error) {
+				return ensureFrontlineRoute(txCtx, tx, domain, project, app, deployment)
 			})
 		}, restate.WithName(fmt.Sprintf("inserting frontline route %s", domain.domain)), restate.WithMaxRetryAttempts(runMaxAttempts))
 		if getFrontlineRouteErr != nil {
 			return fault.Wrap(getFrontlineRouteErr, fault.Public("Route records could not be created."))
 		}
-		if frontlineRouteID != "" {
-			existingRouteIDs = append(existingRouteIDs, frontlineRouteID)
+		if route.NeedsMove {
+			existingRouteIDs = append(existingRouteIDs, route.ID)
 		}
 	}
 

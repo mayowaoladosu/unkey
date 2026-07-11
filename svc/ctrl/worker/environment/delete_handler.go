@@ -69,6 +69,18 @@ func (s *Service) Delete(
 	}
 
 	if err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
+		return s.db.DeleteDeploymentTargetAssignmentsByEnvironment(runCtx, envID)
+	}, restate.WithName("delete deployment target history")); err != nil {
+		return nil, fmt.Errorf("delete deployment target history: %w", err)
+	}
+
+	if err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
+		return s.db.DeleteDeploymentTargetsByEnvironment(runCtx, envID)
+	}, restate.WithName("delete deployment targets")); err != nil {
+		return nil, fmt.Errorf("delete deployment targets: %w", err)
+	}
+
+	if err := restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
 		return s.db.DeleteAppEnvVarsByEnvironmentId(runCtx, envID)
 	}, restate.WithName("delete env vars")); err != nil {
 		return nil, fmt.Errorf("delete env vars: %w", err)

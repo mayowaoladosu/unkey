@@ -423,6 +423,10 @@ type Querier interface {
 	//
 	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
 	FindFrontlineRouteByFQDN(ctx context.Context, fullyQualifiedDomainName string) (FrontlineRoute, error)
+	//FindFrontlineRouteByID
+	//
+	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE id = ?
+	FindFrontlineRouteByID(ctx context.Context, id string) (FrontlineRoute, error)
 	//FindFrontlineRouteForPromotion
 	//
 	//  SELECT
@@ -1035,6 +1039,7 @@ type Querier interface {
 	//      project_id,
 	//      app_id,
 	//      deployment_id,
+	//      target_id,
 	//      environment_id,
 	//      fully_qualified_domain_name,
 	//      sticky,
@@ -1042,6 +1047,7 @@ type Querier interface {
 	//      updated_at
 	//  )
 	//  VALUES (
+	//      ?,
 	//      ?,
 	//      ?,
 	//      ?,
@@ -1336,6 +1342,14 @@ type Querier interface {
 	//      ?
 	//  )
 	InsertWorkspace(ctx context.Context, arg InsertWorkspaceParams) error
+	//LinkFrontlineRouteTarget
+	//
+	//  UPDATE frontline_routes
+	//  SET
+	//    target_id = ?,
+	//    updated_at = ?
+	//  WHERE id = ?
+	LinkFrontlineRouteTarget(ctx context.Context, arg LinkFrontlineRouteTargetParams) error
 	// ListAllDeploymentTopologiesByRegion returns running deployment topologies for a region, paginated by pk.
 	// Used by SyncDesiredState to reconcile krane agents with current desired state.
 	//
@@ -1607,6 +1621,10 @@ type Querier interface {
 	//  ORDER BY w.id ASC
 	//  LIMIT 100
 	ListWorkspacesForQuotaCheck(ctx context.Context, cursor string) ([]ListWorkspacesForQuotaCheckRow, error)
+	//LockDeploymentTargetByID
+	//
+	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at FROM deployment_targets WHERE id = ? FOR UPDATE
+	LockDeploymentTargetByID(ctx context.Context, id string) (DeploymentTarget, error)
 	// MarkClickhouseOutboxBatchDeleted soft-deletes a set of pks after their CH
 	// insert is confirmed. Called inside the same transaction that selected
 	// them, so the row locks held by FOR UPDATE SKIP LOCKED are released as

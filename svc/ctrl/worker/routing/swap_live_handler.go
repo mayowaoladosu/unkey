@@ -29,42 +29,45 @@ func (s *Service) SwapLiveDeployment(
 ) (*hydrav1.SwapLiveDeploymentResponse, error) {
 	deploymentID := req.GetDeploymentId()
 
-	// Reassign routes first — if the update fails, the live-deployment
-	// marker stays pointing at the previous deployment so traffic is
-	// unaffected.
-	for _, frontlineRouteID := range req.GetFrontlineRouteIds() {
-		_, err := restate.Run(ctx, func(stepCtx restate.RunContext) (restate.Void, error) {
-			return restate.Void{}, s.db.ReassignFrontlineRoute(stepCtx, db.ReassignFrontlineRouteParams{
-				ID:           frontlineRouteID,
-				DeploymentID: deploymentID,
-				UpdatedAt:    sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
-			})
-		}, restate.WithName(fmt.Sprintf("reassign-%s", frontlineRouteID)))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Swap the live-deployment pointer. Reads + writes the apps row in a
-	// single transaction so no other call can observe a half-applied state
-	// (which matters if this handler is ever extended to touch multiple
-	// rows).
+	// Reassign every mutable alias, update its explicit target, append target
+	// history, and swap the compatibility app pointer in one transaction. The
+	// env-keyed RoutingService VO serializes these transactions per environment.
 	previous, err := restate.Run(ctx, func(runCtx restate.RunContext) (sql.NullString, error) {
 		return db.TxWithResult(runCtx, s.db.RW(), func(txCtx context.Context, tx db.DBTX) (sql.NullString, error) {
-			deployment, findErr := db.NewQueries(tx).FindDeploymentById(txCtx, deploymentID)
+			queries := db.NewQueries(tx)
+			deployment, findErr := queries.FindDeploymentById(txCtx, deploymentID)
 			if findErr != nil {
 				return sql.NullString{}, fmt.Errorf("find target deployment: %w", findErr)
 			}
-			currentApp, findErr := db.NewQueries(tx).FindAppById(txCtx, deployment.AppID)
+			currentApp, findErr := queries.FindAppById(txCtx, deployment.AppID)
 			if findErr != nil {
 				return sql.NullString{}, fmt.Errorf("find app: %w", findErr)
 			}
 
-			updateErr := db.NewQueries(tx).UpdateAppDeployments(txCtx, db.UpdateAppDeploymentsParams{
+			now := time.Now().UnixMilli()
+			reason := db.DeploymentTargetAssignmentsReasonPromote
+			if req.GetSetRollbackFlag() {
+				reason = db.DeploymentTargetAssignmentsReasonRollback
+			}
+			for _, frontlineRouteID := range req.GetFrontlineRouteIds() {
+				if assignErr := assignFrontlineRoute(
+					txCtx,
+					queries,
+					frontlineRouteID,
+					deploymentID,
+					reason,
+					ctx.Request().ID,
+					now,
+				); assignErr != nil {
+					return sql.NullString{}, assignErr
+				}
+			}
+
+			updateErr := queries.UpdateAppDeployments(txCtx, db.UpdateAppDeploymentsParams{
 				AppID:               deployment.AppID,
 				CurrentDeploymentID: sql.NullString{Valid: true, String: deploymentID},
 				IsRolledBack:        req.GetSetRollbackFlag(),
-				UpdatedAt:           sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
+				UpdatedAt:           sql.NullInt64{Valid: true, Int64: now},
 			})
 			if updateErr != nil {
 				return sql.NullString{}, fmt.Errorf("update app deployments: %w", updateErr)

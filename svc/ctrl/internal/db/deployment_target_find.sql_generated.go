@@ -84,3 +84,30 @@ func (q *Queries) FindDeploymentTargetByIdentity(ctx context.Context, arg FindDe
 	)
 	return i, err
 }
+
+const lockDeploymentTargetByID = `-- name: LockDeploymentTargetByID :one
+SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at FROM deployment_targets WHERE id = ? FOR UPDATE
+`
+
+// LockDeploymentTargetByID
+//
+//	SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at FROM deployment_targets WHERE id = ? FOR UPDATE
+func (q *Queries) LockDeploymentTargetByID(ctx context.Context, id string) (DeploymentTarget, error) {
+	row := q.db.QueryRowContext(ctx, lockDeploymentTargetByID, id)
+	var i DeploymentTarget
+	err := row.Scan(
+		&i.Pk,
+		&i.ID,
+		&i.WorkspaceID,
+		&i.ProjectID,
+		&i.AppID,
+		&i.EnvironmentID,
+		&i.Kind,
+		&i.TargetKey,
+		&i.DeploymentID,
+		&i.PreviousDeploymentID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
