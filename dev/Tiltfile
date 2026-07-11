@@ -8,6 +8,7 @@ update_settings(max_parallel_updates=1)
 
 DATABASE_IMAGE_IGNORES = ['web', 'dev/e2e']
 BACKEND_IMAGE_IGNORES = ['web', 'dev']
+BACKEND_IMAGE_ONLY = ['build', 'gen', 'internal', 'pkg', 'proto', 'svc', 'go.mod', 'go.sum']
 
 config.define_string('topolvm_backing_size')
 cfg = config.parse()
@@ -337,7 +338,7 @@ k8s_resource('restate-idle-preview-deployments', resource_deps=['restate', 'ctrl
 # Service images use Tilt's native Docker builder and the shared dev Dockerfile.
 
 # ─── Vault ─────────────────────────────────────────────────────────────────
-docker_build('unkey/vault:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/vault'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/vault:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/vault'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/vault.yaml')
 k8s_resource(
   'vault',
@@ -349,7 +350,7 @@ k8s_resource(
 )
 
 # ─── API ───────────────────────────────────────────────────────────────────
-docker_build('unkey/api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/api'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/api'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/api.yaml')
 k8s_resource(
   'api',
@@ -361,7 +362,7 @@ k8s_resource(
 )
 
 # ─── Ctrl API ──────────────────────────────────────────────────────────────
-docker_build('unkey/control-api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-api'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/control-api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-api'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/ctrl-api.yaml')
 ctrl_api_deps = ['mysql', 'clickhouse', 'restate', 'vault', 'github-credentials', 'domain-connect-credentials', 'stripe-credentials']
 if has_depot_credentials:
@@ -376,7 +377,7 @@ k8s_resource(
 )
 
 # ─── Ctrl Worker (Restate workflow handlers) ───────────────────────────────
-docker_build('unkey/control-worker:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-worker'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/control-worker:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-worker'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/ctrl-worker.yaml')
 ctrl_worker_deps = ['mysql', 'clickhouse', 'restate', 'webhooks-config', 'github-credentials', 'stripe-credentials']
 if has_depot_credentials:
@@ -403,7 +404,7 @@ if has_github_credentials:
     )
 
 # ─── Frontline (TLS termination proxy for *.unkey.local) ───────────────────
-docker_build('unkey/frontline:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/frontline'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/frontline:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/frontline'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/frontline.yaml')
 k8s_resource(
   'frontline',
@@ -416,7 +417,7 @@ k8s_resource(
 )
 
 # ─── Krane ─────────────────────────────────────────────────────────────────
-docker_build('unkey/krane:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/krane'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/krane:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/krane'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/krane.yaml')
 k8s_resource(
   'krane',
@@ -428,7 +429,7 @@ k8s_resource(
 )
 
 # ─── Heimdall (resource metering agent) ────────────────────────────────────
-docker_build('unkey/heimdall:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/heimdall'}, ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/heimdall:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/heimdall'}, ignore=BACKEND_IMAGE_IGNORES, only=BACKEND_IMAGE_ONLY)
 k8s_yaml('k8s/manifests/heimdall.yaml')
 k8s_resource(
   'heimdall',
