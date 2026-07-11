@@ -124,11 +124,11 @@ func TestWrappedError(t *testing.T) {
 func TestGetLocation(t *testing.T) {
 	location := getLocation()
 
-	parts := strings.Split(location, ":")
-	require.Len(t, parts, 2)
+	separator := strings.LastIndexByte(location, ':')
+	require.Positive(t, separator)
 
-	file := parts[0]
-	line := parts[1]
+	file := location[:separator]
+	line := location[separator+1:]
 
 	require.True(t, strings.HasSuffix(file, ".go"))
 

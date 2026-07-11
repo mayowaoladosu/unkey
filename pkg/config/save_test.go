@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -38,6 +39,10 @@ func TestSave_CreatesDirectories(t *testing.T) {
 }
 
 func TestSave_FilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose POSIX file permissions")
+	}
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 
