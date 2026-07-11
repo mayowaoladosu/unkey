@@ -79,7 +79,7 @@ export const FrameworkDetectionCard = ({
     );
   }
 
-  if (!detectionMutation.data || detectionMutation.isPending) {
+  if (!detectionMutation.data || detectionMutation.isLoading) {
     return (
       <DetectionShell>
         <p className="text-[13px] font-medium text-gray-12">Analyzing repository...</p>
@@ -137,8 +137,8 @@ export const FrameworkDetectionCard = ({
             variant={result.defaultsApplied ? "outline" : "primary"}
             size="sm"
             className="shrink-0"
-            disabled={result.defaultsApplied || acceptanceMutation.isPending}
-            loading={acceptanceMutation.isPending}
+            disabled={result.defaultsApplied || acceptanceMutation.isLoading}
+            loading={acceptanceMutation.isLoading}
             onClick={() =>
               acceptanceMutation.mutate({ projectId, appId, fingerprint: result.fingerprint })
             }

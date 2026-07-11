@@ -9,6 +9,7 @@ import { Section, SectionHeader } from "../../../../../../components/section";
 import { Card } from "../../../../../components/card";
 import { useProjectData } from "../../../../../data-provider";
 import { useDeployment } from "../../../layout-provider";
+import { lifecycleEventRowKey } from "../../../lifecycle-event-row-key";
 
 export function DeploymentResourcesSection() {
 	const { deployment } = useDeployment();
@@ -46,7 +47,7 @@ export function DeploymentResourcesSection() {
 				title="Resources & targets"
 			/>
 			<Card className="overflow-hidden">
-				{resources.isPending ? (
+				{resources.isLoading ? (
 					<div className="grid gap-3 p-4">
 						<div className="h-4 w-52 animate-pulse rounded bg-grayA-3" />
 						<div className="h-16 animate-pulse rounded-md bg-grayA-2" />
@@ -307,9 +308,9 @@ export function DeploymentResourcesSection() {
 						size="xlg"
 						className="w-full rounded-lg"
 						disabled={
-							!rollbackTarget?.previousDeploymentId || rollback.isPending
+							!rollbackTarget?.previousDeploymentId || rollback.isLoading
 						}
-						loading={rollback.isPending}
+						loading={rollback.isLoading}
 						onClick={() => {
 							if (rollbackTarget?.previousDeploymentId) {
 								rollback.mutate({
@@ -458,7 +459,7 @@ function ResourceObservability({
 					<div className="grid gap-3 xl:grid-cols-2">
 						<ObservabilityList
 							title="Recent logs"
-							pending={logs.isPending}
+							pending={logs.isLoading}
 							empty="No logs for this resource yet."
 							rows={(logs.data?.logs ?? []).map((log) => ({
 								key: `${log.time}:${log.instance_id}:${log.message}`,
@@ -469,10 +470,10 @@ function ResourceObservability({
 						/>
 						<ObservabilityList
 							title="Lifecycle events"
-							pending={events.isPending}
+							pending={events.isLoading}
 							empty="No lifecycle events for this resource yet."
 							rows={(events.data?.events ?? []).map((event) => ({
-								key: `${event.time}:${event.eventFingerprint}`,
+									key: lifecycleEventRowKey(event),
 								lead: new Date(event.time).toLocaleTimeString(),
 								value: event.reason || event.message || event.eventKind,
 								badge: event.eventKind,

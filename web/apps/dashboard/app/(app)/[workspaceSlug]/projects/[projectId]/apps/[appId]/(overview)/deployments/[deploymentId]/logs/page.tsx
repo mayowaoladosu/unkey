@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc/client";
 import { PageBody } from "@unkey/ui";
 import { useState } from "react";
 import { useDeployment } from "../layout-provider";
+import { lifecycleEventRowKey } from "../lifecycle-event-row-key";
 
 export default function DeploymentLogsPage() {
   const { deployment } = useDeployment();
@@ -52,7 +53,7 @@ export default function DeploymentLogsPage() {
         <div className="grid gap-4 xl:grid-cols-2">
           <TimelineCard
             title="Runtime logs"
-            pending={logs.isPending}
+            pending={logs.isLoading}
             empty="No runtime logs in this deployment yet."
             rows={(logs.data?.logs ?? []).map((log) => ({
               key: `${log.time}:${log.instance_id}:${log.message}`,
@@ -64,10 +65,10 @@ export default function DeploymentLogsPage() {
           />
           <TimelineCard
             title="Lifecycle events"
-            pending={events.isPending}
+            pending={events.isLoading}
             empty="No lifecycle events in this deployment yet."
             rows={(events.data?.events ?? []).map((event) => ({
-              key: `${event.time}:${event.eventFingerprint}`,
+              key: lifecycleEventRowKey(event),
               time: event.time,
               badge: event.eventKind,
               resource: event.resourceName || event.resourceKind || "legacy",

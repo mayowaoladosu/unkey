@@ -27,7 +27,7 @@ export default function DeploymentSourcePage() {
             </p>
           </header>
           <pre className="max-h-[70dvh] overflow-auto p-4 font-mono text-[11px] leading-5 text-gray-11">
-            {resources.isPending
+            {resources.isLoading
               ? "Loading manifest…"
               : JSON.stringify(resources.data?.manifest?.manifest ?? {}, null, 2)}
           </pre>
@@ -37,7 +37,7 @@ export default function DeploymentSourcePage() {
             <h2 className="text-xs font-medium text-gray-12">Build graph</h2>
             <p className="mt-1 text-[11px] text-gray-9">Deployment {shortenId(deployment.id)}</p>
           </header>
-          {build.isPending ? (
+          {build.isLoading ? (
             <div className="m-4 h-20 animate-pulse rounded bg-grayA-2" />
           ) : (build.data?.steps.length ?? 0) === 0 ? (
             <p className="p-4 text-xs text-gray-9">No structured build steps were recorded.</p>

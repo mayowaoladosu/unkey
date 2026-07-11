@@ -54,6 +54,8 @@ export function transformFilters(
     severity,
     region,
     environmentId,
+    resourceId: [],
+    resourceKind: [],
     message: params.message,
     page: params.page,
   };

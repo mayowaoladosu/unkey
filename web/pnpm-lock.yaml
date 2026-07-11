@@ -119,8 +119,8 @@ importers:
         specifier: 1.0.3
         version: 1.0.3(@types/react-dom@19.2.3(@types/react@19.2.4))(@types/react@19.2.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-slot':
-        specifier: 1.1.0
-        version: 1.1.0(@types/react@19.2.4)(react@19.2.4)
+        specifier: 1.2.4
+        version: 1.2.4(@types/react@19.2.4)(react@19.2.4)
       '@radix-ui/react-switch':
         specifier: 1.0.3
         version: 1.0.3(@types/react-dom@19.2.3(@types/react@19.2.4))(@types/react@19.2.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -355,7 +355,7 @@ importers:
         version: 26.0.0
       vitest:
         specifier: 1.6.1
-        version: 1.6.1(@types/node@22.14.0)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
+        version: 1.6.1(@types/node@22.14.0)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
 
   apps/design:
     dependencies:
@@ -562,7 +562,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: 1.6.1
-        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
+        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
 
   internal/db:
     dependencies:
@@ -599,7 +599,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: 1.6.1
-        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
+        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
 
   internal/encryption:
     dependencies:
@@ -618,7 +618,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: 1.6.1
-        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
+        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
 
   internal/error:
     dependencies:
@@ -656,7 +656,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: 1.6.1
-        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
+        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
 
   internal/icons:
     dependencies:
@@ -710,7 +710,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: 1.6.1
-        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
+        version: 1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1)
 
   internal/rbac:
     dependencies:
@@ -1304,9 +1304,11 @@ packages:
 
   '@clickhouse/client-common@1.11.1':
     resolution: {integrity: sha512-bme0le2yhDSAh13d2fxhSW5ZrNoVqZ3LTyac8jK6hNH0qkksXnjYkLS6KQalPU6NMpffxHmpI4+/Gi2MnX0NCA==}
+    deprecated: 'Deprecated: import from @clickhouse/client or @clickhouse/client-web instead.'
 
   '@clickhouse/client-common@1.18.5':
     resolution: {integrity: sha512-g9LwcS1dvkatKDsIjT1PwUHldsiYzwdKAB0nXfd9APLd+t4PrNJa+my+dXcqJdmcWyhWjKLP/2/ztBwgxp+sbQ==}
+    deprecated: 'Deprecated: import from @clickhouse/client or @clickhouse/client-web instead.'
 
   '@clickhouse/client-web@1.11.1':
     resolution: {integrity: sha512-dRmve4Vh8tdnLo8tt77O+2Ye4FWBR9eBrJ3CsaoNS2Q6aQNwv0JbPUKIrU88ep2sg5kilmNfAXqWaJXehpYVRg==}
@@ -18042,7 +18044,7 @@ snapshots:
       - supports-color
       - terser
 
-  vitest@1.6.1(@types/node@22.14.0)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1):
+  vitest@1.6.1(@types/node@22.14.0)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1):
     dependencies:
       '@vitest/expect': 1.6.1
       '@vitest/runner': 1.6.1
@@ -18078,7 +18080,7 @@ snapshots:
       - supports-color
       - terser
 
-  vitest@1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4(vitest@3.2.4))(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1):
+  vitest@1.6.1(@types/node@25.0.10)(@vitest/ui@3.2.4)(jsdom@26.0.0)(lightningcss@1.32.0)(terser@5.47.1):
     dependencies:
       '@vitest/expect': 1.6.1
       '@vitest/runner': 1.6.1
