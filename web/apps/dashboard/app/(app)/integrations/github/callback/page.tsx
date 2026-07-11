@@ -26,7 +26,15 @@ export default function Page() {
 
   const mutation = trpc.github.registerInstallation.useMutation({
     onSuccess: (data) => {
+      if (data.returnTo === "deploy") {
+        router.replace(`/${data.workspaceSlug}/deploy`);
+        return;
+      }
       if (data.returnTo === "settings") {
+        if (!data.projectId || !data.appId) {
+          toast.error("GitHub callback is missing its app destination");
+          return;
+        }
         router.replace(
           routes.projects.apps.settings({
             workspaceSlug: data.workspaceSlug,
@@ -35,6 +43,10 @@ export default function Page() {
           }),
         );
       } else {
+        if (!data.projectId || !data.appId) {
+          toast.error("GitHub callback is missing its onboarding destination");
+          return;
+        }
         router.replace(
           routes.projects.apps.new({
             workspaceSlug: data.workspaceSlug,

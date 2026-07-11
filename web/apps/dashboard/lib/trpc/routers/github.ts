@@ -25,20 +25,44 @@ const STATE_TTL_MS = 15 * 60 * 1000;
 const FRAMEWORK_DETECTION_VERSION = 1;
 
 // State payload signed and handed to GitHub's install URL. The signature
-// binds the state to a specific user + workspace + project so the callback
+// binds the state to a specific user + workspace and, for app-scoped flows,
+// a project + app so the callback
 // cannot be replayed across sessions or used by an attacker who phishes
 // a logged-in victim into hitting /integrations/github/callback?state=...
-const signedStatePayload = z.object({
-  projectId: z.string().min(1),
-  appId: z.string().min(1),
-  returnTo: z.enum(["settings"]).optional(),
+const signedStatePayloadBase = z.object({
+  projectId: z.string().min(1).optional(),
+  appId: z.string().min(1).optional(),
+  returnTo: z.enum(["settings", "deploy"]).optional(),
   workspaceId: z.string().min(1),
   userId: z.string().min(1),
   nonce: z.string().min(1),
   exp: z.number().int().positive(),
 });
 
-const signedState = signedStatePayload.extend({ sig: z.string().min(1) });
+const validateStateScope = (
+  state: z.infer<typeof signedStatePayloadBase>,
+  ctx: z.RefinementCtx,
+) => {
+  const hasProject = state.projectId !== undefined;
+  const hasApp = state.appId !== undefined;
+  if (hasProject !== hasApp) {
+    ctx.addIssue({
+      code: "custom",
+      message: "GitHub installation state must include both project and app ids",
+    });
+  }
+  if (state.returnTo === "deploy" && (hasProject || hasApp)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Workspace deploy installation state cannot be app-scoped",
+    });
+  }
+};
+
+const signedStatePayload = signedStatePayloadBase.superRefine(validateStateScope);
+const signedState = signedStatePayloadBase
+  .extend({ sig: z.string().min(1) })
+  .superRefine(validateStateScope);
 
 type SignedStatePayload = z.infer<typeof signedStatePayload>;
 
@@ -227,11 +251,16 @@ export const githubRouter = t.router({
 
   prepareInstallation: workspaceProcedure
     .input(
-      z.object({
-        projectId: z.string().min(1),
-        appId: z.string().min(1),
-        returnTo: z.enum(["settings"]).optional(),
-      }),
+      z.union([
+        z.object({
+          projectId: z.string().min(1),
+          appId: z.string().min(1),
+          returnTo: z.literal("settings").optional(),
+        }),
+        z.object({
+          returnTo: z.literal("deploy"),
+        }),
+      ]),
     )
     .mutation(async ({ ctx, input }) => {
       if (!githubAppEnv()) {
@@ -241,25 +270,32 @@ export const githubRouter = t.router({
         });
       }
 
-      // Verify the project belongs to the calling workspace before issuing a
-      // signed state. Without this, an attacker could mint a state for an
-      // arbitrary project id.
-      const project = await db.query.projects.findFirst({
-        where: (table, { and, eq }) =>
-          and(eq(table.id, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
-        columns: { id: true },
-      });
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
+      if ("projectId" in input) {
+        // Verify the project and app belong to the calling workspace before
+        // issuing a signed state. Without this, an attacker could mint a state
+        // for an arbitrary destination.
+        const app = await db.query.apps.findFirst({
+          where: (table, { and, eq }) =>
+            and(
+              eq(table.id, input.appId),
+              eq(table.projectId, input.projectId),
+              eq(table.workspaceId, ctx.workspace.id),
+            ),
+          columns: { id: true },
         });
+        if (!app) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "App not found",
+          });
+        }
       }
 
       return {
         state: signState({
-          projectId: input.projectId,
-          appId: input.appId,
+          ...("projectId" in input
+            ? { projectId: input.projectId, appId: input.appId }
+            : {}),
           returnTo: input.returnTo,
           workspaceId: ctx.workspace.id,
           userId: ctx.user.id,
@@ -391,23 +427,25 @@ export const githubRouter = t.router({
         }
       }
 
-      const projectInstallation = await fetchProjectInstallation(
-        ctx.workspace.id,
-        projectId,
-        input.installationId,
-      ).catch((err) => {
-        console.error(err);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to load project installation",
+      if (projectId) {
+        const projectInstallation = await fetchProjectInstallation(
+          ctx.workspace.id,
+          projectId,
+          input.installationId,
+        ).catch((err) => {
+          console.error(err);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to load project installation",
+          });
         });
-      });
 
-      if (!projectInstallation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
+        if (!projectInstallation) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Project not found",
+          });
+        }
       }
 
       await db
@@ -431,6 +469,22 @@ export const githubRouter = t.router({
           });
         });
 
+      if (parsedState.returnTo === "deploy") {
+        return {
+          workspaceSlug: ctx.workspace.slug,
+          projectId: null,
+          appId: null,
+          returnTo: "deploy" as const,
+        };
+      }
+
+      if (!projectId || !parsedState.appId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid app installation state",
+        });
+      }
+
       return {
         workspaceSlug: ctx.workspace.slug,
         projectId,
@@ -438,6 +492,60 @@ export const githubRouter = t.router({
         returnTo: parsedState.returnTo ?? null,
       };
     }),
+
+  listWorkspaceRepositories: workspaceProcedure.query(async ({ ctx }) => {
+    if (!githubAppEnv()) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "GitHub App not configured",
+      });
+    }
+
+    const installations = await db.query.githubAppInstallations.findMany({
+      where: (table, { eq }) => eq(table.workspaceId, ctx.workspace.id),
+      columns: { installationId: true },
+    });
+
+    if (installations.length === 0) {
+      return { repositories: [] };
+    }
+
+    const repositories = (
+      await Promise.all(
+        installations.map(async ({ installationId }) => {
+          const repos = await getInstallationRepositories(installationId).catch((err) => {
+            console.error(err);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to load GitHub repositories",
+            });
+          });
+          return repos.map((repo) => ({
+            id: repo.id,
+            name: repo.name,
+            fullName: repo.full_name,
+            private: repo.private,
+            htmlUrl: repo.html_url,
+            defaultBranch: repo.default_branch,
+            installationId,
+            pushedAt: repo.pushed_at,
+            language: repo.language,
+          }));
+        }),
+      )
+    ).flat();
+
+    repositories.sort((a, b) => {
+      const aTime = a.pushedAt ? new Date(a.pushedAt).getTime() : 0;
+      const bTime = b.pushedAt ? new Date(b.pushedAt).getTime() : 0;
+      if (aTime !== bTime) {
+        return bTime - aTime;
+      }
+      return a.fullName.localeCompare(b.fullName);
+    });
+
+    return { repositories };
+  }),
 
   getRepoTree: workspaceProcedure
     .input(z.object({ projectId: z.string(), appId: z.string().min(1) }))
