@@ -31,9 +31,10 @@ type Result struct {
 
 // Validator validates HTTP requests against an OpenAPI specification.
 type Validator struct {
-	validator        validator.Validator
-	warmMu           sync.Mutex
-	warmedOperations sync.Map
+	validator         validator.Validator
+	warmMu            sync.Mutex
+	warmedOperations  sync.Map
+	requestMediaTypes map[string]struct{}
 }
 
 // NewFromBytes creates a Validator from a raw OpenAPI spec.
@@ -44,14 +45,12 @@ func NewFromBytes(spec []byte) (*Validator, error) {
 		return nil, fault.Wrap(err, fault.Internal("failed to create OpenAPI document"))
 	}
 
-	v, errors := validator.NewValidator(document, config.WithRegexCache(&sync.Map{}))
-	if len(errors) > 0 {
-		messages := make([]fault.Wrapper, len(errors))
-		for i, e := range errors {
-			messages[i] = fault.Internal(e.Error())
-		}
-		return nil, fault.New("failed to create validator", messages...)
+	model, modelErr := document.BuildV3Model()
+	if modelErr != nil {
+		return nil, fault.New("failed to create validator", fault.Internal(modelErr.Error()))
 	}
+	v := validator.NewValidatorFromV3Model(&model.Model, config.WithRegexCache(&sync.Map{}))
+	v.SetDocument(document)
 
 	valid, docErrors := v.ValidateDocument()
 	if !valid {
@@ -62,15 +61,56 @@ func NewFromBytes(spec []byte) (*Validator, error) {
 		return nil, fault.New("openapi document is invalid", messages...)
 	}
 
-	return &Validator{validator: v}, nil
+	requestMediaTypes := map[string]struct{}{"": {}}
+	if model.Model.Paths != nil && model.Model.Paths.PathItems != nil {
+		for pathPair := model.Model.Paths.PathItems.First(); pathPair != nil; pathPair = pathPair.Next() {
+			pathItem := pathPair.Value()
+			if pathItem == nil {
+				continue
+			}
+			operations := pathItem.GetOperations()
+			if operations == nil {
+				continue
+			}
+			for operationPair := operations.First(); operationPair != nil; operationPair = operationPair.Next() {
+				operation := operationPair.Value()
+				if operation == nil {
+					continue
+				}
+				requestBody := operation.RequestBody
+				if requestBody == nil || requestBody.Content == nil {
+					continue
+				}
+				for contentPair := requestBody.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+					mediaType, _, parseErr := mime.ParseMediaType(contentPair.Key())
+					if parseErr == nil {
+						requestMediaTypes[strings.ToLower(mediaType)] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
+	return &Validator{
+		validator:         v,
+		requestMediaTypes: requestMediaTypes,
+	}, nil
 }
 
 // Validate checks r against the OpenAPI spec.
 // Returns nil when the request is valid; returns a *Result describing
 // the failures otherwise.
 func (v *Validator) Validate(r *http.Request) *Result {
-	operationKey := requestOperationKey(r)
-	if _, warmed := v.warmedOperations.Load(operationKey); warmed {
+	operationKey, cacheable := v.requestOperationKey(r)
+	if cacheable {
+		if _, warmed := v.warmedOperations.Load(operationKey); warmed {
+			return v.validate(r)
+		}
+	}
+
+	if !cacheable {
+		v.warmMu.Lock()
+		defer v.warmMu.Unlock()
 		return v.validate(r)
 	}
 
@@ -132,16 +172,40 @@ func (v *Validator) validate(r *http.Request) *Result {
 	return result
 }
 
-func requestOperationKey(r *http.Request) string {
-	route := r.Pattern
-	if route == "" {
-		route = r.URL.Path
+const unsupportedMediaType = "<unsupported>"
+
+func (v *Validator) requestOperationKey(r *http.Request) (string, bool) {
+	if r.Pattern == "" {
+		// Production requests arrive through http.ServeMux, which sets Pattern.
+		// Direct callers have no finite route template, so keep them safe by
+		// serializing validation without retaining attacker-controlled URL paths.
+		return "", false
 	}
-	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	return r.Method + "\x00" + r.Pattern + "\x00" + v.canonicalRequestMediaType(r.Header.Get("Content-Type")), true
+}
+
+func (v *Validator) canonicalRequestMediaType(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	contentType, _, err := mime.ParseMediaType(raw)
 	if err != nil {
-		contentType = strings.TrimSpace(r.Header.Get("Content-Type"))
+		return unsupportedMediaType
 	}
-	return r.Method + "\x00" + route + "\x00" + strings.ToLower(contentType)
+	contentType = strings.ToLower(contentType)
+	if _, allowed := v.requestMediaTypes[contentType]; allowed {
+		return contentType
+	}
+	if slash := strings.IndexByte(contentType, '/'); slash > 0 {
+		wildcard := contentType[:slash] + "/*"
+		if _, allowed := v.requestMediaTypes[wildcard]; allowed {
+			return wildcard
+		}
+	}
+	if _, allowed := v.requestMediaTypes["*/*"]; allowed {
+		return "*/*"
+	}
+	return unsupportedMediaType
 }
 
 func isSchemaRenderFailure(result *Result) bool {
