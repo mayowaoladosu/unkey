@@ -15,8 +15,10 @@ export const buildStepsRequestSchema = z.object({
 });
 
 export const buildStepLogsRequestSchema = buildStepsRequestSchema.extend({
-  stepIds: z.array(z.string()),
-  limit: z.number().int().positive().default(20),
+  stepId: z.string().min(1),
+  cursor: z.number().int().nonnegative().default(0),
+  // Callers fetch one extra row to determine whether another page exists.
+  limit: z.number().int().positive().max(501).default(201),
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -80,9 +82,10 @@ export function getBuildStepLogs(ch: Querier) {
         WHERE workspace_id = {workspaceId: String}
           AND project_id = {projectId: String}
           AND deployment_id = {deploymentId: String}
-          AND step_id IN {stepIds: Array(String)}
-        ORDER BY time ASC, step_id ASC
-        LIMIT {limit: Int}`,
+          AND step_id = {stepId: String}
+        ORDER BY time DESC, message DESC
+        LIMIT {limit: Int}
+        OFFSET {cursor: Int}`,
       params: buildStepLogsRequestSchema,
       schema: buildStepLogSchema,
     });

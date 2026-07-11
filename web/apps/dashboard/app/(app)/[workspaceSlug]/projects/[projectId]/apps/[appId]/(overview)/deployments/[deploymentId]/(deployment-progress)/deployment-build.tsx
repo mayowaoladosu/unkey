@@ -27,7 +27,6 @@ export function DeploymentBuild() {
   const buildSteps = trpc.deploy.deployment.buildSteps.useQuery(
     {
       deploymentId: deployment.id,
-      includeStepLogs: true,
     },
     {
       refetchInterval: 1_000,
@@ -47,6 +46,7 @@ export function DeploymentBuild() {
           expandable={
             <div className="bg-grayA-2">
               <DeploymentBuildStepsTable
+                deploymentId={deployment.id}
                 steps={buildSteps.data?.steps ?? []}
                 isLoading={buildSteps.isLoading}
                 fixedHeight={750}

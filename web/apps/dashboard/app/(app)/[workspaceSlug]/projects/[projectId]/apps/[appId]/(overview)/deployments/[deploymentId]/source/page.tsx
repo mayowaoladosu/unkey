@@ -13,7 +13,6 @@ export default function DeploymentSourcePage() {
   });
   const build = trpc.deploy.deployment.buildSteps.useQuery({
     deploymentId: deployment.id,
-    includeStepLogs: false,
   });
 
   return (

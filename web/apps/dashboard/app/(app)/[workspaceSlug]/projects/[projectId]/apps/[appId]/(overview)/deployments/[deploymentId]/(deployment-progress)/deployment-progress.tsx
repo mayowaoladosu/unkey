@@ -34,7 +34,6 @@ export function DeploymentProgress({ stepsData }: { stepsData?: StepsData }) {
   const buildSteps = trpc.deploy.deployment.buildSteps.useQuery(
     {
       deploymentId: deployment.id,
-      includeStepLogs: true,
     },
     {
       refetchInterval: 1_000,
@@ -221,6 +220,7 @@ export function DeploymentProgress({ stepsData }: { stepsData?: StepsData }) {
             isPrebuilt ? null : (
               <div className="bg-grayA-2">
                 <DeploymentBuildStepsTable
+                  deploymentId={deployment.id}
                   steps={buildSteps.data?.steps ?? []}
                   isLoading={buildSteps.isLoading}
                   focusStep={buildFocus}
@@ -240,7 +240,7 @@ export function DeploymentProgress({ stepsData }: { stepsData?: StepsData }) {
             deploying ? (
               <div className="bg-grayA-2">
                 <DeploymentContainerLogsTable
-                  logs={deploymentRuntimeLogs.data?.logs ?? []}
+                  logs={[...(deploymentRuntimeLogs.data?.logs ?? [])].reverse()}
                   isLoading={deploymentRuntimeLogs.isLoading}
                 />
               </div>

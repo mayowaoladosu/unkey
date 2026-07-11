@@ -5,9 +5,9 @@ import { TRPCError } from "@trpc/server";
 import { buildStepLogSchema, buildStepSchema } from "@unkey/clickhouse/src/build-steps";
 import { z } from "zod";
 
-const buildStepWithLogsSchema = buildStepSchema.omit({ error: true }).extend({
+const MAX_LOG_PAGE_SIZE = 500;
+const buildStepOutputSchema = buildStepSchema.omit({ error: true }).extend({
   error: z.string().nullable(),
-  logs: z.array(buildStepLogSchema.pick({ time: true, message: true })).optional(),
 });
 
 export const getDeploymentBuildSteps = workspaceProcedure
@@ -15,12 +15,11 @@ export const getDeploymentBuildSteps = workspaceProcedure
   .input(
     z.object({
       deploymentId: z.string(),
-      includeStepLogs: z.boolean().default(false),
     }),
   )
   .output(
     z.object({
-      steps: z.array(buildStepWithLogsSchema),
+      steps: z.array(buildStepOutputSchema),
     }),
   )
   .query(async ({ ctx, input }) => {
@@ -50,35 +49,58 @@ export const getDeploymentBuildSteps = workspaceProcedure
       });
     }
 
-    const steps = stepsResult.val;
+    return { steps: stepsResult.val };
+  });
 
-    // Optionally fetch logs for steps that have them
-    if (input.includeStepLogs && steps.length > 0) {
-      const stepIdsWithLogs = steps.filter((s) => s.has_logs).map((s) => s.step_id);
-
-      if (stepIdsWithLogs.length > 0) {
-        const logsResult = await clickhouse.buildSteps.getLogs({
-          workspaceId: deployment.workspaceId,
-          projectId: deployment.projectId,
-          deploymentId: input.deploymentId,
-          stepIds: stepIdsWithLogs,
-          limit: 20,
-        });
-
-        if (!logsResult.err) {
-          // Nest logs under each step
-          return {
-            steps: steps.map((step) => ({
-              ...step,
-              logs: logsResult.val
-                .filter((log) => log.step_id === step.step_id)
-                .map((log) => ({ time: log.time, message: log.message })),
-            })),
-          };
-        }
-      }
+export const getDeploymentBuildStepLogs = workspaceProcedure
+  .use(withRatelimit(ratelimit.read))
+  .input(
+    z.object({
+      deploymentId: z.string(),
+      stepId: z.string().min(1),
+      cursor: z.number().int().nonnegative().default(0),
+      limit: z.number().int().min(1).max(MAX_LOG_PAGE_SIZE).default(200),
+    }),
+  )
+  .output(
+    z.object({
+      // Rows are newest-first so page offsets remain stable once the step has
+      // completed. The client reverses loaded pages for terminal-style output.
+      logs: z.array(buildStepLogSchema.pick({ time: true, message: true })),
+      nextCursor: z.number().int().nonnegative().nullable(),
+    }),
+  )
+  .query(async ({ ctx, input }) => {
+    const deployment = await db.query.deployments.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.id, input.deploymentId), eq(table.workspaceId, ctx.workspace.id)),
+    });
+    if (!deployment) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Deployment not found",
+      });
     }
 
-    // Return steps without logs
-    return { steps };
+    const result = await clickhouse.buildSteps.getLogs({
+      workspaceId: deployment.workspaceId,
+      projectId: deployment.projectId,
+      deploymentId: deployment.id,
+      stepId: input.stepId,
+      cursor: input.cursor,
+      limit: input.limit + 1,
+    });
+
+    if (result.err) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch build step logs",
+      });
+    }
+
+    const hasMore = result.val.length > input.limit;
+    return {
+      logs: result.val.slice(0, input.limit).map(({ time, message }) => ({ time, message })),
+      nextCursor: hasMore ? input.cursor + input.limit : null,
+    };
   });

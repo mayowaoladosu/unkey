@@ -15,6 +15,7 @@ import {
 } from "./skeletons";
 
 type Props = {
+  deploymentId: string;
   steps: BuildStepRow[];
   isLoading: boolean;
   fixedHeight?: number;
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export const DeploymentBuildStepsTable: React.FC<Props> = ({
+  deploymentId,
   steps,
   isLoading,
   fixedHeight = 500,
@@ -81,7 +83,9 @@ export const DeploymentBuildStepsTable: React.FC<Props> = ({
         rowClassName={getBuildStepRowClass}
         onRowClick={toggleExpand}
         renderExpanded={(step) =>
-          expandedIds.has(step.step_id) ? <BuildStepLogsExpanded step={step} /> : null
+          expandedIds.has(step.step_id) ? (
+            <BuildStepLogsExpanded deploymentId={deploymentId} step={step} />
+          ) : null
         }
         renderSkeletonCell={(col) => {
           switch (col.key) {

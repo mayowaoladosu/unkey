@@ -44,7 +44,10 @@ import { deleteCustomDomain } from "./deploy/custom-domains/delete";
 import { listCustomDomains } from "./deploy/custom-domains/list";
 import { retryVerification } from "./deploy/custom-domains/retry";
 import { authorizeDeployment } from "./deploy/deployment/authorize";
-import { getDeploymentBuildSteps } from "./deploy/deployment/build-steps";
+import {
+  getDeploymentBuildStepLogs,
+  getDeploymentBuildSteps,
+} from "./deploy/deployment/build-steps";
 import { cancelDeployment } from "./deploy/deployment/cancel";
 import { createDeploy } from "./deploy/deployment/create-deploy";
 import { getDeploymentSteps } from "./deploy/deployment/deployment-steps";
@@ -555,6 +558,7 @@ export const router = t.router({
       getById: getDeploymentById,
       resources: getDeploymentResources,
       buildSteps: getDeploymentBuildSteps,
+      buildStepLogs: getDeploymentBuildStepLogs,
       runtimeLogs: getDeploymentRuntimeLogs,
       instanceEvents: getDeploymentInstanceEvents,
       steps: getDeploymentSteps,
