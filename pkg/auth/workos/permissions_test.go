@@ -147,7 +147,7 @@ func TestTranslatePermissionsGolden(t *testing.T) {
 	got := strings.Join(translated, "\n") + "\n"
 	want, err := os.ReadFile("testdata/permissions.golden")
 	require.NoError(t, err)
-	require.Equal(t, string(want), got)
+	require.Equal(t, strings.ReplaceAll(string(want), "\r\n", "\n"), got)
 }
 
 // TestSortedPermissionSlugs guarantees generated definitions consume a
