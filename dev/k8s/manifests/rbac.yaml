@@ -42,6 +42,11 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+  # CronJob management for scheduled deployment resources
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
   # Deployment CRD management
   - apiGroups: ["kubernetes.unkey.com"]
     resources: ["deployments", "deployments/status"]

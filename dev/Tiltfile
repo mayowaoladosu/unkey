@@ -6,7 +6,8 @@ load('ext://helm_remote', 'helm_remote')
 # watchers can exhaust WSL memory. Backend builds share cache, so serialize them.
 update_settings(max_parallel_updates=1)
 
-BACKEND_IMAGE_IGNORES = ['web']
+DATABASE_IMAGE_IGNORES = ['web', 'dev/e2e']
+BACKEND_IMAGE_IGNORES = ['web', 'dev']
 
 config.define_string('topolvm_backing_size')
 cfg = config.parse()
@@ -283,7 +284,7 @@ k8s_yaml('k8s/manifests/redis.yaml')
 k8s_resource('redis', port_forwards='6379:6379', resource_deps=[], labels=['database'])
 
 # MySQL service
-docker_build('unkey/mysql:local', '..', dockerfile='./Dockerfile.mysql', ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/mysql:local', '..', dockerfile='./Dockerfile.mysql', ignore=DATABASE_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/mysql.yaml')
 k8s_resource('mysql', port_forwards='3306:3306', resource_deps=[], labels=['database'])
 
@@ -295,7 +296,7 @@ local_resource(
 )
 
 # ClickHouse service
-docker_build('unkey/clickhouse:local', '..', dockerfile='./Dockerfile.clickhouse', ignore=BACKEND_IMAGE_IGNORES)
+docker_build('unkey/clickhouse:local', '..', dockerfile='./Dockerfile.clickhouse', ignore=DATABASE_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/clickhouse.yaml')
 k8s_resource('clickhouse', port_forwards=['8123:8123','9000:9000'], resource_deps=[], labels=['database'])
 
@@ -420,7 +421,7 @@ k8s_yaml('k8s/manifests/krane.yaml')
 k8s_resource(
   'krane',
   port_forwards='8070:8070',
-  resource_deps=['ctrl-api', 'rbac', 'namespace', 'cilium-policies', 'depot-credentials', 'topolvm-storageclass'],
+  resource_deps=['ctrl-api', 'rbac', 'namespace', 'cilium-policies', 'topolvm-storageclass'],
   labels=['unkey'],
   auto_init=True,
   trigger_mode=TRIGGER_MODE_AUTO
@@ -466,8 +467,24 @@ local_resource(
     'dashboard',
     serve_cmd='''
       set -a
+  [ -f ./.env.seed ] && . ./.env.seed
       [ -f ./.env.github ] && . ./.env.github
       [ -f ./.github-private-key.pem ] && export UNKEY_GITHUB_PRIVATE_KEY_PEM="$(cat ./.github-private-key.pem)"
+  export DATABASE_HOST="${DATABASE_HOST:-127.0.0.1:3306}"
+  export DATABASE_USERNAME="${DATABASE_USERNAME:-unkey}"
+  export DATABASE_PASSWORD="${DATABASE_PASSWORD:-password}"
+  export UNKEY_WORKSPACE_ID="${UNKEY_WORKSPACE_ID:-ws_local}"
+  export UNKEY_API_ID="${UNKEY_API_ID:-api_local}"
+  export UNKEY_API_URL="${UNKEY_API_URL:-http://localhost:7070}"
+  export UNKEY_JWT_SECRET="${UNKEY_JWT_SECRET:-local-dev-jwt-secret-with-at-least-32-bytes}"
+  export CTRL_URL="${CTRL_URL:-http://127.0.0.1:7091}"
+  export CTRL_API_KEY="${CTRL_API_KEY:-your-local-dev-key}"
+  export VAULT_URL="${VAULT_URL:-http://localhost:8060}"
+  export VAULT_TOKEN="${VAULT_TOKEN:-vault-test-token-123}"
+  export CLICKHOUSE_URL="${CLICKHOUSE_URL:-http://default:password@127.0.0.1:8123/default}"
+  export AUTH_PROVIDER="${AUTH_PROVIDER:-local}"
+  export SENTRY_DISABLED="${SENTRY_DISABLED:-true}"
+  export NEXT_PUBLIC_SENTRY_DISABLED="${NEXT_PUBLIC_SENTRY_DISABLED:-true}"
       export GITHUB_APP_ID="$UNKEY_GITHUB_APP_ID"
       set +a
       cd ../web && pnpm --filter=@unkey/dashboard dev

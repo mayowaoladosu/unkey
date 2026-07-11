@@ -1,0 +1,41 @@
+[
+  {
+    "kind": "container",
+    "name": "web",
+    "port": 8080,
+    "upstreamProtocol": "http1",
+    "command": ["node", "web.js"],
+    "public": true,
+    "bindings": [
+      { "name": "API", "resource": "api", "protocol": "http" },
+      { "name": "FUNCTION", "resource": "function", "protocol": "http" }
+    ]
+  },
+  {
+    "kind": "container",
+    "name": "api",
+    "port": 8081,
+    "upstreamProtocol": "http1",
+    "command": ["node", "api.js"]
+  },
+  {
+    "kind": "function",
+    "name": "function",
+    "runtime": "node",
+    "handler": "function.handler"
+  },
+  {
+    "kind": "worker",
+    "name": "worker",
+    "command": ["node", "worker.js"],
+    "bindings": [
+      { "name": "API", "resource": "api", "protocol": "http" }
+    ]
+  },
+  {
+    "kind": "cron",
+    "name": "cron",
+    "command": ["node", "cron.js"],
+    "schedule": "* * * * *"
+  }
+]
