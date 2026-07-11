@@ -35,6 +35,7 @@ const (
 	OutputKindStatic    OutputKind = "static"
 	OutputKindFunction  OutputKind = "function"
 	OutputKindWorker    OutputKind = "worker"
+	OutputKindCron      OutputKind = "cron"
 )
 
 type RouteKind string
@@ -73,6 +74,9 @@ type Output struct {
 	SPAFallback      bool       `json:"spaFallback,omitempty"`
 	Runtime          string     `json:"runtime,omitempty"`
 	Handler          string     `json:"handler,omitempty"`
+	Command          []string   `json:"command,omitempty"`
+	Schedule         string     `json:"schedule,omitempty"`
+	Public           bool       `json:"public,omitempty"`
 }
 
 type Runtime struct {
@@ -221,9 +225,18 @@ func validate(plan Plan) error {
 	if len(plan.Outputs) == 0 {
 		return fmt.Errorf("deployment manifest requires at least one output")
 	}
+	outputNames := make(map[string]struct{}, len(plan.Outputs))
+	publicOutputs := 0
 	for _, output := range plan.Outputs {
 		if output.Name == "" {
 			return fmt.Errorf("deployment output requires a name")
+		}
+		if _, exists := outputNames[output.Name]; exists {
+			return fmt.Errorf("deployment output name %q is duplicated", output.Name)
+		}
+		outputNames[output.Name] = struct{}{}
+		if output.Public {
+			publicOutputs++
 		}
 		switch output.Kind {
 		case OutputKindContainer:
@@ -239,10 +252,25 @@ func validate(plan Plan) error {
 				return fmt.Errorf("function output %q requires runtime and handler", output.Name)
 			}
 		case OutputKindWorker:
-			// Workers are materialized by a runtime adapter and require no route.
+			if len(output.Command) == 0 {
+				return fmt.Errorf("worker output %q requires a command", output.Name)
+			}
+			if output.Public {
+				return fmt.Errorf("worker output %q cannot be public", output.Name)
+			}
+		case OutputKindCron:
+			if output.Schedule == "" || len(output.Command) == 0 {
+				return fmt.Errorf("cron output %q requires a schedule and command", output.Name)
+			}
+			if output.Public {
+				return fmt.Errorf("cron output %q cannot be public", output.Name)
+			}
 		default:
 			return fmt.Errorf("unsupported output kind %q", output.Kind)
 		}
+	}
+	if publicOutputs > 1 {
+		return fmt.Errorf("deployment manifest supports at most one public output")
 	}
 	return nil
 }

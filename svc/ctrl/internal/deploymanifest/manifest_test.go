@@ -89,3 +89,64 @@ func TestCompileProducesCanonicalImmutableManifest(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, compiled.Manifest, parsed)
 }
+
+func TestCompileSupportsOneImageServicesWorkersAndCron(t *testing.T) {
+	compiled, err := Compile(Plan{
+		Source: Source{
+			Kind:       SourceKindGit,
+			Repository: "Layerrail/commerce",
+			CommitSHA:  "0123456789abcdef0123456789abcdef01234567",
+		},
+		Build: Build{Strategy: BuildStrategyRailpack},
+		Outputs: []Output{
+			{
+				Kind:             OutputKindContainer,
+				Name:             "web",
+				Port:             3000,
+				UpstreamProtocol: "http1",
+				Command:          []string{"node", "server.js"},
+				Public:           true,
+			},
+			{
+				Kind:    OutputKindWorker,
+				Name:    "emails",
+				Command: []string{"node", "worker.js"},
+			},
+			{
+				Kind:     OutputKindCron,
+				Name:     "cleanup",
+				Command:  []string{"node", "cleanup.js"},
+				Schedule: "0 * * * *",
+			},
+		},
+		Runtime: Runtime{
+			CpuMillicores:  250,
+			MemoryMib:      256,
+			ShutdownSignal: "SIGTERM",
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, compiled.Manifest.Outputs, 3)
+	require.Equal(t, OutputKindContainer, compiled.Manifest.Outputs[0].Kind)
+	require.Equal(t, OutputKindCron, compiled.Manifest.Outputs[1].Kind)
+	require.Equal(t, OutputKindWorker, compiled.Manifest.Outputs[2].Kind)
+
+	_, err = Compile(Plan{
+		Source: Source{Kind: SourceKindDockerImage, DockerImage: "example.com/app:latest"},
+		Build:  Build{Strategy: BuildStrategyPrebuilt},
+		Outputs: []Output{
+			{Kind: OutputKindContainer, Name: "web", Port: 3000, Public: true},
+			{Kind: OutputKindContainer, Name: "admin", Port: 3001, Public: true},
+		},
+	})
+	require.ErrorContains(t, err, "at most one public output")
+
+	_, err = Compile(Plan{
+		Source: Source{Kind: SourceKindDockerImage, DockerImage: "example.com/app:latest"},
+		Build:  Build{Strategy: BuildStrategyPrebuilt},
+		Outputs: []Output{
+			{Kind: OutputKindWorker, Name: "worker"},
+		},
+	})
+	require.ErrorContains(t, err, "requires a command")
+}
