@@ -51,6 +51,7 @@ export default function DeployPage() {
   const [mode, setMode] = useState<SourceMode>("github");
   const [search, setSearch] = useState("");
   const [selectedRepository, setSelectedRepository] = useState<Repository | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectSlug, setProjectSlug] = useState("");
   const [image, setImage] = useState("");
@@ -60,6 +61,16 @@ export default function DeployPage() {
     enabled: installations.data?.hasInstallation === true,
     refetchOnWindowFocus: false,
   });
+  const repositoryDetails = trpc.github.getWorkspaceRepositoryDetails.useQuery(
+    {
+      installationId: selectedRepository?.installationId ?? 0,
+      repositoryId: selectedRepository?.id ?? 0,
+    },
+    {
+      enabled: selectedRepository !== null,
+      refetchOnWindowFocus: false,
+    },
+  );
   const prepareInstallation = trpc.github.prepareInstallation.useMutation();
   const initialize = trpc.deploy.project.initialize.useMutation({
     onSuccess: async (result) => {
@@ -95,6 +106,7 @@ export default function DeployPage() {
 
   const selectRepository = (repository: Repository) => {
     setSelectedRepository(repository);
+    setSelectedBranch(repository.defaultBranch);
     setProjectName(repository.name);
     setProjectSlug(normalizeProjectSlug(repository.name));
   };
@@ -120,7 +132,9 @@ export default function DeployPage() {
   const validSlug =
     projectSlug.length >= 3 && projectSlug.length <= 256 && /^[a-z0-9-]+$/.test(projectSlug);
   const validSource =
-    mode === "github" ? selectedRepository !== null : image.trim().length > 0 && !/\s/.test(image);
+    mode === "github"
+      ? selectedRepository !== null && selectedBranch.length > 0
+      : image.trim().length > 0 && !/\s/.test(image);
   const canContinue = validName && validSlug && validSource && !initialize.isLoading;
 
   const continueToConfiguration = () => {
@@ -136,7 +150,7 @@ export default function DeployPage() {
               type: "github",
               installationId: selectedRepository.installationId,
               repositoryId: selectedRepository.id,
-              branch: selectedRepository.defaultBranch,
+              branch: selectedBranch,
             }
           : { type: "image", image: image.trim() },
     });
@@ -235,6 +249,29 @@ export default function DeployPage() {
                         placeholder="my-project"
                       />
                     </Field>
+                    {mode === "github" && selectedRepository ? (
+                      <Field label="Production branch" hint="First deployment source">
+                        <select
+                          className={fieldClass}
+                          value={selectedBranch}
+                          disabled={repositoryDetails.isLoading}
+                          onChange={(event) => setSelectedBranch(event.target.value)}
+                        >
+                          {(repositoryDetails.data?.branches ?? [
+                            { name: selectedRepository.defaultBranch, lastPushDate: null },
+                          ]).map((branch) => (
+                            <option key={branch.name} value={branch.name}>
+                              {branch.name}
+                            </option>
+                          ))}
+                        </select>
+                        {repositoryDetails.isError ? (
+                          <span className="text-[11px] font-normal text-warning-11">
+                            Branches could not be refreshed. The repository default remains selected.
+                          </span>
+                        ) : null}
+                      </Field>
+                    ) : null}
 
                     <div className="rounded-lg border border-grayA-4 bg-grayA-2 p-3 text-xs">
                       <SummaryRow
@@ -247,7 +284,7 @@ export default function DeployPage() {
                       />
                       <SummaryRow
                         label="Branch"
-                        value={mode === "github" ? selectedRepository?.defaultBranch ?? "—" : "—"}
+                        value={mode === "github" ? selectedBranch || "—" : "—"}
                       />
                       <SummaryRow label="Environment" value="Production" />
                       <SummaryRow label="Build" value={mode === "github" ? "Auto-detect" : "Use image"} />

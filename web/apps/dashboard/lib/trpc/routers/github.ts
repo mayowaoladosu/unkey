@@ -240,6 +240,38 @@ const fetchProjectInstallation = async (
   };
 };
 
+const collectRepositoryBranches = async (
+  installationId: number,
+  owner: string,
+  repo: string,
+  defaultBranch: string,
+) => {
+  const [activeBranches, alphabeticalBranches] = await Promise.all([
+    getMostActiveBranches(installationId, owner, repo).catch((): BranchActivity[] => []),
+    getRepositoryBranches(installationId, owner, repo, MAX_BRANCHES),
+  ]);
+  const activityMap = new Map(activeBranches.map((branch) => [branch.name, branch.lastPushDate]));
+  const seen = new Set<string>();
+  const branches: Array<{ name: string; lastPushDate: string | null }> = [];
+
+  for (const branch of activeBranches) {
+    if (!seen.has(branch.name)) {
+      seen.add(branch.name);
+      branches.push({ name: branch.name, lastPushDate: branch.lastPushDate });
+    }
+  }
+  for (const branch of alphabeticalBranches) {
+    if (!seen.has(branch.name) && branches.length < MAX_BRANCHES) {
+      seen.add(branch.name);
+      branches.push({ name: branch.name, lastPushDate: activityMap.get(branch.name) ?? null });
+    }
+  }
+  if (!seen.has(defaultBranch)) {
+    branches.unshift({ name: defaultBranch, lastPushDate: null });
+  }
+  return branches;
+};
+
 export const githubRouter = t.router({
   hasInstallations: workspaceProcedure.query(async ({ ctx }) => {
     const installation = await db.query.githubAppInstallations.findFirst({
@@ -546,6 +578,51 @@ export const githubRouter = t.router({
 
     return { repositories };
   }),
+
+  getWorkspaceRepositoryDetails: workspaceProcedure
+    .input(
+      z.object({
+        installationId: z.number().int().positive(),
+        repositoryId: z.number().int().positive(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const installation = await db.query.githubAppInstallations.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.workspaceId, ctx.workspace.id),
+            eq(table.installationId, input.installationId),
+          ),
+        columns: { pk: true },
+      });
+      if (!installation) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "GitHub installation not found for this workspace",
+        });
+      }
+
+      const repository = await getRepositoryById(input.installationId, input.repositoryId);
+      if (!repository) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "GitHub repository not found" });
+      }
+      const [owner, repo] = repository.full_name.split("/");
+      if (!owner || !repo) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid GitHub repository name" });
+      }
+
+      return {
+        repositoryFullName: repository.full_name,
+        defaultBranch: repository.default_branch,
+        pushedAt: repository.pushed_at,
+        branches: await collectRepositoryBranches(
+          input.installationId,
+          owner,
+          repo,
+          repository.default_branch,
+        ),
+      };
+    }),
 
   getRepoTree: workspaceProcedure
     .input(z.object({ projectId: z.string(), appId: z.string().min(1) }))
@@ -904,35 +981,15 @@ export const githubRouter = t.router({
         });
       }
 
-      const [repoData, activeBranches, alphabeticalBranches] = await Promise.all([
+      const [repoData, branches] = await Promise.all([
         getRepository(input.installationId, input.owner, input.repo),
-        getMostActiveBranches(input.installationId, input.owner, input.repo).catch(
-          (): BranchActivity[] => [],
+        collectRepositoryBranches(
+          input.installationId,
+          input.owner,
+          input.repo,
+          input.defaultBranch,
         ),
-        getRepositoryBranches(input.installationId, input.owner, input.repo, MAX_BRANCHES),
       ]);
-
-      const activityMap = new Map(activeBranches.map((b) => [b.name, b.lastPushDate]));
-      const seen = new Set<string>();
-      const branches: Array<{ name: string; lastPushDate: string | null }> = [];
-
-      for (const b of activeBranches) {
-        if (!seen.has(b.name)) {
-          seen.add(b.name);
-          branches.push({ name: b.name, lastPushDate: b.lastPushDate });
-        }
-      }
-
-      for (const b of alphabeticalBranches) {
-        if (!seen.has(b.name) && branches.length < MAX_BRANCHES) {
-          seen.add(b.name);
-          branches.push({ name: b.name, lastPushDate: activityMap.get(b.name) ?? null });
-        }
-      }
-
-      if (!seen.has(input.defaultBranch)) {
-        branches.unshift({ name: input.defaultBranch, lastPushDate: null });
-      }
 
       return {
         branches,
