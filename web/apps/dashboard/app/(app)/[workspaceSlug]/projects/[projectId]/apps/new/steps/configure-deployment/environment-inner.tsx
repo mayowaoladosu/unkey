@@ -188,7 +188,13 @@ function useInitializeSettings(
 
     if (mutations.length > 0) {
       Promise.all(mutations)
-        .then(() => setSettingsInitialized(true))
+        .then(async () => {
+          // The mutations bypass the collection's onUpdate handler, so its
+          // bootstrap snapshot still contains zero values until explicitly
+          // refreshed. Never render deploy controls against that stale state.
+          await collection.environmentSettings.utils.refetch();
+          setSettingsInitialized(true);
+        })
         .catch((err) => {
           const message = err instanceof Error ? err.message : "An unexpected error occurred";
           setInitializationError(message);

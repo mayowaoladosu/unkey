@@ -90,10 +90,6 @@ spec:
     spec:
       serviceAccountName: unkey-serviceaccount
       volumes:
-        - name: docker-socket
-          hostPath:
-            path: /var/run/docker.sock
-            type: Socket
         - name: config
           configMap:
             name: ctrl-worker-config
@@ -101,7 +97,7 @@ spec:
         - name: ctrl-worker
           image: unkey/control-worker:dev
           args: ["--config", "/etc/unkey/unkey.toml"]
-          imagePullPolicy: Never # Use local images
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9080
           livenessProbe:
@@ -152,8 +148,6 @@ spec:
             - name: FORCE_DEPLOYMENT_APPROVAL
               value: "false"
           volumeMounts:
-            - name: docker-socket
-              mountPath: /var/run/docker.sock
             - name: config
               mountPath: /etc/unkey
               readOnly: true

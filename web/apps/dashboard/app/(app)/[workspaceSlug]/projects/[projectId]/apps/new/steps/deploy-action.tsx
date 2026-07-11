@@ -1,6 +1,7 @@
 "use client";
 
 import { queryClient } from "@/lib/collections/client";
+import { dismissSettingsBanner } from "@/lib/collections/deploy/environment-settings";
 import { trpc } from "@/lib/trpc/client";
 import { Button, toast, useStepWizard } from "@unkey/ui";
 
@@ -24,6 +25,7 @@ export const DeployAction = ({
   const deploy = trpc.deploy.deployment.create.useMutation({
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: ["deployments", projectId] });
+      dismissSettingsBanner();
       toast.success("Deployment triggered", {
         description: "Your app is being built and deployed",
       });

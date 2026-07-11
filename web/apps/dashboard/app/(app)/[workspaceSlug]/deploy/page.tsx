@@ -57,8 +57,9 @@ export default function DeployPage() {
   const [image, setImage] = useState("");
 
   const installations = trpc.github.hasInstallations.useQuery();
+  const hasGithubInstallation = installations.data?.hasInstallation === true;
   const repositories = trpc.github.listWorkspaceRepositories.useQuery(undefined, {
-    enabled: installations.data?.hasInstallation === true,
+    enabled: hasGithubInstallation,
     refetchOnWindowFocus: false,
   });
   const repositoryDetails = trpc.github.getWorkspaceRepositoryDetails.useQuery(
@@ -205,8 +206,10 @@ export default function DeployPage() {
               <section className="min-w-0 rounded-xl border border-grayA-5 bg-gray-1 shadow-sm">
                 {mode === "github" ? (
                   <GithubSource
-                    connected={installations.data?.hasInstallation === true}
-                    loading={installations.isLoading || repositories.isLoading}
+                    connected={hasGithubInstallation}
+                    loading={
+                      installations.isLoading || (hasGithubInstallation && repositories.isLoading)
+                    }
                     error={repositories.error?.message}
                     repositories={visibleRepositories}
                     selectedRepository={selectedRepository}
@@ -251,12 +254,14 @@ export default function DeployPage() {
                     </Field>
                     {mode === "github" && selectedRepository ? (
                       <Field label="Production branch" hint="First deployment source">
-                        <select
+                        <input
                           className={fieldClass}
                           value={selectedBranch}
-                          disabled={repositoryDetails.isLoading}
+                          list={`repository-branches-${selectedRepository.id}`}
                           onChange={(event) => setSelectedBranch(event.target.value)}
-                        >
+                          placeholder={selectedRepository.defaultBranch}
+                        />
+                        <datalist id={`repository-branches-${selectedRepository.id}`}>
                           {(repositoryDetails.data?.branches ?? [
                             { name: selectedRepository.defaultBranch, lastPushDate: null },
                           ]).map((branch) => (
@@ -264,7 +269,12 @@ export default function DeployPage() {
                               {branch.name}
                             </option>
                           ))}
-                        </select>
+                        </datalist>
+                        {repositoryDetails.isLoading ? (
+                          <span className="text-[11px] font-normal text-gray-9">
+                            Loading recently active branches…
+                          </span>
+                        ) : null}
                         {repositoryDetails.isError ? (
                           <span className="text-[11px] font-normal text-warning-11">
                             Branches could not be refreshed. The repository default remains selected.
@@ -555,8 +565,8 @@ function ImageSource({ image, onImageChange }: { image: string; onImageChange: (
           <Capability title="Full controls" description="Configure regions and resources" />
         </div>
         <div className="mt-5 rounded-lg border border-grayA-5 bg-grayA-2 p-4 text-xs leading-5 text-gray-10">
-          The registry must be reachable by the build cluster. Private registry credentials can be
-          configured before production deployment.
+          The registry must be reachable by the build cluster. Pin a digest instead of a mutable
+          tag when the release must be exactly reproducible.
         </div>
       </div>
     </>
