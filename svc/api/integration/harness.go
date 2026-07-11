@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -102,6 +103,12 @@ func New(t *testing.T, config Config) *Harness {
 		apiCluster:    nil, // Will be set later
 		counter:       counter.NewMemory(),
 	}
+	t.Cleanup(func() {
+		h.cancel()
+		require.NoError(t, h.counter.Close())
+		require.NoError(t, h.DB.Close())
+		require.NoError(t, h.CH.Close())
+	})
 
 	h.Seed.Seed(ctx)
 
@@ -125,9 +132,38 @@ func (h *Harness) RunAPI(config ApiConfig) *ApiCluster {
 	cluster := &ApiCluster{
 		Addrs: make([]string, config.Nodes),
 	}
+	type runningNode struct {
+		id       int
+		cancel   context.CancelFunc
+		shutdown <-chan error
+	}
+	nodes := make([]runningNode, 0, config.Nodes)
+	var shutdownOnce sync.Once
+	shutdown := func() {
+		shutdownOnce.Do(func() {
+			for _, node := range nodes {
+				node.cancel()
+			}
+
+			timer := time.NewTimer(90 * time.Second)
+			defer timer.Stop()
+			for _, node := range nodes {
+				select {
+				case err := <-node.shutdown:
+					if err != nil {
+						h.t.Errorf("API server %d shutdown failed: %v", node.id, err)
+					}
+				case <-timer.C:
+					h.t.Errorf("API server shutdown timeout: nodes did not stop within 90 seconds")
+					return
+				}
+			}
+		})
+	}
 
 	// Start each API node as a goroutine
 	for i := 0; i < config.Nodes; i++ {
+		nodeID := i
 		// Create ephemeral listener
 		ln, err := net.Listen("tcp", ":0") //nolint: gosec
 		require.NoError(h.t, err, "Failed to create ephemeral listener")
@@ -204,47 +240,55 @@ func (h *Harness) RunAPI(config ApiConfig) *ApiCluster {
 		// Start API server in goroutine
 		ctx, cancel := context.WithCancel(context.Background())
 
-		// Channel to get startup result
+		// Separate startup and shutdown channels let readiness checks observe an
+		// early process failure without consuming the completion signal cleanup
+		// must await.
 		startupResult := make(chan error, 1)
+		shutdownResult := make(chan error, 1)
 
 		go func(nodeID int, cfg api.Config) {
+			var runErr error
 			defer func() {
 				if r := recover(); r != nil {
 					h.t.Logf("API server %d panicked: %v", nodeID, r)
-					startupResult <- fmt.Errorf("panic: %v", r)
+					runErr = fmt.Errorf("panic: %v", r)
 				}
+				if runErr == nil && ctx.Err() == nil {
+					runErr = fmt.Errorf("API server %d stopped before cancellation", nodeID)
+				}
+				if runErr != nil && ctx.Err() == nil {
+					select {
+					case startupResult <- runErr:
+					default:
+					}
+				}
+				shutdownResult <- runErr
 			}()
 
-			// Give some time for the server to indicate it's starting
-			go func() {
-				time.Sleep(500 * time.Millisecond)
-				startupResult <- nil // Indicate startup attempt
-			}()
-
-			err := api.Run(ctx, cfg)
-			if err != nil && ctx.Err() == nil {
-				h.t.Logf("API server %d failed: %v", nodeID, err)
-				select {
-				case startupResult <- err:
-				default:
-				}
+			runErr = api.Run(ctx, cfg)
+			if runErr != nil && ctx.Err() == nil {
+				h.t.Logf("API server %d failed: %v", nodeID, runErr)
 			}
-		}(i, apiConfig)
+		}(nodeID, apiConfig)
 
-		// Wait for startup indication
-		select {
-		case err := <-startupResult:
-			if err != nil {
-				require.NoError(h.t, err, "API server %d startup failed", i)
-			}
-		case <-time.After(2 * time.Second):
-			require.Fail(h.t, "API server %d startup timeout", i)
-		}
+		nodes = append(nodes, runningNode{
+			id:       nodeID,
+			cancel:   cancel,
+			shutdown: shutdownResult,
+		})
+		// Register after the node's vault cleanup so this shared once-guarded
+		// callback runs first, stops every node, and only then releases vaults.
+		h.t.Cleanup(shutdown)
 
 		// Wait for server to start
 		maxAttempts := 30
 		healthURL := fmt.Sprintf("http://%s/v2/liveness", ln.Addr().String())
 		for attempt := range maxAttempts {
+			select {
+			case err := <-startupResult:
+				require.NoError(h.t, err, "API server %d startup failed", nodeID)
+			default:
+			}
 			//nolint:gosec // Health check URL is constructed from controlled Docker container address
 			resp, err := http.Get(healthURL)
 			if err == nil {
@@ -255,17 +299,10 @@ func (h *Harness) RunAPI(config ApiConfig) *ApiCluster {
 				}
 			}
 			if attempt == maxAttempts-1 {
-				require.NoError(h.t, err, "API server %d failed to start", i)
+				require.FailNow(h.t, "API server failed to start", "node %d: %v", nodeID, err)
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-
-		// Register cleanup
-		h.t.Cleanup(func() {
-			cancel()
-			// Note: Don't call ln.Close() here as the zen server
-			// will properly close the listener during graceful shutdown
-		})
 	}
 
 	return cluster
