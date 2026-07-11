@@ -15,9 +15,10 @@ import (
 	rldb "github.com/unkeyed/unkey/internal/services/ratelimit/db"
 )
 
-// newTestDB returns a [mysql.MySQL] handle for a per-test MySQL container.
-// Connection is closed on t.Cleanup. Used by unit tests that need to satisfy
-// [Config.DB] but don't exercise cross-region count propagation directly.
+// newTestDB returns a [mysql.MySQL] handle backed by the shared test MySQL
+// container. The connection pool remains per-test and closes on t.Cleanup.
+// Used by unit tests that need to satisfy [Config.DB] but don't exercise
+// cross-region count propagation directly.
 func newTestDB(t testing.TB) DB {
 	t.Helper()
 
@@ -78,14 +79,10 @@ func (c *failingCounter) Increment(_ context.Context, _ string, _ int64, _ ...ti
 	return 0, c.err
 }
 
-// integrationTestEnv bundles a per-test MySQL container plus both a
-// pkg/mysql database (for handing to [ratelimit.New] under the [DB]
-// interface) and a wrapped ratelimit DB (for direct query assertions).
-// Each test gets independent service instances against the same data
-// plane; that's the multi-region scenario the integration tests assert.
-//
-// Uses a per-test MySQL container so tests that assert on row counts and table
-// contents don't race through shared state.
+// integrationTestEnv bundles a per-test connection pool to the shared MySQL
+// test container plus a wrapped ratelimit DB for direct query assertions.
+// Tests use unique workspace IDs so persistent rows cannot collide across
+// parallel tests or repeated package runs.
 type integrationTestEnv struct {
 	t    *testing.T
 	db   DB
