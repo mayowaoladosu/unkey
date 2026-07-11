@@ -36,6 +36,35 @@ export function hasFrameworkDefaults(defaults: FrameworkDefaults): boolean {
   );
 }
 
+/**
+ * Returns true only for a detected static output that can be accepted without
+ * changing build settings. Unknown or unresolved detections remain advisory.
+ */
+export function canAcceptDetectedOutput(detection: unknown, defaults: FrameworkDefaults): boolean {
+  if (hasFrameworkDefaults(defaults) || !isRecord(detection)) {
+    return false;
+  }
+
+  const preset = detection.preset;
+  const output = detection.output;
+  const unresolvedDecisions = detection.unresolvedDecisions;
+  return (
+    isRecord(preset) &&
+    typeof preset.id === "string" &&
+    preset.id.length > 0 &&
+    isRecord(output) &&
+    output.mode === "static" &&
+    typeof output.directory === "string" &&
+    output.directory.length > 0 &&
+    Array.isArray(unresolvedDecisions) &&
+    unresolvedDecisions.length === 0
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

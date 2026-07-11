@@ -68,6 +68,7 @@ import { listEnvVars } from "./deploy/env-vars/list";
 import { makeSensitive } from "./deploy/env-vars/make-sensitive";
 import { renameEnvVars } from "./deploy/env-vars/rename";
 import { updateEnvVar } from "./deploy/env-vars/update";
+import { acceptFrameworkDetection } from "./deploy/environment-settings/build/accept-framework-detection";
 import { applyFrameworkDefaults } from "./deploy/environment-settings/build/apply-framework-defaults";
 import { updateAutoDeploy } from "./deploy/environment-settings/build/update-auto-deploy";
 import { updateBuildCommand } from "./deploy/environment-settings/build/update-build-command";
@@ -511,6 +512,7 @@ export const router = t.router({
         updateUpstreamProtocol,
       }),
       build: t.router({
+        acceptFrameworkDetection,
         applyFrameworkDefaults,
         updateAutoDeploy,
         updateDockerfile,

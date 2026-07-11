@@ -2,7 +2,7 @@ import { persistFrameworkDetectionAcceptance } from "@/lib/trpc/routers/deploy/e
 import { z } from "zod";
 import { workspaceProcedure } from "../../../../trpc";
 
-export const applyFrameworkDefaults = workspaceProcedure
+export const acceptFrameworkDetection = workspaceProcedure
   .input(
     z.object({
       projectId: z.string().min(1),
@@ -16,6 +16,6 @@ export const applyFrameworkDefaults = workspaceProcedure
       projectId: input.projectId,
       appId: input.appId,
       fingerprint: input.fingerprint,
-      mode: "defaults",
+      mode: "output",
     });
   });

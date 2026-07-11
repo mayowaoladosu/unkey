@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { hasFrameworkDefaults, resolveFrameworkDefaults } from "./framework-defaults";
+import {
+  canAcceptDetectedOutput,
+  hasFrameworkDefaults,
+  resolveFrameworkDefaults,
+} from "./framework-defaults";
 import { detectFramework } from "./framework-detection";
 
 describe("resolveFrameworkDefaults", () => {
@@ -85,5 +89,35 @@ describe("resolveFrameworkDefaults", () => {
       buildCommand: null,
     });
     expect(hasFrameworkDefaults(defaults)).toBe(false);
+  });
+
+  it("allows plain static detection to remain meaningful without setting overrides", () => {
+    const detection = detectFramework({
+      paths: ["index.html", "styles.css"],
+      packageJson: null,
+    });
+    const defaults = resolveFrameworkDefaults(detection);
+
+    expect(detection.preset?.id).toBe("static");
+    expect(detection.output).toEqual({ mode: "static", directory: "." });
+    expect(defaults).toEqual({
+      rootDirectory: ".",
+      dockerfile: null,
+      buildCommand: null,
+    });
+    expect(hasFrameworkDefaults(defaults)).toBe(false);
+    expect(canAcceptDetectedOutput(detection, defaults)).toBe(true);
+    expect(canAcceptDetectedOutput({ ...detection, preset: null }, defaults)).toBe(false);
+    expect(
+      canAcceptDetectedOutput(
+        {
+          ...detection,
+          unresolvedDecisions: [
+            { code: "confirm-framework", message: "Confirm output", options: ["static"] },
+          ],
+        },
+        defaults,
+      ),
+    ).toBe(false);
   });
 });

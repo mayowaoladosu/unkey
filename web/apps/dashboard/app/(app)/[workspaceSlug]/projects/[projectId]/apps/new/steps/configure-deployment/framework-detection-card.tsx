@@ -5,7 +5,7 @@ import {
   useProjectData,
 } from "@/app/(app)/[workspaceSlug]/projects/[projectId]/apps/[appId]/(overview)/data-provider";
 import { collection } from "@/lib/collections";
-import { hasFrameworkDefaults } from "@/lib/deploy/framework-defaults";
+import { canAcceptDetectedOutput, hasFrameworkDefaults } from "@/lib/deploy/framework-defaults";
 import { trpc } from "@/lib/trpc/client";
 import { Button, toast } from "@unkey/ui";
 import { type ReactNode, useEffect, useRef } from "react";
@@ -28,31 +28,43 @@ export const FrameworkDetectionCard = ({
     detectionMutation.mutate({ projectId, appId });
   }, [appId, projectId, detectionMutation]);
 
-  const applyDefaults = trpc.deploy.environmentSettings.build.applyFrameworkDefaults.useMutation({
-    onSuccess: async () => {
+  const afterAcceptance = async (settingsUpdated: boolean) => {
+    if (settingsUpdated) {
       try {
         await collection.environmentSettings.utils.refetch();
       } catch {
         // Remounting below creates a fresh settings subscription even if this
         // eager cache refresh fails.
       }
-      // The server mutation already committed. Always remount the settings
-      // panel so a cache refresh failure cannot leave stale form state.
+      // The server mutation already committed. Remount the settings panel so
+      // a cache refresh failure cannot leave stale form state.
       onDefaultsApplied();
+    }
 
-      try {
-        await detectionMutation.mutateAsync({ projectId, appId });
-      } catch {
-        // Defaults are already persisted and the settings panel has been
-        // refreshed. A failed advisory re-detection must not hide success.
-      }
+    try {
+      await detectionMutation.mutateAsync({ projectId, appId });
+    } catch {
+      // Acceptance is already persisted. A failed advisory re-detection must
+      // not hide success or reset the accepted output.
+    }
 
-      toast.success("Detected settings applied", {
-        description: "The settings remain editable and will be used for the next deployment.",
-      });
-    },
+    toast.success(settingsUpdated ? "Detected settings applied" : "Detected output accepted", {
+      description: settingsUpdated
+        ? "The settings remain editable and will be used for the next deployment."
+        : "The detected output mode will be used for the next deployment.",
+    });
+  };
+
+  const applyDefaults = trpc.deploy.environmentSettings.build.applyFrameworkDefaults.useMutation({
+    onSuccess: ({ settingsUpdated }) => afterAcceptance(settingsUpdated),
     onError: (error) => {
       toast.error("Unable to apply detected settings", { description: error.message });
+    },
+  });
+  const acceptOutput = trpc.deploy.environmentSettings.build.acceptFrameworkDetection.useMutation({
+    onSuccess: ({ settingsUpdated }) => afterAcceptance(settingsUpdated),
+    onError: (error) => {
+      toast.error("Unable to accept detected output", { description: error.message });
     },
   });
 
@@ -67,7 +79,7 @@ export const FrameworkDetectionCard = ({
     );
   }
 
-  if (!detectionMutation.data || detectionMutation.isLoading) {
+  if (!detectionMutation.data || detectionMutation.isPending) {
     return (
       <DetectionShell>
         <p className="text-[13px] font-medium text-gray-12">Analyzing repository...</p>
@@ -90,6 +102,9 @@ export const FrameworkDetectionCard = ({
 
   const { detection, defaults } = result;
   const canApply = hasFrameworkDefaults(defaults);
+  const canAcceptOutput = canAcceptDetectedOutput(detection, defaults);
+  const canConfirm = canApply || canAcceptOutput;
+  const acceptanceMutation = canApply ? applyDefaults : acceptOutput;
   const detectedName = detection.preset?.name ?? "No single framework selected";
   const defaultsList = [
     defaults.rootDirectory && defaults.rootDirectory !== "."
@@ -116,19 +131,23 @@ export const FrameworkDetectionCard = ({
             worker verifies the actual commit before deployment.
           </p>
         </div>
-        {canApply ? (
+        {canConfirm ? (
           <Button
             type="button"
             variant={result.defaultsApplied ? "outline" : "primary"}
             size="sm"
             className="shrink-0"
-            disabled={result.defaultsApplied || applyDefaults.isLoading}
-            loading={applyDefaults.isLoading}
+            disabled={result.defaultsApplied || acceptanceMutation.isPending}
+            loading={acceptanceMutation.isPending}
             onClick={() =>
-              applyDefaults.mutate({ projectId, appId, fingerprint: result.fingerprint })
+              acceptanceMutation.mutate({ projectId, appId, fingerprint: result.fingerprint })
             }
           >
-            {result.defaultsApplied ? "Defaults applied" : "Use detected settings"}
+            {result.defaultsApplied
+              ? "Detection accepted"
+              : canApply
+                ? "Use detected settings"
+                : "Accept detected output"}
           </Button>
         ) : null}
       </div>
