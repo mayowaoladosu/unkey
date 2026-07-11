@@ -6,6 +6,7 @@ import {
 	ArrowDottedRotateAnticlockwise,
 	Ban,
 	Bolt,
+	CloudUp,
 	Minus,
 } from "@unkey/icons";
 import {
@@ -43,6 +44,14 @@ const CancelDialog = dynamic(
 	{ ssr: false },
 );
 
+const PromoteToProductionDialog = dynamic(
+	() =>
+		import(
+			"../components/table/components/actions/promote-to-production-dialog"
+		).then((m) => m.PromoteToProductionDialog),
+	{ ssr: false },
+);
+
 export function DeploymentDetailHeader() {
 	const { deployment } = useDeployment();
 	// Keyed by id so dialog and cancelled state reset when navigation swaps
@@ -64,6 +73,7 @@ function DeploymentDetailHeaderContent({
 	const [isCancelOpen, setIsCancelOpen] = useState(false);
 	const [isStopOpen, setIsStopOpen] = useState(false);
 	const [isWakeOpen, setIsWakeOpen] = useState(false);
+	const [isPromoteToProductionOpen, setIsPromoteToProductionOpen] = useState(false);
 	const [cancelled, setCancelled] = useState(false);
 	const canCancel = isCancellableDeploymentStatus(derivedStatus) && !cancelled;
 	const canRedeploy = isRedeployableDeploymentStatus(derivedStatus);
@@ -71,6 +81,7 @@ function DeploymentDetailHeaderContent({
 	const isNonProduction = environment !== undefined && environment.slug !== "production";
 	const canStop = isNonProduction && derivedStatus === "ready";
 	const canWake = isNonProduction && derivedStatus === "stopped";
+	const canPromoteToProduction = isNonProduction && derivedStatus === "ready";
 
 	const title = deployment.gitCommitMessage || shortenId(deployment.id);
 
@@ -82,6 +93,12 @@ function DeploymentDetailHeaderContent({
 				</PageHeaderTitle>
 			</PageHeaderContent>
 			<PageHeaderActions>
+				{canPromoteToProduction && (
+					<Button variant="primary" onClick={() => setIsPromoteToProductionOpen(true)}>
+						<CloudUp iconSize="sm-medium" />
+						Promote to production
+					</Button>
+				)}
 				{canWake && (
 					<Button variant="primary" onClick={() => setIsWakeOpen(true)}>
 						<Bolt iconSize="sm-medium" />
@@ -133,6 +150,13 @@ function DeploymentDetailHeaderContent({
 				<WakeDialog
 					isOpen={isWakeOpen}
 					onClose={() => setIsWakeOpen(false)}
+					deployment={deployment}
+				/>
+			)}
+			{canPromoteToProduction && (
+				<PromoteToProductionDialog
+					isOpen={isPromoteToProductionOpen}
+					onClose={() => setIsPromoteToProductionOpen(false)}
 					deployment={deployment}
 				/>
 			)}

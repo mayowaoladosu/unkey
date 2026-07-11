@@ -54,6 +54,7 @@ import { getDeploymentInstanceEvents } from "./deploy/deployment/instance-events
 import { listDeployments } from "./deploy/deployment/list";
 import { searchDeployments } from "./deploy/deployment/llm-search";
 import { promote } from "./deploy/deployment/promote";
+import { promoteToProduction } from "./deploy/deployment/promote-to-production";
 import { redeploy } from "./deploy/deployment/redeploy";
 import { getDeploymentResources } from "./deploy/deployment/resources";
 import { rollback } from "./deploy/deployment/rollback";
@@ -561,6 +562,7 @@ export const router = t.router({
       getOpenApiDiff: getOpenApiDiff,
       rollback,
       promote,
+      promoteToProduction,
       redeploy,
       create: createDeploy,
       authorize: authorizeDeployment,
