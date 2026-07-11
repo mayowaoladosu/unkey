@@ -87,10 +87,10 @@ func (w *Workflow) Rollback(ctx restate.ObjectContext, req *hydrav1.RollbackRequ
 		return nil, restate.TerminalError(fmt.Errorf("source deployment is not the current deployment"), 400)
 	}
 
-	// ensure the rolled back deployment does not get spun down from existing scheduled actions
-	_, err = hydrav1.NewDeploymentServiceClient(ctx, targetDeployment.ID).ClearScheduledStateChanges().Request(&hydrav1.ClearScheduledStateChangesRequest{})
-	if err != nil {
-		return nil, err
+	// Retained container deployments are warmed to healthy before the route
+	// swap. Static-only deployments are restored without a rebuild or pod.
+	if err = w.prepareDeploymentForTraffic(ctx, targetDeployment); err != nil {
+		return nil, fmt.Errorf("prepare rollback target for traffic: %w", err)
 	}
 
 	// Get all frontlineRoutes on the current deployment that are sticky

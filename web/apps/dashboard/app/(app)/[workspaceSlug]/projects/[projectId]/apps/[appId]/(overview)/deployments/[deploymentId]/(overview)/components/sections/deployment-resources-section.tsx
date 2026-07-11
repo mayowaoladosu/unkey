@@ -3,17 +3,36 @@
 import { shortenId } from "@/lib/shorten-id";
 import { trpc } from "@/lib/trpc/client";
 import { Cube, Earth, Layers2 } from "@unkey/icons";
-import { CopyButton } from "@unkey/ui";
-import type { ReactNode } from "react";
+import { Button, CopyButton, DialogContainer, toast } from "@unkey/ui";
+import { type ReactNode, useState } from "react";
 import { Section, SectionHeader } from "../../../../../../components/section";
 import { Card } from "../../../../../components/card";
+import { useProjectData } from "../../../../../data-provider";
 import { useDeployment } from "../../../layout-provider";
 
 export function DeploymentResourcesSection() {
   const { deployment } = useDeployment();
+  const { refetchAll } = useProjectData();
+  const [rollbackOpen, setRollbackOpen] = useState(false);
   const resources = trpc.deploy.deployment.resources.useQuery({
     deploymentId: deployment.id,
     projectId: deployment.projectId,
+  });
+  const rollbackTarget = resources.data?.targets.find(
+    (target) => target.kind === "live" && target.isCurrent && target.previousDeploymentId,
+  );
+  const rollback = trpc.deploy.deployment.rollback.useMutation({
+    onSuccess: async () => {
+      await resources.refetch();
+      refetchAll();
+      setRollbackOpen(false);
+      toast.success("Rollback completed", {
+        description: `Traffic now points to ${shortenId(rollbackTarget?.previousDeploymentId ?? "")}.`,
+      });
+    },
+    onError: (error) => {
+      toast.error("Rollback failed", { description: error.message });
+    },
   });
 
   return (
@@ -121,6 +140,19 @@ export function DeploymentResourcesSection() {
               empty="No mutable targets have been assigned yet."
               hasContent={resources.data.targets.length > 0}
             >
+              {rollbackTarget?.previousDeploymentId ? (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-warningA-5 bg-warningA-2 px-3 py-2">
+                  <div>
+                    <p className="text-xs font-medium text-gray-12">Instant rollback available</p>
+                    <p className="mt-0.5 text-[11px] text-gray-10">
+                      Restore {shortenId(rollbackTarget.previousDeploymentId)} without rebuilding.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => setRollbackOpen(true)}>
+                    Roll back
+                  </Button>
+                </div>
+              ) : null}
               <div className="grid gap-2 sm:grid-cols-2">
                 {resources.data.targets.map((target) => (
                   <div key={target.id} className="rounded-md border border-grayA-4 px-3 py-2">
@@ -167,6 +199,42 @@ export function DeploymentResourcesSection() {
           </div>
         )}
       </Card>
+      <DialogContainer
+        isOpen={rollbackOpen}
+        onOpenChange={setRollbackOpen}
+        title="Roll back live traffic"
+        subTitle="Move the live and environment aliases to the retained deployment. No source rebuild will run."
+        footer={
+          <Button
+            type="button"
+            variant="primary"
+            size="xlg"
+            className="w-full rounded-lg"
+            disabled={!rollbackTarget?.previousDeploymentId || rollback.isPending}
+            loading={rollback.isPending}
+            onClick={() => {
+              if (rollbackTarget?.previousDeploymentId) {
+                rollback.mutate({ targetDeploymentId: rollbackTarget.previousDeploymentId });
+              }
+            }}
+          >
+            Roll back to {shortenId(rollbackTarget?.previousDeploymentId ?? "deployment")}
+          </Button>
+        }
+      >
+        <div className="grid gap-3 rounded-lg border border-grayA-4 bg-grayA-2 p-4 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-gray-9">Current</span>
+            <span className="font-mono text-gray-12">{shortenId(deployment.id)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-gray-9">Restore</span>
+            <span className="font-mono text-gray-12">
+              {shortenId(rollbackTarget?.previousDeploymentId ?? "")}
+            </span>
+          </div>
+        </div>
+      </DialogContainer>
     </Section>
   );
 }

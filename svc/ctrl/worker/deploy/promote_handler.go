@@ -114,6 +114,13 @@ func (w *Workflow) Promote(ctx restate.ObjectContext, req *hydrav1.PromoteReques
 		}
 	}
 
+	// Retained deployments may already be scheduled for standby or fully
+	// stopped. Restore them before moving aliases so promotion never points
+	// traffic at an unavailable container. Static artifacts need no warm-up.
+	if err := w.prepareDeploymentForTraffic(ctx, targetDeployment); err != nil {
+		return nil, fault.Wrap(err, fault.Public("The target deployment could not be restored for traffic"))
+	}
+
 	// Atomic swap inside the env-keyed Routing VO. For normal promotion this
 	// reassigns the routes AND swaps current_deployment_id. For
 	// confirm-rollback, routes are empty so it just clears is_rolled_back
@@ -126,13 +133,6 @@ func (w *Workflow) Promote(ctx restate.ObjectContext, req *hydrav1.PromoteReques
 	})
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Public("Failed to swap live deployment"))
-	}
-
-	// Ensure the newly-promoted deployment is not spun down by any pending
-	// standby schedule from when it was previously demoted.
-	_, err = hydrav1.NewDeploymentServiceClient(ctx, targetDeployment.ID).ClearScheduledStateChanges().Request(&hydrav1.ClearScheduledStateChangesRequest{})
-	if err != nil {
-		return nil, fault.Wrap(err, fault.Public("Failed to clear scheduled state changes on the promoted deployment"))
 	}
 
 	// Schedule the deployment that just got demoted for standby. For
