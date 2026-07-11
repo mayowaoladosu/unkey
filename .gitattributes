@@ -1,2 +1,4 @@
 *.tmpl text eol=lf
 *.sh text eol=lf
+pkg/clickhouse/migrations/*.sql text eol=lf
+pkg/clickhouse/migrations/atlas.sum text eol=lf
