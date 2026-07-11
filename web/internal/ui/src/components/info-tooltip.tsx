@@ -1,6 +1,10 @@
-// biome-ignore lint: React in this context is used throughout, so biome will change to types because no APIs are used even though React is needed.
 import React, { type PropsWithChildren } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./tooltip";
 import { cn } from "../lib/utils";
 
 const baseVariant =
@@ -40,9 +44,17 @@ const InfoTooltip = ({
   className?: string;
   triggerClassName?: string;
 }>) => {
+  const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+    }
+  }, [disabled]);
+
   return (
     <TooltipProvider delayDuration={delayDuration ?? undefined}>
-      <Tooltip open={disabled ? false : undefined}>
+      <Tooltip open={!disabled && open} onOpenChange={setOpen}>
         <TooltipTrigger asChild={asChild} className={triggerClassName}>
           {children}
         </TooltipTrigger>

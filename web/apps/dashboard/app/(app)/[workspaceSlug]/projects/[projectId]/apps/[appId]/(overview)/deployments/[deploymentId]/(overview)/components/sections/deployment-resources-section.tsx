@@ -8,6 +8,7 @@ import { type ReactNode, useState } from "react";
 import { Section, SectionHeader } from "../../../../../../components/section";
 import { Card } from "../../../../../components/card";
 import { useProjectData } from "../../../../../data-provider";
+import { dedupeRowsByKey } from "../../../dedupe-row-keys";
 import { useDeployment } from "../../../layout-provider";
 import { lifecycleEventRowKey } from "../../../lifecycle-event-row-key";
 
@@ -473,7 +474,7 @@ function ResourceObservability({
 							pending={events.isLoading}
 							empty="No lifecycle events for this resource yet."
 							rows={(events.data?.events ?? []).map((event) => ({
-									key: lifecycleEventRowKey(event),
+								key: lifecycleEventRowKey(event),
 								lead: new Date(event.time).toLocaleTimeString(),
 								value: event.reason || event.message || event.eventKind,
 								badge: event.eventKind,
@@ -501,6 +502,8 @@ function ObservabilityList({
 	empty: string;
 	rows: Array<{ key: string; lead: string; value: string; badge: string }>;
 }) {
+	const uniqueRows = dedupeRowsByKey(rows);
+
 	return (
 		<div className="rounded-md border border-grayA-4 p-3">
 			<p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-9">
@@ -508,11 +511,11 @@ function ObservabilityList({
 			</p>
 			{pending ? (
 				<div className="h-12 animate-pulse rounded bg-grayA-2" />
-			) : rows.length === 0 ? (
+			) : uniqueRows.length === 0 ? (
 				<p className="text-[11px] text-gray-9">{empty}</p>
 			) : (
 				<div className="grid gap-1.5">
-					{rows.map((row) => (
+					{uniqueRows.map((row) => (
 						<div
 							key={row.key}
 							className="flex min-w-0 items-center gap-2 text-[10px]"

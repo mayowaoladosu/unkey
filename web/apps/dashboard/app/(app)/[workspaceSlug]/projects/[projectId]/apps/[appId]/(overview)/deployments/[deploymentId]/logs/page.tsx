@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { PageBody, toast } from "@unkey/ui";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { DeploymentBuildStepsTable } from "../(deployment-progress)/build-steps-table/deployment-build-steps-table";
+import { dedupeRowsByKey } from "../dedupe-row-keys";
 import { useDeployment } from "../layout-provider";
 import { lifecycleEventRowKey } from "../lifecycle-event-row-key";
 
@@ -89,6 +90,7 @@ export default function DeploymentLogsPage() {
     { refetchInterval: isLive ? 2_000 : false },
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resource changes intentionally reset pagination.
   useEffect(() => {
     setPage(1);
     setAnchorTime(Date.now());
@@ -318,6 +320,8 @@ function TimelineCard({
   headerActions?: ReactNode;
   footer?: ReactNode;
 }) {
+  const uniqueRows = dedupeRowsByKey(rows);
+
   return (
     <section className="overflow-hidden rounded-lg border border-grayA-4 bg-gray-1">
       <header className="flex items-center justify-between gap-3 border-b border-grayA-4 px-4 py-3 text-xs font-medium text-gray-12">
@@ -326,11 +330,11 @@ function TimelineCard({
       </header>
       {pending ? (
         <div className="m-4 h-24 animate-pulse rounded bg-grayA-2" />
-      ) : rows.length === 0 ? (
+      ) : uniqueRows.length === 0 ? (
         <p className="p-4 text-xs text-gray-9">{empty}</p>
       ) : (
         <div className="max-h-[65dvh] divide-y divide-grayA-3 overflow-y-auto">
-          {rows.map((row) => (
+          {uniqueRows.map((row) => (
             <div
               key={row.key}
               className="grid grid-cols-[72px_90px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-[10px]"

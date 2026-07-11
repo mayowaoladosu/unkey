@@ -112,16 +112,16 @@ export const DeploymentBuildStepsTable: React.FC<Props> = ({
               deployment starts building.
             </Empty.Description>
             <Empty.Actions className="mt-4 justify-start">
-              <a
-                href="https://www.unkey.com/docs/introduction"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button size="md">
+              <Button size="md" asChild>
+                <a
+                  href="https://www.unkey.com/docs/introduction"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <BookBookmark />
                   Documentation
-                </Button>
-              </a>
+                </a>
+              </Button>
             </Empty.Actions>
           </Empty>
         }

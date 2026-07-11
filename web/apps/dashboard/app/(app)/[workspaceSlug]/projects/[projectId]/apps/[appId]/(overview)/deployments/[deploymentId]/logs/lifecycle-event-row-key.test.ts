@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { dedupeRowsByKey } from "../dedupe-row-keys";
 import { lifecycleEventRowKey } from "../lifecycle-event-row-key";
 
 const sharedIncident = {
@@ -21,5 +22,15 @@ describe("lifecycleEventRowKey", () => {
     const event = { ...sharedIncident, podUid: "pod-web" };
 
     expect(lifecycleEventRowKey(event)).toBe(lifecycleEventRowKey(event));
+  });
+});
+
+describe("dedupeRowsByKey", () => {
+  it("keeps the first stable row when ClickHouse retries produce duplicates", () => {
+    const first = { key: "same-container-life", message: "first" };
+    const duplicate = { key: "same-container-life", message: "duplicate" };
+    const next = { key: "next-container-life", message: "next" };
+
+    expect(dedupeRowsByKey([first, duplicate, next])).toEqual([first, next]);
   });
 });

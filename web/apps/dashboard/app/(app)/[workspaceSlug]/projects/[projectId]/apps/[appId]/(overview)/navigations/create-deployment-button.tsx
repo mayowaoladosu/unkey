@@ -360,13 +360,18 @@ export const CreateDeploymentButton = ({
           {isCliApp && imageRows.length > 0 && (
             <div className="flex flex-col divide-y divide-gray-4 rounded-md border border-gray-4 overflow-hidden">
               {imageRows.map((deployment) => (
-                <button
+                <div
                   key={deployment.id}
-                  type="button"
-                  onClick={() => setValue("name", deployment.image ?? "", { shouldValidate: true })}
                   className="flex items-center justify-between px-3 py-2 bg-grayA-2 hover:bg-grayA-3 transition-colors cursor-pointer text-[13px] text-grayA-11"
                 >
-                  <span className="flex items-center gap-1.5 min-w-0 max-w-[300px]">
+                  <button
+                    type="button"
+                    aria-label={`Use image ${deployment.image}`}
+                    onClick={() =>
+                      setValue("name", deployment.image ?? "", { shouldValidate: true })
+                    }
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer"
+                  >
                     <InfoTooltip
                       content={deployment.image}
                       asChild
@@ -374,13 +379,13 @@ export const CreateDeploymentButton = ({
                     >
                       <span className="truncate">{deployment.image}</span>
                     </InfoTooltip>
-                  </span>
+                  </button>
                   <TimestampInfo
                     value={deployment.createdAt}
                     displayType="relative"
                     className="text-gray-11 shrink-0 ml-3"
                   />
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -404,16 +409,19 @@ export const CreateDeploymentButton = ({
                   </div>
                 ))}
               {branches.map((branch) => (
-                <button
+                <div
                   key={branch.name}
-                  type="button"
-                  onClick={() => setValue("name", branch.name, { shouldValidate: true })}
                   className="flex items-center justify-between px-3 py-2 bg-grayA-2 hover:bg-grayA-3 transition-colors cursor-pointer text-[13px] text-grayA-11"
                 >
-                  <span className="flex items-center gap-1.5 min-w-0 max-w-[300px]">
+                  <button
+                    type="button"
+                    aria-label={`Use branch ${branch.name}`}
+                    onClick={() => setValue("name", branch.name, { shouldValidate: true })}
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer"
+                  >
                     <CodeBranch iconSize="sm-regular" className="shrink-0 text-gray-12" />
                     <span className="truncate">{branch.name}</span>
-                  </span>
+                  </button>
                   {branch.lastPushDate && (
                     <TimestampInfo
                       value={branch.lastPushDate}
@@ -421,7 +429,7 @@ export const CreateDeploymentButton = ({
                       className="text-gray-11 shrink-0 ml-3"
                     />
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}

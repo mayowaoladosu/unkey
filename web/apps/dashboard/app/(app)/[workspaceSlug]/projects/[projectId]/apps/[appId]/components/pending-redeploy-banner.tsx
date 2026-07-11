@@ -94,7 +94,7 @@ export function PendingRedeployBanner() {
           <div className="flex flex-col gap-1 pr-5">
             <span className="text-sm font-semibold text-gray-12 leading-5">Changes detected</span>
             <span className="text-xs text-gray-11 leading-4">
-              Redeploy to apply your latest changes to {targetEnvironment?.slug}.
+              Redeploy to apply your latest changes to {targetEnvironment?.slug ?? "this environment"}.
             </span>
           </div>
           <Button
