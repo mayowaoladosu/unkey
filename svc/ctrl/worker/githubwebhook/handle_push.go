@@ -22,6 +22,19 @@ import (
 // repo connections with full deploy context (project, environment, app, settings)
 // in a single query, creates deployment records, and fires off DeployService.Deploy().
 func (s *Service) HandlePush(ctx restate.ObjectContext, req *hydrav1.HandlePushRequest) (*hydrav1.HandlePushResponse, error) {
+	if req.GetPullRequestClosed() {
+		logger.Info("handling GitHub pull request closure in Restate",
+			"delivery_id", req.GetDeliveryId(),
+			"repository", req.GetRepositoryFullName(),
+			"branch", req.GetBranch(),
+			"pr_number", req.GetPrNumber(),
+		)
+		if err := s.closePullRequest(ctx, req); err != nil {
+			return nil, err
+		}
+		return &hydrav1.HandlePushResponse{}, nil
+	}
+
 	logger.Info("handling GitHub push in Restate",
 		"delivery_id", req.GetDeliveryId(),
 		"repository", req.GetRepositoryFullName(),

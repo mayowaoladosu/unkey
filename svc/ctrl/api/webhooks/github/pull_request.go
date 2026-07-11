@@ -33,22 +33,23 @@ type pullRequestRef struct {
 	Repo pushRepository `json:"repo"`
 }
 
-// pullRequest handles pull_request events from forks. Same-repo PRs are skipped
-// because the push event already covers them. Fork PRs go through the same
-// HandlePush RPC with IsForkPr=true.
+// pullRequest handles pull_request events from forks. Same-repo PR deployments
+// are created by push events, but their closed event still comes through here
+// so the matching branch preview can be reclaimed.
 func (h *handler) pullRequest(
 	ctx context.Context,
 	event webhook.Event,
 	payload pullRequestPayload,
 ) error {
-	// Only new commits matter (opened or a new push to the PR).
-	if payload.Action != "opened" && payload.Action != "synchronize" {
+	// New commits create previews; closed ends their lifecycle.
+	if payload.Action != "opened" && payload.Action != "synchronize" && payload.Action != "reopened" && payload.Action != "closed" {
 		return fmt.Errorf("%w: pull_request action %s adds no commits", webhook.ErrIgnore, payload.Action)
 	}
 
-	// Same-repo PRs are already handled by the push event; skip to avoid a
-	// double deploy.
-	if payload.PullRequest.Head.Repo.ID == payload.PullRequest.Base.Repo.ID {
+	isFork := payload.PullRequest.Head.Repo.ID != payload.PullRequest.Base.Repo.ID
+	// Same-repo PRs are already handled by the push event; skip open/sync to
+	// avoid a double deploy. Closed is retained for branch-preview cleanup.
+	if !isFork && payload.Action != "reopened" && payload.Action != "closed" {
 		return fmt.Errorf("%w: same-repo pull request, push event handles this", webhook.ErrIgnore)
 	}
 
@@ -69,6 +70,10 @@ func (h *handler) pullRequest(
 	if authorAvatar == "" {
 		authorAvatar = fmt.Sprintf("https://github.com/%s.png", url.PathEscape(authorHandle))
 	}
+	forkRepositoryFullName := ""
+	if isFork {
+		forkRepositoryFullName = pr.Head.Repo.FullName
+	}
 
 	_, err := client.HandlePush().Send(ctx, &hydrav1.HandlePushRequest{
 		InstallationId:         payload.Installation.ID,
@@ -82,15 +87,16 @@ func (h *handler) pullRequest(
 		CommitTimestamp:        time.Now().UnixMilli(),
 		DeliveryId:             deliveryID,
 		SenderLogin:            payload.Sender.Login,
-		IsForkPr:               true,
+		IsForkPr:               isFork,
 		PrNumber:               payload.Number,
-		ForkRepositoryFullName: pr.Head.Repo.FullName,
+		ForkRepositoryFullName: forkRepositoryFullName,
+		PullRequestClosed:      payload.Action == "closed",
 	}, sendOpts...)
 	if err != nil {
-		return fmt.Errorf("enqueue fork PR for %s: %w", baseRepo.FullName, err)
+		return fmt.Errorf("enqueue pull request for %s: %w", baseRepo.FullName, err)
 	}
 
-	logger.Info("GitHub fork PR webhook enqueued to Restate",
+	logger.Info("GitHub pull request webhook enqueued to Restate",
 		"delivery_id", deliveryID,
 		"repository", baseRepo.FullName,
 		"branch", pr.Head.Ref,

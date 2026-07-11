@@ -123,6 +123,98 @@ func TestGitHubWebhook_Push_ProcessesCreatedBranch(t *testing.T) {
 	}
 }
 
+func TestGitHubWebhook_PullRequest_TriggersForkPreview(t *testing.T) {
+	pushRequests := make(chan *hydrav1.HandlePushRequest, 1)
+	harness := newWebhookHarness(t, webhookHarnessConfig{
+		Services: []restate.ServiceDefinition{hydrav1.NewGitHubWebhookServiceServer(&mockGitHubWebhookService{requests: pushRequests})},
+	})
+
+	payload := newTestPullRequestPayload("opened", true)
+	resp, err := sendWebhookEvent(
+		fmt.Sprintf("%s/webhooks/github", harness.CtrlURL),
+		"pull_request",
+		mustMarshal(t, payload),
+		harness.Secret,
+	)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	select {
+	case req := <-pushRequests:
+		require.True(t, req.GetIsForkPr())
+		require.False(t, req.GetPullRequestClosed())
+		require.Equal(t, int64(42), req.GetPrNumber())
+		require.Equal(t, "feature/preview", req.GetBranch())
+		require.Equal(t, "contributor/repo", req.GetForkRepositoryFullName())
+	case <-time.After(10 * time.Second):
+		t.Fatal("expected fork pull request preview invocation")
+	}
+}
+
+func TestGitHubWebhook_PullRequestReopened_RecreatesSameRepositoryPreview(t *testing.T) {
+	pushRequests := make(chan *hydrav1.HandlePushRequest, 1)
+	harness := newWebhookHarness(t, webhookHarnessConfig{
+		Services: []restate.ServiceDefinition{hydrav1.NewGitHubWebhookServiceServer(&mockGitHubWebhookService{requests: pushRequests})},
+	})
+
+	resp, err := sendWebhookEvent(
+		fmt.Sprintf("%s/webhooks/github", harness.CtrlURL),
+		"pull_request",
+		mustMarshal(t, newTestPullRequestPayload("reopened", false)),
+		harness.Secret,
+	)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	select {
+	case req := <-pushRequests:
+		require.False(t, req.GetIsForkPr())
+		require.False(t, req.GetPullRequestClosed())
+		require.Equal(t, "feature/preview", req.GetBranch())
+		require.Equal(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", req.GetAfter())
+	case <-time.After(10 * time.Second):
+		t.Fatal("expected reopened pull request preview invocation")
+	}
+}
+
+func TestGitHubWebhook_PullRequestClosed_TriggersPreviewCleanup(t *testing.T) {
+	for _, fork := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fork=%t", fork), func(t *testing.T) {
+			pushRequests := make(chan *hydrav1.HandlePushRequest, 1)
+			harness := newWebhookHarness(t, webhookHarnessConfig{
+				Services: []restate.ServiceDefinition{hydrav1.NewGitHubWebhookServiceServer(&mockGitHubWebhookService{requests: pushRequests})},
+			})
+
+			resp, err := sendWebhookEvent(
+				fmt.Sprintf("%s/webhooks/github", harness.CtrlURL),
+				"pull_request",
+				mustMarshal(t, newTestPullRequestPayload("closed", fork)),
+				harness.Secret,
+			)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			_ = resp.Body.Close()
+
+			select {
+			case req := <-pushRequests:
+				require.True(t, req.GetPullRequestClosed())
+				require.Equal(t, int64(42), req.GetPrNumber())
+				require.Equal(t, "feature/preview", req.GetBranch())
+				require.Equal(t, fork, req.GetIsForkPr())
+				if fork {
+					require.Equal(t, "contributor/repo", req.GetForkRepositoryFullName())
+				} else {
+					require.Empty(t, req.GetForkRepositoryFullName())
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("expected pull request cleanup invocation")
+			}
+		})
+	}
+}
+
 func TestGitHubWebhook_InvalidSignature(t *testing.T) {
 	pushRequests := make(chan *hydrav1.HandlePushRequest, 1)
 	harness := newWebhookHarness(t, webhookHarnessConfig{
@@ -142,12 +234,16 @@ func TestGitHubWebhook_InvalidSignature(t *testing.T) {
 }
 
 func sendWebhook(url string, body []byte, secret string) (*http.Response, error) {
+	return sendWebhookEvent(url, "push", body, secret)
+}
+
+func sendWebhookEvent(url, event string, body []byte, secret string) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("X-GitHub-Event", "push")
+	req.Header.Set("X-GitHub-Event", event)
 	// Unique per request: the handler forwards this as the Restate idempotency
 	// key, so a constant would make every push after the first dedupe to the
 	// first invocation and the handler would never run again.
@@ -156,6 +252,33 @@ func sendWebhook(url string, body []byte, secret string) (*http.Response, error)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	return client.Do(req)
+}
+
+func newTestPullRequestPayload(action string, fork bool) map[string]any {
+	baseRepo := map[string]any{"id": 202, "full_name": testRepoFullName, "fork": false}
+	headRepo := baseRepo
+	if fork {
+		headRepo = map[string]any{"id": 303, "full_name": "contributor/repo", "fork": true}
+	}
+	return map[string]any{
+		"action":       action,
+		"number":       42,
+		"installation": map[string]any{"id": 101},
+		"sender":       map[string]any{"login": "contributor", "avatar_url": "https://avatar"},
+		"pull_request": map[string]any{
+			"title": "feat: preview lifecycle",
+			"head": map[string]any{
+				"ref":  "feature/preview",
+				"sha":  "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				"repo": headRepo,
+			},
+			"base": map[string]any{
+				"ref":  "main",
+				"sha":  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				"repo": baseRepo,
+			},
+		},
+	}
 }
 
 // newTestPushPayload builds the push webhook body as a raw JSON map so this

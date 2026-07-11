@@ -40,6 +40,7 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/worker/cron/deploybilling"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/deploy"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/deployment"
+	"github.com/unkeyed/unkey/svc/ctrl/worker/githubwebhook"
 	"github.com/unkeyed/unkey/svc/ctrl/worker/keylastusedsync"
 	vaulttestutil "github.com/unkeyed/unkey/svc/vault/testutil"
 	"golang.org/x/net/http2"
@@ -300,6 +301,14 @@ func New(t *testing.T, opts ...Option) *Harness {
 	buildSlotSvc := buildslot.New(buildslot.Config{
 		DB: database,
 	})
+	restateAdminClient := restateadmin.New(restateadmin.Config{BaseURL: restateCfg.AdminURL, APIKey: ""})
+	githubWebhookSvc := githubwebhook.New(githubwebhook.Config{
+		DB:                              database,
+		GitHub:                          nil,
+		RestateAdmin:                    restateAdminClient,
+		DashboardURL:                    "https://app.unkey.com",
+		AllowUnauthenticatedDeployments: true,
+	})
 
 	// Set up Restate server with all services
 	// Use the proto-generated wrappers (same as run.go) to get correct service names
@@ -310,6 +319,7 @@ func New(t *testing.T, opts ...Option) *Harness {
 	restateSrv.Bind(hydrav1.NewDeployServiceServer(deploySvc))
 	restateSrv.Bind(hydrav1.NewDeploymentServiceServer(deploymentSvc))
 	restateSrv.Bind(hydrav1.NewBuildSlotServiceServer(buildSlotSvc))
+	restateSrv.Bind(hydrav1.NewGitHubWebhookServiceServer(githubWebhookSvc))
 
 	restateHandler, err := restateSrv.Handler()
 	require.NoError(t, err)
@@ -332,8 +342,7 @@ func New(t *testing.T, opts ...Option) *Harness {
 	workerPort := tcpAddr.Port
 	registerAs := fmt.Sprintf("http://%s:%d", containers.HostGateway, workerPort)
 
-	adminClient := restateadmin.New(restateadmin.Config{BaseURL: restateCfg.AdminURL, APIKey: ""})
-	require.NoError(t, adminClient.RegisterDeployment(ctx, registerAs))
+	require.NoError(t, restateAdminClient.RegisterDeployment(ctx, registerAs))
 	t.Logf("Total harness setup in %s", time.Since(start))
 
 	return &Harness{
