@@ -32,6 +32,11 @@ const (
 
 	containerScopeEnv = "UNKEY_TEST_CONTAINER_SCOPE"
 
+	// HostGateway is the hostname containers use to reach services bound on
+	// the test host. startContainer guarantees this name resolves on runtimes
+	// that do not provide it automatically.
+	HostGateway = "host.docker.internal"
+
 	reusableCreateConflictTimeout  = 30 * time.Second
 	reusableCreateConflictInterval = 100 * time.Millisecond
 )
@@ -245,7 +250,7 @@ func startContainer(t testing.TB, cfg containerConfig) *Container {
 				// like OrbStack do not. Without it, containers that need to call
 				// back to host-bound test servers (e.g. Restate -> worker handler)
 				// fail with DNS resolution errors.
-				ExtraHosts: []string{"host.docker.internal:host-gateway"},
+				ExtraHosts: []string{HostGateway + ":host-gateway"},
 			},
 			nil, // NetworkingConfig
 			nil, // Platform

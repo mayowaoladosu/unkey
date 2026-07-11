@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -331,7 +330,7 @@ func New(t *testing.T, opts ...Option) *Harness {
 	tcpAddr, ok := workerListener.Addr().(*net.TCPAddr)
 	require.True(t, ok, "listener address must be TCP")
 	workerPort := tcpAddr.Port
-	registerAs := fmt.Sprintf("http://%s:%d", dockerHost(), workerPort)
+	registerAs := fmt.Sprintf("http://%s:%d", containers.HostGateway, workerPort)
 
 	adminClient := restateadmin.New(restateadmin.Config{BaseURL: restateCfg.AdminURL, APIKey: ""})
 	require.NoError(t, adminClient.RegisterDeployment(ctx, registerAs))
@@ -352,12 +351,4 @@ func New(t *testing.T, opts ...Option) *Harness {
 		RestateAdmin:   restateCfg.AdminURL,
 		Clock:          o.clock,
 	}
-}
-
-// dockerHost returns the hostname to use for connecting from Docker containers.
-func dockerHost() string {
-	if runtime.GOOS == "darwin" {
-		return "host.docker.internal"
-	}
-	return "172.17.0.1"
 }

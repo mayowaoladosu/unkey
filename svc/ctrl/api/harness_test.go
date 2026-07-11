@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -93,7 +92,7 @@ func newWebhookHarness(t *testing.T, cfg webhookHarnessConfig) *webhookHarness {
 	t.Cleanup(workerServer.Close)
 
 	workerPort := workerListener.Addr().(*net.TCPAddr).Port
-	registration := &restateRegistration{adminURL: restateCfg.AdminURL, registerAs: fmt.Sprintf("http://%s:%d", dockerHost(), workerPort)}
+	registration := &restateRegistration{adminURL: restateCfg.AdminURL, registerAs: fmt.Sprintf("http://%s:%d", containers.HostGateway, workerPort)}
 	deploymentID, err := registration.register(ctx)
 	require.NoError(t, err)
 	t.Cleanup(func() { registration.deregister(context.Background(), deploymentID) })
@@ -305,11 +304,4 @@ func pickAddr(t *testing.T) addrInfo {
 	require.True(t, ok)
 
 	return addrInfo{Host: addr.IP.String(), Port: addr.Port}
-}
-
-func dockerHost() string {
-	if runtime.GOOS == "darwin" {
-		return "host.docker.internal"
-	}
-	return "172.17.0.1"
 }
