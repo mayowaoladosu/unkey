@@ -1,7 +1,7 @@
 "use client";
 
-import { trpc } from "@/lib/trpc/client";
 import { shortenId } from "@/lib/shorten-id";
+import { trpc } from "@/lib/trpc/client";
 import { PageBody } from "@unkey/ui";
 import { useDeployment } from "../layout-provider";
 
