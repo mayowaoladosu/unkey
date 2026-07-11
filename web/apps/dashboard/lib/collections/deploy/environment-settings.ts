@@ -4,48 +4,53 @@ import { createCollection } from "@tanstack/react-db";
 import { toast } from "@unkey/ui";
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
+import { deploymentOutputSchema } from "../../deploy/deployment-output-schema";
 import { queryClient, trpcClient } from "../client";
-import { parseEnvironmentIdFromWhere, validateEnvironmentIdInQuery } from "./utils";
+import {
+	parseEnvironmentIdFromWhere,
+	validateEnvironmentIdInQuery,
+} from "./utils";
 
 const healthcheckSchema = z
-  .object({
-    method: z.enum(["GET", "POST"]),
-    path: z.string(),
-    intervalSeconds: z.number(),
-    timeoutSeconds: z.number(),
-    failureThreshold: z.number(),
-    initialDelaySeconds: z.number(),
-  })
-  .nullable();
+	.object({
+		method: z.enum(["GET", "POST"]),
+		path: z.string(),
+		intervalSeconds: z.number(),
+		timeoutSeconds: z.number(),
+		failureThreshold: z.number(),
+		initialDelaySeconds: z.number(),
+	})
+	.nullable();
 
 const schema = z.object({
-  environmentId: z.string(),
-  // Build settings
-  autoDeploy: z.boolean().default(true),
-  dockerfile: z.string(),
-  dockerContext: z.string(),
-  // Empty means "let Railpack auto-detect". Overrides Railpack's build command
-  // so monorepos can scope the build to a single app.
-  buildCommand: z.string().default(""),
-  watchPaths: z.array(z.string()).default([]),
-  // Runtime settings
-  port: z.number().int(),
-  cpuMillicores: z.number().int(),
-  memoryMib: z.number().int(),
-  storageMib: z.number().int(),
-  command: z.array(z.string()),
-  healthcheck: healthcheckSchema,
-  regions: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      replicasMin: z.number().int().min(1),
-      replicasMax: z.number().int().min(1),
-    }),
-  ),
-  shutdownSignal: z.string(),
-  upstreamProtocol: z.enum(["http1", "h2c"]).default("http1"),
-  openapiSpecPath: z.string().nullable().default(null),
+	environmentId: z.string(),
+	// Build settings
+	autoDeploy: z.boolean().default(true),
+	dockerfile: z.string(),
+	dockerContext: z.string(),
+	// Empty means "let Railpack auto-detect". Overrides Railpack's build command
+	// so monorepos can scope the build to a single app.
+	buildCommand: z.string().default(""),
+	watchPaths: z.array(z.string()).default([]),
+	// Runtime settings
+	port: z.number().int(),
+	cpuMillicores: z.number().int(),
+	memoryMib: z.number().int(),
+	storageMib: z.number().int(),
+	command: z.array(z.string()),
+	outputs: z.array(deploymentOutputSchema).default([]),
+	healthcheck: healthcheckSchema,
+	regions: z.array(
+		z.object({
+			id: z.string(),
+			name: z.string(),
+			replicasMin: z.number().int().min(1),
+			replicasMax: z.number().int().min(1),
+		}),
+	),
+	shutdownSignal: z.string(),
+	upstreamProtocol: z.enum(["http1", "h2c"]).default("http1"),
+	openapiSpecPath: z.string().nullable().default(null),
 });
 
 /**
@@ -54,106 +59,118 @@ const schema = z.object({
  * IMPORTANT: All queries MUST filter by environmentId:
  * .where(({ s }) => eq(s.environmentId, environmentId))
  */
-export const environmentSettings = createCollection<EnvironmentSettings, string>(
-  queryCollectionOptions({
-    queryClient,
-    queryKey: (opts) => {
-      const environmentId = parseEnvironmentIdFromWhere(opts.where);
-      return environmentId ? ["environmentSettings", environmentId] : ["environmentSettings"];
-    },
-    retry: 3,
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const options = ctx.meta?.loadSubsetOptions;
+export const environmentSettings = createCollection<
+	EnvironmentSettings,
+	string
+>(
+	queryCollectionOptions({
+		queryClient,
+		queryKey: (opts) => {
+			const environmentId = parseEnvironmentIdFromWhere(opts.where);
+			return environmentId
+				? ["environmentSettings", environmentId]
+				: ["environmentSettings"];
+		},
+		retry: 3,
+		syncMode: "on-demand",
+		queryFn: async (ctx) => {
+			const options = ctx.meta?.loadSubsetOptions;
 
-      validateEnvironmentIdInQuery(options?.where);
-      const environmentId = parseEnvironmentIdFromWhere(options?.where);
+			validateEnvironmentIdInQuery(options?.where);
+			const environmentId = parseEnvironmentIdFromWhere(options?.where);
 
-      if (!environmentId) {
-        throw new Error(
-          "Query must include eq(collection.environmentId, environmentId) constraint",
-        );
-      }
+			if (!environmentId) {
+				throw new Error(
+					"Query must include eq(collection.environmentId, environmentId) constraint",
+				);
+			}
 
-      const result = await trpcClient.deploy.environmentSettings.get.query({
-        environmentId,
-      });
+			const result = await trpcClient.deploy.environmentSettings.get.query({
+				environmentId,
+			});
 
-      return [
-        flattenSettingsResponse(
-          environmentId,
-          result.buildSettings,
-          result.runtimeSettings,
-          result.regionalSettings,
-        ),
-      ];
-    },
-    getKey: (item) => item.environmentId,
-    id: "environmentSettings",
-    onUpdate: async ({ transaction }) => {
-      const { original, modified } = transaction.mutations[0];
-      const silent = transaction.metadata?.silent === true;
-      await dispatchSettingsMutations(original, modified, silent);
-    },
-  }),
+			return [
+				flattenSettingsResponse(
+					environmentId,
+					result.buildSettings,
+					result.runtimeSettings,
+					result.regionalSettings,
+				),
+			];
+		},
+		getKey: (item) => item.environmentId,
+		id: "environmentSettings",
+		onUpdate: async ({ transaction }) => {
+			const { original, modified } = transaction.mutations[0];
+			const silent = transaction.metadata?.silent === true;
+			await dispatchSettingsMutations(original, modified, silent);
+		},
+	}),
 );
 
 export type EnvironmentSettings = z.infer<typeof schema>;
 
 /** Default values for environment settings fields (excluding regions, which are runtime-dependent). */
 export const ENVIRONMENT_SETTINGS_DEFAULTS = {
-  autoDeploy: true,
-  // Empty means "no Dockerfile configured" — the app is built with Railpack.
-  dockerfile: "",
-  dockerContext: ".",
-  // Empty means "let Railpack auto-detect" the build command.
-  buildCommand: "",
-  port: 8080,
-  cpuMillicores: 250,
-  memoryMib: 256,
-  storageMib: 0,
-  shutdownSignal: "SIGTERM",
-  upstreamProtocol: "http1",
+	autoDeploy: true,
+	// Empty means "no Dockerfile configured" — the app is built with Railpack.
+	dockerfile: "",
+	dockerContext: ".",
+	// Empty means "let Railpack auto-detect" the build command.
+	buildCommand: "",
+	port: 8080,
+	cpuMillicores: 250,
+	memoryMib: 256,
+	storageMib: 0,
+	shutdownSignal: "SIGTERM",
+	upstreamProtocol: "http1",
 } as const;
 
-type SettingsResponse = Awaited<ReturnType<typeof trpcClient.deploy.environmentSettings.get.query>>;
+type SettingsResponse = Awaited<
+	ReturnType<typeof trpcClient.deploy.environmentSettings.get.query>
+>;
 
 function changed<T>(a: T, b: T): boolean {
-  return JSON.stringify(a) !== JSON.stringify(b);
+	return JSON.stringify(a) !== JSON.stringify(b);
 }
 
 function flattenSettingsResponse(
-  environmentId: string,
-  build: SettingsResponse["buildSettings"],
-  runtime: SettingsResponse["runtimeSettings"],
-  regional: SettingsResponse["regionalSettings"],
+	environmentId: string,
+	build: SettingsResponse["buildSettings"],
+	runtime: SettingsResponse["runtimeSettings"],
+	regional: SettingsResponse["regionalSettings"],
 ): EnvironmentSettings {
-  const d = ENVIRONMENT_SETTINGS_DEFAULTS;
-  return {
-    environmentId,
-    autoDeploy: build?.autoDeploy ?? d.autoDeploy,
-    dockerfile: build?.dockerfile ?? d.dockerfile,
-    dockerContext: build?.dockerContext || d.dockerContext,
-    buildCommand: build?.buildCommand ?? d.buildCommand,
-    watchPaths: build?.watchPaths ?? [],
-    port: runtime?.port ?? d.port,
-    cpuMillicores: runtime?.cpuMillicores ?? d.cpuMillicores,
-    memoryMib: runtime?.memoryMib ?? d.memoryMib,
-    storageMib: runtime?.storageMib ?? d.storageMib,
-    command: runtime?.command ?? [],
-    healthcheck: runtime?.healthcheck ?? null,
-    regions: regional
-      .filter((r): r is typeof r & { region: NonNullable<typeof r.region> } => r.region !== null)
-      .map((r) => ({
-        id: r.region.id,
-        name: r.region.name,
-        replicasMin: r.horizontalAutoscalingPolicy?.replicasMin ?? 1,
-        replicasMax: r.replicas,
-      })),
-    shutdownSignal: d.shutdownSignal,
-    upstreamProtocol: (runtime?.upstreamProtocol as "http1" | "h2c") ?? d.upstreamProtocol,
-    openapiSpecPath: runtime?.openapiSpecPath ?? null,
-  };
+	const d = ENVIRONMENT_SETTINGS_DEFAULTS;
+	return {
+		environmentId,
+		autoDeploy: build?.autoDeploy ?? d.autoDeploy,
+		dockerfile: build?.dockerfile ?? d.dockerfile,
+		dockerContext: build?.dockerContext || d.dockerContext,
+		buildCommand: build?.buildCommand ?? d.buildCommand,
+		watchPaths: build?.watchPaths ?? [],
+		port: runtime?.port ?? d.port,
+		cpuMillicores: runtime?.cpuMillicores ?? d.cpuMillicores,
+		memoryMib: runtime?.memoryMib ?? d.memoryMib,
+		storageMib: runtime?.storageMib ?? d.storageMib,
+		command: runtime?.command ?? [],
+		outputs: runtime?.outputs ?? [],
+		healthcheck: runtime?.healthcheck ?? null,
+		regions: regional
+			.filter(
+				(r): r is typeof r & { region: NonNullable<typeof r.region> } =>
+					r.region !== null,
+			)
+			.map((r) => ({
+				id: r.region.id,
+				name: r.region.name,
+				replicasMin: r.horizontalAutoscalingPolicy?.replicasMin ?? 1,
+				replicasMax: r.replicas,
+			})),
+		shutdownSignal: d.shutdownSignal,
+		upstreamProtocol:
+			(runtime?.upstreamProtocol as "http1" | "h2c") ?? d.upstreamProtocol,
+		openapiSpecPath: runtime?.openapiSpecPath ?? null,
+	};
 }
 
 /**
@@ -163,187 +180,205 @@ function flattenSettingsResponse(
  * Pure function — no toasts, no side-effects beyond the network calls.
  */
 export function buildSettingsMutations(
-  environmentId: string,
-  original: EnvironmentSettings,
-  modified: EnvironmentSettings,
+	environmentId: string,
+	original: EnvironmentSettings,
+	modified: EnvironmentSettings,
 ): Promise<unknown>[] {
-  const mutations: Promise<unknown>[] = [];
+	const mutations: Promise<unknown>[] = [];
 
-  if (modified.autoDeploy !== original.autoDeploy) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.build.updateAutoDeploy.mutate({
-        environmentId,
-        autoDeploy: modified.autoDeploy,
-      }),
-    );
-  }
+	if (modified.autoDeploy !== original.autoDeploy) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.build.updateAutoDeploy.mutate({
+				environmentId,
+				autoDeploy: modified.autoDeploy,
+			}),
+		);
+	}
 
-  if (modified.dockerfile !== original.dockerfile) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.build.updateDockerfile.mutate({
-        environmentId,
-        dockerfile: modified.dockerfile,
-      }),
-    );
-  }
+	if (modified.dockerfile !== original.dockerfile) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.build.updateDockerfile.mutate({
+				environmentId,
+				dockerfile: modified.dockerfile,
+			}),
+		);
+	}
 
-  if (modified.dockerContext !== original.dockerContext) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.build.updateDockerContext.mutate({
-        environmentId,
-        dockerContext: modified.dockerContext,
-      }),
-    );
-  }
+	if (modified.dockerContext !== original.dockerContext) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.build.updateDockerContext.mutate({
+				environmentId,
+				dockerContext: modified.dockerContext,
+			}),
+		);
+	}
 
-  if (modified.buildCommand !== original.buildCommand) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.build.updateBuildCommand.mutate({
-        environmentId,
-        buildCommand: modified.buildCommand,
-      }),
-    );
-  }
+	if (modified.buildCommand !== original.buildCommand) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.build.updateBuildCommand.mutate({
+				environmentId,
+				buildCommand: modified.buildCommand,
+			}),
+		);
+	}
 
-  if (changed(original.watchPaths, modified.watchPaths)) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.build.updateWatchPaths.mutate({
-        environmentId,
-        watchPaths: modified.watchPaths,
-      }),
-    );
-  }
+	if (changed(original.watchPaths, modified.watchPaths)) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.build.updateWatchPaths.mutate({
+				environmentId,
+				watchPaths: modified.watchPaths,
+			}),
+		);
+	}
 
-  if (modified.port !== original.port) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updatePort.mutate({
-        environmentId,
-        port: modified.port,
-      }),
-    );
-  }
+	if (modified.port !== original.port) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updatePort.mutate({
+				environmentId,
+				port: modified.port,
+			}),
+		);
+	}
 
-  if (modified.cpuMillicores !== original.cpuMillicores) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateCpu.mutate({
-        environmentId,
-        cpuMillicores: modified.cpuMillicores,
-      }),
-    );
-  }
+	if (modified.cpuMillicores !== original.cpuMillicores) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateCpu.mutate({
+				environmentId,
+				cpuMillicores: modified.cpuMillicores,
+			}),
+		);
+	}
 
-  if (modified.memoryMib !== original.memoryMib) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateMemory.mutate({
-        environmentId,
-        memoryMib: modified.memoryMib,
-      }),
-    );
-  }
+	if (modified.memoryMib !== original.memoryMib) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateMemory.mutate({
+				environmentId,
+				memoryMib: modified.memoryMib,
+			}),
+		);
+	}
 
-  if (modified.storageMib !== original.storageMib) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateStorage.mutate({
-        environmentId,
-        storageMib: modified.storageMib,
-      }),
-    );
-  }
+	if (modified.storageMib !== original.storageMib) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateStorage.mutate({
+				environmentId,
+				storageMib: modified.storageMib,
+			}),
+		);
+	}
 
-  if (changed(original.command, modified.command)) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateCommand.mutate({
-        environmentId,
-        command: modified.command,
-      }),
-    );
-  }
+	if (changed(original.command, modified.command)) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateCommand.mutate({
+				environmentId,
+				command: modified.command,
+			}),
+		);
+	}
 
-  if (changed(original.healthcheck, modified.healthcheck)) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateHealthcheck.mutate({
-        environmentId,
-        healthcheck: modified.healthcheck,
-      }),
-    );
-  }
+	if (changed(original.outputs, modified.outputs)) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateOutputs.mutate({
+				environmentId,
+				outputs: modified.outputs,
+			}),
+		);
+	}
 
-  const origRegionIds = original.regions.map((r) => r.id).sort();
-  const modRegionIds = modified.regions.map((r) => r.id).sort();
-  const regionsChanged = changed(origRegionIds, modRegionIds);
+	if (changed(original.healthcheck, modified.healthcheck)) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateHealthcheck.mutate({
+				environmentId,
+				healthcheck: modified.healthcheck,
+			}),
+		);
+	}
 
-  if (regionsChanged) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateRegions.mutate({
-        environmentId,
-        regionIds: modRegionIds,
-      }),
-    );
-  }
+	const origRegionIds = original.regions.map((r) => r.id).sort();
+	const modRegionIds = modified.regions.map((r) => r.id).sort();
+	const regionsChanged = changed(origRegionIds, modRegionIds);
 
-  const origReplicasMin = original.regions.at(0)?.replicasMin ?? 1;
-  const modReplicasMin = modified.regions.at(0)?.replicasMin ?? 1;
-  const origReplicasMax = original.regions.at(0)?.replicasMax ?? 1;
-  const modReplicasMax = modified.regions.at(0)?.replicasMax ?? 1;
-  const instancesChanged =
-    !regionsChanged &&
-    modified.regions.length > 0 &&
-    (modReplicasMin !== origReplicasMin || modReplicasMax !== origReplicasMax);
+	if (regionsChanged) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateRegions.mutate({
+				environmentId,
+				regionIds: modRegionIds,
+			}),
+		);
+	}
 
-  if (instancesChanged) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateInstances.mutate({
-        environmentId,
-        replicasMin: modReplicasMin,
-        replicasMax: modReplicasMax,
-      }),
-    );
-  }
+	const origReplicasMin = original.regions.at(0)?.replicasMin ?? 1;
+	const modReplicasMin = modified.regions.at(0)?.replicasMin ?? 1;
+	const origReplicasMax = original.regions.at(0)?.replicasMax ?? 1;
+	const modReplicasMax = modified.regions.at(0)?.replicasMax ?? 1;
+	const instancesChanged =
+		!regionsChanged &&
+		modified.regions.length > 0 &&
+		(modReplicasMin !== origReplicasMin || modReplicasMax !== origReplicasMax);
 
-  if (modified.upstreamProtocol !== original.upstreamProtocol) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateUpstreamProtocol.mutate({
-        environmentId,
-        upstreamProtocol: modified.upstreamProtocol,
-      }),
-    );
-  }
+	if (instancesChanged) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateInstances.mutate({
+				environmentId,
+				replicasMin: modReplicasMin,
+				replicasMax: modReplicasMax,
+			}),
+		);
+	}
 
-  if (modified.openapiSpecPath !== original.openapiSpecPath) {
-    mutations.push(
-      trpcClient.deploy.environmentSettings.runtime.updateOpenapiSpecPath.mutate({
-        environmentId,
-        openapiSpecPath: modified.openapiSpecPath,
-      }),
-    );
-  }
+	if (modified.upstreamProtocol !== original.upstreamProtocol) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateUpstreamProtocol.mutate(
+				{
+					environmentId,
+					upstreamProtocol: modified.upstreamProtocol,
+				},
+			),
+		);
+	}
 
-  return mutations;
+	if (modified.openapiSpecPath !== original.openapiSpecPath) {
+		mutations.push(
+			trpcClient.deploy.environmentSettings.runtime.updateOpenapiSpecPath.mutate(
+				{
+					environmentId,
+					openapiSpecPath: modified.openapiSpecPath,
+				},
+			),
+		);
+	}
+
+	return mutations;
 }
 
 async function dispatchSettingsMutations(
-  original: EnvironmentSettings,
-  modified: EnvironmentSettings,
-  silent = false,
+	original: EnvironmentSettings,
+	modified: EnvironmentSettings,
+	silent = false,
 ): Promise<void> {
-  const mutations = buildSettingsMutations(original.environmentId, original, modified);
+	const mutations = buildSettingsMutations(
+		original.environmentId,
+		original,
+		modified,
+	);
 
-  if (mutations.length === 0) {
-    return;
-  }
+	if (mutations.length === 0) {
+		return;
+	}
 
-  const allMutations = Promise.all(mutations);
-  if (!silent) {
-    toast.promise(allMutations, {
-      loading: "Saving settings...",
-      success: "Settings updated",
-      error: (err) => ({
-        message: "Failed to update settings",
-        description: err instanceof Error ? err.message : "An unexpected error occurred",
-      }),
-    });
-  }
-  await trackSave(allMutations);
+	const allMutations = Promise.all(mutations);
+	if (!silent) {
+		toast.promise(allMutations, {
+			loading: "Saving settings...",
+			success: "Settings updated",
+			error: (err) => ({
+				message: "Failed to update settings",
+				description:
+					err instanceof Error ? err.message : "An unexpected error occurred",
+			}),
+		});
+	}
+	await trackSave(allMutations);
 }
 
 /**
@@ -353,61 +388,61 @@ async function dispatchSettingsMutations(
  * pending-redeploy banner reacts to mutations from either source.
  */
 const saveStore = {
-  pendingSaves: 0,
-  savedCount: 0,
-  dismissedAtCount: 0,
-  listeners: new Set<() => void>(),
-  notify() {
-    for (const cb of this.listeners) {
-      cb();
-    }
-  },
-  subscribe(cb: () => void): () => void {
-    this.listeners.add(cb);
-    return () => {
-      this.listeners.delete(cb);
-    };
-  },
-  dismiss() {
-    this.dismissedAtCount = this.savedCount;
-    this.notify();
-  },
+	pendingSaves: 0,
+	savedCount: 0,
+	dismissedAtCount: 0,
+	listeners: new Set<() => void>(),
+	notify() {
+		for (const cb of this.listeners) {
+			cb();
+		}
+	},
+	subscribe(cb: () => void): () => void {
+		this.listeners.add(cb);
+		return () => {
+			this.listeners.delete(cb);
+		};
+	},
+	dismiss() {
+		this.dismissedAtCount = this.savedCount;
+		this.notify();
+	},
 };
 
 export function trackSave<T>(promise: Promise<T>): Promise<T> {
-  saveStore.pendingSaves++;
-  saveStore.notify();
-  return promise.then(
-    (result) => {
-      saveStore.savedCount++;
-      saveStore.pendingSaves--;
-      saveStore.notify();
-      return result;
-    },
-    (err) => {
-      saveStore.pendingSaves--;
-      saveStore.notify();
-      throw err;
-    },
-  );
+	saveStore.pendingSaves++;
+	saveStore.notify();
+	return promise.then(
+		(result) => {
+			saveStore.savedCount++;
+			saveStore.pendingSaves--;
+			saveStore.notify();
+			return result;
+		},
+		(err) => {
+			saveStore.pendingSaves--;
+			saveStore.notify();
+			throw err;
+		},
+	);
 }
 
 export function useSettingsIsSaving(): boolean {
-  return useSyncExternalStore(
-    (cb) => saveStore.subscribe(cb),
-    () => saveStore.pendingSaves > 0,
-  );
+	return useSyncExternalStore(
+		(cb) => saveStore.subscribe(cb),
+		() => saveStore.pendingSaves > 0,
+	);
 }
 
 /** Returns true when there are saves the user hasn't dismissed yet. Survives navigation. */
 export function useSettingsBannerVisible(): boolean {
-  return useSyncExternalStore(
-    (cb) => saveStore.subscribe(cb),
-    () => saveStore.savedCount > saveStore.dismissedAtCount,
-  );
+	return useSyncExternalStore(
+		(cb) => saveStore.subscribe(cb),
+		() => saveStore.savedCount > saveStore.dismissedAtCount,
+	);
 }
 
 /** Dismisses the pending-redeploy banner until a new save occurs. */
 export function dismissSettingsBanner(): void {
-  saveStore.dismiss();
+	saveStore.dismiss();
 }

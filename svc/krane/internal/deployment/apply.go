@@ -371,6 +371,9 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: fmt.Sprintf("%s-", req.GetK8SName()),
 					Labels:       usedLabels,
+					Annotations: map[string]string{
+						labels.AnnotationKeyResourceName: req.GetResourceName(),
+					},
 				},
 				Spec: podSpec,
 			},

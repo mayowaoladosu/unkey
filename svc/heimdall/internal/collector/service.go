@@ -21,13 +21,16 @@ import (
 )
 
 const (
-	LabelManagedBy  = "app.kubernetes.io/managed-by"
-	LabelComponent  = "app.kubernetes.io/component"
-	LabelWorkspace  = "unkey.com/workspace.id"
-	LabelProject    = "unkey.com/project.id"
-	LabelEnv        = "unkey.com/environment.id"
-	LabelDeployment = "unkey.com/deployment.id"
-	LabelSentinel   = "unkey.com/sentinel.id"
+	LabelManagedBy                   = "app.kubernetes.io/managed-by"
+	LabelComponent                   = "app.kubernetes.io/component"
+	LabelWorkspace                   = "unkey.com/workspace.id"
+	LabelProject                     = "unkey.com/project.id"
+	LabelEnv                         = "unkey.com/environment.id"
+	LabelDeployment                  = "unkey.com/deployment.id"
+	LabelDeploymentResource          = "unkey.com/resource.id"
+	LabelDeploymentResourceKind      = "unkey.com/resource.kind"
+	AnnotationDeploymentResourceName = "layerrail.com/resource.name"
+	LabelSentinel                    = "unkey.com/sentinel.id"
 )
 
 type Config struct {
@@ -273,6 +276,9 @@ func (c *Collector) emitLifecycleCheckpoint(podUID, kind string) {
 		EnvironmentID:              info.environmentID,
 		ResourceType:               info.resourceType,
 		ResourceID:                 info.resourceID,
+		DeploymentResourceID:       info.deploymentResourceID,
+		DeploymentResourceName:     info.deploymentResourceName,
+		DeploymentResourceKind:     info.deploymentResourceKind,
 		PodUID:                     string(pod.UID),
 		InstanceID:                 info.name,
 		ContainerUID:               containerUID,

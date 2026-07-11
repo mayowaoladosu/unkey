@@ -170,20 +170,23 @@ type BuildStepLogV1 struct {
 //
 //unkey:table default.instance_checkpoints_v1
 type InstanceCheckpoint struct {
-	NodeID        string `ch:"node_id" json:"node_id"`
-	WorkspaceID   string `ch:"workspace_id" json:"workspace_id"`
-	ProjectID     string `ch:"project_id" json:"project_id"`
-	EnvironmentID string `ch:"environment_id" json:"environment_id"`
-	ResourceType  string `ch:"resource_type" json:"resource_type"`
-	ResourceID    string `ch:"resource_id" json:"resource_id"`
-	PodUID        string `ch:"pod_uid" json:"pod_uid"`
-	InstanceID    string `ch:"instance_id" json:"instance_id"`
-	ContainerUID  string `ch:"container_uid" json:"container_uid"`
-	RestartCount  uint32 `ch:"restart_count" json:"restart_count"`
-	Ts            int64  `ch:"ts" json:"ts"`
-	EventKind     string `ch:"event_kind" json:"event_kind"`
-	CPUUsageUsec  int64  `ch:"cpu_usage_usec" json:"cpu_usage_usec"`
-	MemoryBytes   int64  `ch:"memory_bytes" json:"memory_bytes"`
+	NodeID                 string `ch:"node_id" json:"node_id"`
+	WorkspaceID            string `ch:"workspace_id" json:"workspace_id"`
+	ProjectID              string `ch:"project_id" json:"project_id"`
+	EnvironmentID          string `ch:"environment_id" json:"environment_id"`
+	ResourceType           string `ch:"resource_type" json:"resource_type"`
+	ResourceID             string `ch:"resource_id" json:"resource_id"`
+	DeploymentResourceID   string `ch:"deployment_resource_id" json:"deployment_resource_id"`
+	DeploymentResourceName string `ch:"deployment_resource_name" json:"deployment_resource_name"`
+	DeploymentResourceKind string `ch:"deployment_resource_kind" json:"deployment_resource_kind"`
+	PodUID                 string `ch:"pod_uid" json:"pod_uid"`
+	InstanceID             string `ch:"instance_id" json:"instance_id"`
+	ContainerUID           string `ch:"container_uid" json:"container_uid"`
+	RestartCount           uint32 `ch:"restart_count" json:"restart_count"`
+	Ts                     int64  `ch:"ts" json:"ts"`
+	EventKind              string `ch:"event_kind" json:"event_kind"`
+	CPUUsageUsec           int64  `ch:"cpu_usage_usec" json:"cpu_usage_usec"`
+	MemoryBytes            int64  `ch:"memory_bytes" json:"memory_bytes"`
 	// Allocated from pod spec. Observational (utilization%), not billed.
 	// Captured every tick so resize events appear as value changes over time.
 	CPUAllocatedMillicores int32 `ch:"cpu_allocated_millicores" json:"cpu_allocated_millicores"`
@@ -279,6 +282,9 @@ type InstanceEventV1 struct {
 	AppID         string `ch:"app_id" json:"app_id"`
 	EnvironmentID string `ch:"environment_id" json:"environment_id"`
 	DeploymentID  string `ch:"deployment_id" json:"deployment_id"`
+	ResourceID    string `ch:"resource_id" json:"resource_id"`
+	ResourceName  string `ch:"resource_name" json:"resource_name"`
+	ResourceKind  string `ch:"resource_kind" json:"resource_kind"`
 
 	PodUID        string `ch:"pod_uid" json:"pod_uid"`
 	PodName       string `ch:"pod_name" json:"pod_name"`
@@ -322,6 +328,9 @@ type FrontlineRequest struct {
 	EnvironmentID    string              `ch:"environment_id" json:"environment_id"`
 	FrontlineID      string              `ch:"frontline_id" json:"frontline_id"`
 	DeploymentID     string              `ch:"deployment_id" json:"deployment_id"`
+	ResourceID       string              `ch:"resource_id" json:"resource_id"`
+	ResourceName     string              `ch:"resource_name" json:"resource_name"`
+	ResourceKind     string              `ch:"resource_kind" json:"resource_kind"`
 	InstanceID       string              `ch:"instance_id" json:"instance_id"`
 	InstanceAddress  string              `ch:"instance_address" json:"instance_address"`
 	Region           string              `ch:"region" json:"region"`

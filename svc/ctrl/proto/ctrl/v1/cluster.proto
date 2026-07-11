@@ -188,6 +188,11 @@ message InstanceEvent {
   //   cpu_request_millicores, memory_request_mib, build_id.
   // Numbers are stringified so the wire shape matches the column type.
   map<string, string> attributes = 17;
+
+  // Independently materialized output identity. Empty on legacy workloads.
+  string resource_id = 18;
+  string resource_name = 19;
+  string resource_kind = 20;
 }
 
 // Running means the container is healthy and serving. The event itself

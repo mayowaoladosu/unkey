@@ -303,6 +303,7 @@ var fieldAssertions = map[string]func(t *testing.T, rs *appsv1.ReplicaSet){
 		require.Equal(t, testResourceID, v)
 	},
 	"resource_name": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		require.Equal(t, testResourceName, rs.Spec.Template.Annotations[labels.AnnotationKeyResourceName])
 		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_RESOURCE_NAME")
 		require.True(t, ok)
 		require.Equal(t, testResourceName, v)

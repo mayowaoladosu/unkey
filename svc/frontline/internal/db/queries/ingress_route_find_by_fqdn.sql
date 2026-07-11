@@ -6,6 +6,9 @@
 SELECT
   fr.environment_id,
   fr.deployment_id,
+  COALESCE(public_dr.id, '') AS resource_id,
+  COALESCE(public_dr.name, '') AS resource_name,
+  COALESCE(public_dr.kind, '') AS resource_kind,
   d.workspace_id,
   d.project_id,
   d.app_id,
@@ -17,6 +20,14 @@ SELECT
   da.metadata AS static_metadata
 FROM frontline_routes fr
 INNER JOIN deployments d ON fr.deployment_id = d.id
+LEFT JOIN deployment_resources public_dr
+  ON public_dr.deployment_id = d.id
+  AND public_dr.public = true
+  AND public_dr.pk = (
+    SELECT MIN(candidate.pk)
+    FROM deployment_resources candidate
+    WHERE candidate.deployment_id = d.id AND candidate.public = true
+  )
 LEFT JOIN deployment_artifacts da
   ON da.deployment_id = d.id
   AND da.kind = 'static_bundle'

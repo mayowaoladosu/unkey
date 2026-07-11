@@ -14,6 +14,8 @@ import (
 const findInstancesByDeploymentID = `-- name: FindInstancesByDeploymentID :many
 SELECT
   i.pk, i.id, i.deployment_id, i.resource_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
+  COALESCE(dr.name, '') AS resource_name,
+  COALESCE(dr.kind, '') AS resource_kind,
   r.name AS region_name,
   r.platform AS region_platform
 FROM instances i
@@ -24,23 +26,25 @@ WHERE i.deployment_id = ?
 `
 
 type FindInstancesByDeploymentIDRow struct {
-	Pk              uint64                 `db:"pk"`
-	ID              string                 `db:"id"`
-	DeploymentID    string                 `db:"deployment_id"`
-	ResourceID      string                 `db:"resource_id"`
-	WorkspaceID     string                 `db:"workspace_id"`
-	ProjectID       string                 `db:"project_id"`
-	AppID           string                 `db:"app_id"`
-	RegionID        string                 `db:"region_id"`
-	K8sName         string                 `db:"k8s_name"`
-	Address         string                 `db:"address"`
-	CpuMillicores   int32                  `db:"cpu_millicores"`
-	MemoryMib       int32                  `db:"memory_mib"`
-	StorageMib      uint32                 `db:"storage_mib"`
-	Status          InstancesStatus        `db:"status"`
-	ContainerStatus dbtype.ContainerStatus `db:"container_status"`
-	RegionName      string                 `db:"region_name"`
-	RegionPlatform  string                 `db:"region_platform"`
+	Pk              uint64                  `db:"pk"`
+	ID              string                  `db:"id"`
+	DeploymentID    string                  `db:"deployment_id"`
+	ResourceID      string                  `db:"resource_id"`
+	WorkspaceID     string                  `db:"workspace_id"`
+	ProjectID       string                  `db:"project_id"`
+	AppID           string                  `db:"app_id"`
+	RegionID        string                  `db:"region_id"`
+	K8sName         string                  `db:"k8s_name"`
+	Address         string                  `db:"address"`
+	CpuMillicores   int32                   `db:"cpu_millicores"`
+	MemoryMib       int32                   `db:"memory_mib"`
+	StorageMib      uint32                  `db:"storage_mib"`
+	Status          InstancesStatus         `db:"status"`
+	ContainerStatus dbtype.ContainerStatus  `db:"container_status"`
+	ResourceName    string                  `db:"resource_name"`
+	ResourceKind    DeploymentResourcesKind `db:"resource_kind"`
+	RegionName      string                  `db:"region_name"`
+	RegionPlatform  string                  `db:"region_platform"`
 }
 
 // FindInstancesByDeploymentID returns all instances for a given deployment
@@ -48,6 +52,8 @@ type FindInstancesByDeploymentIDRow struct {
 //
 //	SELECT
 //	  i.pk, i.id, i.deployment_id, i.resource_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
+//	  COALESCE(dr.name, '') AS resource_name,
+//	  COALESCE(dr.kind, '') AS resource_kind,
 //	  r.name AS region_name,
 //	  r.platform AS region_platform
 //	FROM instances i
@@ -80,6 +86,8 @@ func (q *Queries) FindInstancesByDeploymentID(ctx context.Context, deploymentID 
 			&i.StorageMib,
 			&i.Status,
 			&i.ContainerStatus,
+			&i.ResourceName,
+			&i.ResourceKind,
 			&i.RegionName,
 			&i.RegionPlatform,
 		); err != nil {

@@ -667,7 +667,11 @@ type InstanceEvent struct {
 	//   image, image_id, cpu_limit_millicores, memory_limit_mib,
 	//   cpu_request_millicores, memory_request_mib, build_id.
 	// Numbers are stringified so the wire shape matches the column type.
-	Attributes    map[string]string `protobuf:"bytes,17,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Attributes map[string]string `protobuf:"bytes,17,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Independently materialized output identity. Empty on legacy workloads.
+	ResourceId    string `protobuf:"bytes,18,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	ResourceName  string `protobuf:"bytes,19,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
+	ResourceKind  string `protobuf:"bytes,20,opt,name=resource_kind,json=resourceKind,proto3" json:"resource_kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -832,6 +836,27 @@ func (x *InstanceEvent) GetAttributes() map[string]string {
 		return x.Attributes
 	}
 	return nil
+}
+
+func (x *InstanceEvent) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *InstanceEvent) GetResourceName() string {
+	if x != nil {
+		return x.ResourceName
+	}
+	return ""
+}
+
+func (x *InstanceEvent) GetResourceKind() string {
+	if x != nil {
+		return x.ResourceKind
+	}
+	return ""
 }
 
 type isInstanceEvent_State interface {
@@ -2122,7 +2147,7 @@ const file_ctrl_v1_cluster_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceIdB\b\n" +
 	"\x06change\" \n" +
-	"\x1eReportDeploymentStatusResponse\"\xd8\x05\n" +
+	"\x1eReportDeploymentStatusResponse\"\xc3\x06\n" +
 	"\rInstanceEvent\x12\x17\n" +
 	"\apod_uid\x18\x01 \x01(\tR\x06podUid\x12\x19\n" +
 	"\bpod_name\x18\x02 \x01(\tR\apodName\x12\x1b\n" +
@@ -2146,7 +2171,11 @@ const file_ctrl_v1_cluster_proto_rawDesc = "" +
 	"\awaiting\x18\x10 \x01(\v2\x10.ctrl.v1.WaitingH\x00R\awaiting\x12F\n" +
 	"\n" +
 	"attributes\x18\x11 \x03(\v2&.ctrl.v1.InstanceEvent.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
+	"attributes\x12\x1f\n" +
+	"\vresource_id\x18\x12 \x01(\tR\n" +
+	"resourceId\x12#\n" +
+	"\rresource_name\x18\x13 \x01(\tR\fresourceName\x12#\n" +
+	"\rresource_kind\x18\x14 \x01(\tR\fresourceKind\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\a\n" +

@@ -447,7 +447,7 @@ type Querier interface {
 	FindAppRegionalSettingsByAppAndEnv(ctx context.Context, db DBTX, arg FindAppRegionalSettingsByAppAndEnvParams) ([]FindAppRegionalSettingsByAppAndEnvRow, error)
 	//FindAppRuntimeSettingsByAppAndEnv
 	//
-	//  SELECT app_runtime_settings.pk, app_runtime_settings.workspace_id, app_runtime_settings.app_id, app_runtime_settings.environment_id, app_runtime_settings.port, app_runtime_settings.cpu_millicores, app_runtime_settings.memory_mib, app_runtime_settings.storage_mib, app_runtime_settings.command, app_runtime_settings.healthcheck, app_runtime_settings.shutdown_signal, app_runtime_settings.upstream_protocol, app_runtime_settings.sentinel_config, app_runtime_settings.openapi_spec_path, app_runtime_settings.created_at, app_runtime_settings.updated_at
+	//  SELECT app_runtime_settings.pk, app_runtime_settings.workspace_id, app_runtime_settings.app_id, app_runtime_settings.environment_id, app_runtime_settings.port, app_runtime_settings.cpu_millicores, app_runtime_settings.memory_mib, app_runtime_settings.storage_mib, app_runtime_settings.command, app_runtime_settings.outputs, app_runtime_settings.healthcheck, app_runtime_settings.shutdown_signal, app_runtime_settings.upstream_protocol, app_runtime_settings.sentinel_config, app_runtime_settings.openapi_spec_path, app_runtime_settings.created_at, app_runtime_settings.updated_at
 	//  FROM app_runtime_settings
 	//  WHERE app_id = ?
 	//    AND environment_id = ?
@@ -468,7 +468,7 @@ type Querier interface {
 	//  SELECT
 	//      a.pk, a.id, a.workspace_id, a.project_id, a.name, a.slug, a.default_branch, a.current_deployment_id, a.is_rolled_back, a.delete_protection, a.created_at, a.updated_at,
 	//      abs.pk, abs.workspace_id, abs.app_id, abs.environment_id, abs.dockerfile, abs.docker_context, abs.build_command, abs.watch_paths, abs.auto_deploy, abs.created_at, abs.updated_at,
-	//      ars.pk, ars.workspace_id, ars.app_id, ars.environment_id, ars.port, ars.cpu_millicores, ars.memory_mib, ars.storage_mib, ars.command, ars.healthcheck, ars.shutdown_signal, ars.upstream_protocol, ars.sentinel_config, ars.openapi_spec_path, ars.created_at, ars.updated_at
+	//      ars.pk, ars.workspace_id, ars.app_id, ars.environment_id, ars.port, ars.cpu_millicores, ars.memory_mib, ars.storage_mib, ars.command, ars.outputs, ars.healthcheck, ars.shutdown_signal, ars.upstream_protocol, ars.sentinel_config, ars.openapi_spec_path, ars.created_at, ars.updated_at
 	//  FROM apps a
 	//  INNER JOIN app_build_settings abs ON abs.app_id = a.id AND abs.environment_id = ?
 	//  INNER JOIN app_runtime_settings ars ON ars.app_id = a.id AND ars.environment_id = ?
@@ -2524,7 +2524,7 @@ type Querier interface {
 	// Returns the runtime settings for every environment in an app, for callers
 	// that build multiple environments at once and group by environment_id.
 	//
-	//  SELECT app_runtime_settings.pk, app_runtime_settings.workspace_id, app_runtime_settings.app_id, app_runtime_settings.environment_id, app_runtime_settings.port, app_runtime_settings.cpu_millicores, app_runtime_settings.memory_mib, app_runtime_settings.storage_mib, app_runtime_settings.command, app_runtime_settings.healthcheck, app_runtime_settings.shutdown_signal, app_runtime_settings.upstream_protocol, app_runtime_settings.sentinel_config, app_runtime_settings.openapi_spec_path, app_runtime_settings.created_at, app_runtime_settings.updated_at
+	//  SELECT app_runtime_settings.pk, app_runtime_settings.workspace_id, app_runtime_settings.app_id, app_runtime_settings.environment_id, app_runtime_settings.port, app_runtime_settings.cpu_millicores, app_runtime_settings.memory_mib, app_runtime_settings.storage_mib, app_runtime_settings.command, app_runtime_settings.outputs, app_runtime_settings.healthcheck, app_runtime_settings.shutdown_signal, app_runtime_settings.upstream_protocol, app_runtime_settings.sentinel_config, app_runtime_settings.openapi_spec_path, app_runtime_settings.created_at, app_runtime_settings.updated_at
 	//  FROM app_runtime_settings
 	//  WHERE app_id = ?
 	ListAppRuntimeSettingsByApp(ctx context.Context, db DBTX, appID string) ([]ListAppRuntimeSettingsByAppRow, error)
@@ -3146,7 +3146,7 @@ type Querier interface {
 	//      e.pk, e.id, e.workspace_id, e.project_id, e.app_id, e.slug, e.description, e.delete_protection, e.created_at, e.updated_at,
 	//      a.pk, a.id, a.workspace_id, a.project_id, a.name, a.slug, a.default_branch, a.current_deployment_id, a.is_rolled_back, a.delete_protection, a.created_at, a.updated_at,
 	//      abs.pk, abs.workspace_id, abs.app_id, abs.environment_id, abs.dockerfile, abs.docker_context, abs.build_command, abs.watch_paths, abs.auto_deploy, abs.created_at, abs.updated_at,
-	//      ars.pk, ars.workspace_id, ars.app_id, ars.environment_id, ars.port, ars.cpu_millicores, ars.memory_mib, ars.storage_mib, ars.command, ars.healthcheck, ars.shutdown_signal, ars.upstream_protocol, ars.sentinel_config, ars.openapi_spec_path, ars.created_at, ars.updated_at
+	//      ars.pk, ars.workspace_id, ars.app_id, ars.environment_id, ars.port, ars.cpu_millicores, ars.memory_mib, ars.storage_mib, ars.command, ars.outputs, ars.healthcheck, ars.shutdown_signal, ars.upstream_protocol, ars.sentinel_config, ars.openapi_spec_path, ars.created_at, ars.updated_at
 	//  FROM github_repo_connections gc
 	//  INNER JOIN apps a ON a.id = gc.app_id
 	//  INNER JOIN projects p ON p.id = gc.project_id

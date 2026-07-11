@@ -10,85 +10,85 @@ import type { Querier } from "./client";
 // or per-month.
 
 export const TIME_WINDOWS = [
-  "15m",
-  "1h",
-  "3h",
-  "6h",
-  "12h",
-  "1d",
-  "1w",
-  "30d",
-  "90d",
-  "1y",
+	"15m",
+	"1h",
+	"3h",
+	"6h",
+	"12h",
+	"1d",
+	"1w",
+	"30d",
+	"90d",
+	"1y",
 ] as const;
 export type TimeWindow = (typeof TIME_WINDOWS)[number];
 
 type WindowSpec = {
-  windowSeconds: number;
-  bucketSeconds: number;
-  mvTable: string;
+	windowSeconds: number;
+	bucketSeconds: number;
+	mvTable: string;
 };
 
 const WINDOW_CONFIG: Record<TimeWindow, WindowSpec> = {
-  "15m": {
-    windowSeconds: 15 * 60,
-    bucketSeconds: 15,
-    mvTable: "default.instance_resources_per_15s_v1",
-  },
-  "1h": {
-    windowSeconds: 60 * 60,
-    bucketSeconds: 15,
-    mvTable: "default.instance_resources_per_15s_v1",
-  },
-  "3h": {
-    windowSeconds: 3 * 60 * 60,
-    bucketSeconds: 60,
-    mvTable: "default.instance_resources_per_minute_v1",
-  },
-  "6h": {
-    windowSeconds: 6 * 60 * 60,
-    bucketSeconds: 60,
-    mvTable: "default.instance_resources_per_minute_v1",
-  },
-  "12h": {
-    windowSeconds: 12 * 60 * 60,
-    bucketSeconds: 60,
-    mvTable: "default.instance_resources_per_minute_v1",
-  },
-  "1d": {
-    windowSeconds: 24 * 60 * 60,
-    bucketSeconds: 60,
-    mvTable: "default.instance_resources_per_minute_v1",
-  },
-  "1w": {
-    windowSeconds: 7 * 24 * 60 * 60,
-    bucketSeconds: 60 * 60,
-    mvTable: "default.instance_resources_per_hour_v1",
-  },
-  // 30d @ hour buckets = 720 points — still readable, more detail than day
-  // buckets would give. per-hour MV TTL is 90 days so the full 30-day
-  // window fits.
-  "30d": {
-    windowSeconds: 30 * 24 * 60 * 60,
-    bucketSeconds: 60 * 60,
-    mvTable: "default.instance_resources_per_hour_v1",
-  },
-  // 90d @ day buckets = 90 points. per-hour MV TTL is exactly 90 days, so
-  // we'd risk missing the earliest bucket — per-day (365d TTL) is the
-  // safer read at this range.
-  "90d": {
-    windowSeconds: 90 * 24 * 60 * 60,
-    bucketSeconds: 24 * 60 * 60,
-    mvTable: "default.instance_resources_per_day_v1",
-  },
-  // 1y @ day buckets = 365 points — dense but readable. per-day MV TTL is
-  // 365 days, so the edge is covered. Month buckets would only give 12
-  // points, losing too much detail for day-level hover / annotations.
-  "1y": {
-    windowSeconds: 365 * 24 * 60 * 60,
-    bucketSeconds: 24 * 60 * 60,
-    mvTable: "default.instance_resources_per_day_v1",
-  },
+	"15m": {
+		windowSeconds: 15 * 60,
+		bucketSeconds: 15,
+		mvTable: "default.instance_resources_per_15s_v1",
+	},
+	"1h": {
+		windowSeconds: 60 * 60,
+		bucketSeconds: 15,
+		mvTable: "default.instance_resources_per_15s_v1",
+	},
+	"3h": {
+		windowSeconds: 3 * 60 * 60,
+		bucketSeconds: 60,
+		mvTable: "default.instance_resources_per_minute_v1",
+	},
+	"6h": {
+		windowSeconds: 6 * 60 * 60,
+		bucketSeconds: 60,
+		mvTable: "default.instance_resources_per_minute_v1",
+	},
+	"12h": {
+		windowSeconds: 12 * 60 * 60,
+		bucketSeconds: 60,
+		mvTable: "default.instance_resources_per_minute_v1",
+	},
+	"1d": {
+		windowSeconds: 24 * 60 * 60,
+		bucketSeconds: 60,
+		mvTable: "default.instance_resources_per_minute_v1",
+	},
+	"1w": {
+		windowSeconds: 7 * 24 * 60 * 60,
+		bucketSeconds: 60 * 60,
+		mvTable: "default.instance_resources_per_hour_v1",
+	},
+	// 30d @ hour buckets = 720 points — still readable, more detail than day
+	// buckets would give. per-hour MV TTL is 90 days so the full 30-day
+	// window fits.
+	"30d": {
+		windowSeconds: 30 * 24 * 60 * 60,
+		bucketSeconds: 60 * 60,
+		mvTable: "default.instance_resources_per_hour_v1",
+	},
+	// 90d @ day buckets = 90 points. per-hour MV TTL is exactly 90 days, so
+	// we'd risk missing the earliest bucket — per-day (365d TTL) is the
+	// safer read at this range.
+	"90d": {
+		windowSeconds: 90 * 24 * 60 * 60,
+		bucketSeconds: 24 * 60 * 60,
+		mvTable: "default.instance_resources_per_day_v1",
+	},
+	// 1y @ day buckets = 365 points — dense but readable. per-day MV TTL is
+	// 365 days, so the edge is covered. Month buckets would only give 12
+	// points, losing too much detail for day-level hover / annotations.
+	"1y": {
+		windowSeconds: 365 * 24 * 60 * 60,
+		bucketSeconds: 24 * 60 * 60,
+		mvTable: "default.instance_resources_per_day_v1",
+	},
 };
 
 // Raw FINAL view for the "live tip" of charts (current, still-filling bucket).
@@ -104,18 +104,23 @@ const RESOURCE_FILTER = `
   workspace_id = {workspaceId: String}
   AND resource_type = 'deployment'
   AND resource_id = {resourceId: String}
+  AND (
+    {deploymentResourceId: String} = ''
+    OR deployment_resource_id = {deploymentResourceId: String}
+  )
   AND ({instanceName: String} = '' OR instance_id = {instanceName: String})`;
 
 const baseParams = z.object({
-  workspaceId: z.string(),
-  resourceId: z.string(),
-  instanceName: z.string().default(""),
-  window: z.enum(TIME_WINDOWS).default("1h"),
+	workspaceId: z.string(),
+	resourceId: z.string(),
+	deploymentResourceId: z.string().default(""),
+	instanceName: z.string().default(""),
+	window: z.enum(TIME_WINDOWS).default("1h"),
 });
 
 const timeseriesPointSchema = z.object({
-  x: z.number().int(),
-  y: z.number(),
+	x: z.number().int(),
+	y: z.number(),
 });
 
 // ─── Hybrid timeseries (MV for cold tail + raw for live bucket) ───────
@@ -141,47 +146,48 @@ const timeseriesPointSchema = z.object({
 const MV_GRACE_SECONDS = 30;
 
 function buildParams() {
-  return baseParams.extend({
-    windowSeconds: z.number(),
-    bucketSeconds: z.number(),
-    graceSeconds: z.number(),
-    tSec: z.number(),
-    windowStartSec: z.number(),
-    windowEndSec: z.number(),
-    tMs: z.number(),
-    windowStartMs: z.number(),
-    windowEndMs: z.number(),
-  });
+	return baseParams.extend({
+		windowSeconds: z.number(),
+		bucketSeconds: z.number(),
+		graceSeconds: z.number(),
+		tSec: z.number(),
+		windowStartSec: z.number(),
+		windowEndSec: z.number(),
+		tMs: z.number(),
+		windowStartMs: z.number(),
+		windowEndMs: z.number(),
+	});
 }
 
 function specFor(args: z.infer<typeof baseParams>) {
-  const spec = WINDOW_CONFIG[args.window];
-  // Compute every time boundary the query needs in JS, not as a SQL CTE.
-  // ClickHouse's WITH FILL FROM/TO requires a non-Nullable constant;
-  // pulling the bound from a subquery returns Nullable(Int64) and the
-  // server rejects the query with "Sort FILL FROM expression must be
-  // constant with numeric type". Pinning now() once here also keeps the
-  // cold/live cutoff aligned with the FILL bounds (the original reason
-  // the CTE existed). Clock skew between dashboard host and ClickHouse
-  // is sub-second, invisible at any of the chart resolutions.
-  const nowSec = Math.floor(Date.now() / 1000);
-  const bucket = (sec: number) => Math.floor(sec / spec.bucketSeconds) * spec.bucketSeconds;
-  const tSec = bucket(nowSec - MV_GRACE_SECONDS);
-  const windowStartSec = bucket(nowSec - spec.windowSeconds);
-  const windowEndSec = bucket(nowSec);
-  return {
-    ...args,
-    windowSeconds: spec.windowSeconds,
-    bucketSeconds: spec.bucketSeconds,
-    graceSeconds: MV_GRACE_SECONDS,
-    tSec,
-    windowStartSec,
-    windowEndSec,
-    tMs: tSec * 1000,
-    windowStartMs: windowStartSec * 1000,
-    windowEndMs: windowEndSec * 1000,
-    mvTable: spec.mvTable,
-  };
+	const spec = WINDOW_CONFIG[args.window];
+	// Compute every time boundary the query needs in JS, not as a SQL CTE.
+	// ClickHouse's WITH FILL FROM/TO requires a non-Nullable constant;
+	// pulling the bound from a subquery returns Nullable(Int64) and the
+	// server rejects the query with "Sort FILL FROM expression must be
+	// constant with numeric type". Pinning now() once here also keeps the
+	// cold/live cutoff aligned with the FILL bounds (the original reason
+	// the CTE existed). Clock skew between dashboard host and ClickHouse
+	// is sub-second, invisible at any of the chart resolutions.
+	const nowSec = Math.floor(Date.now() / 1000);
+	const bucket = (sec: number) =>
+		Math.floor(sec / spec.bucketSeconds) * spec.bucketSeconds;
+	const tSec = bucket(nowSec - MV_GRACE_SECONDS);
+	const windowStartSec = bucket(nowSec - spec.windowSeconds);
+	const windowEndSec = bucket(nowSec);
+	return {
+		...args,
+		windowSeconds: spec.windowSeconds,
+		bucketSeconds: spec.bucketSeconds,
+		graceSeconds: MV_GRACE_SECONDS,
+		tSec,
+		windowStartSec,
+		windowEndSec,
+		tMs: tSec * 1000,
+		windowStartMs: windowStartSec * 1000,
+		windowEndMs: windowEndSec * 1000,
+		mvTable: spec.mvTable,
+	};
 }
 
 // ─── Metric registry ──────────────────────────────────────────────────
@@ -201,87 +207,88 @@ function specFor(args: z.infer<typeof baseParams>) {
 // raw stitching, parameter binding, and zero-bar suppression are shared.
 
 type Metric = {
-  // Per-bucket aggregate over the MV's pre-aggregated columns.
-  // Resulting column is aliased AS y by the builder.
-  mvAgg: string;
-  // Per-bucket aggregate over either raw checkpoints or the per-container
-  // subquery output. Aliased AS y by the builder.
-  rawAgg: string;
-  // Optional: per-container reduction inside the live-tip subquery.
-  // Result is aliased AS container_value, available to rawAgg.
-  perContainer?: string;
+	// Per-bucket aggregate over the MV's pre-aggregated columns.
+	// Resulting column is aliased AS y by the builder.
+	mvAgg: string;
+	// Per-bucket aggregate over either raw checkpoints or the per-container
+	// subquery output. Aliased AS y by the builder.
+	rawAgg: string;
+	// Optional: per-container reduction inside the live-tip subquery.
+	// Result is aliased AS container_value, available to rawAgg.
+	perContainer?: string;
 };
 
 const METRICS: Record<string, Metric> = {
-  // CPU: cumulative usec counter delta per container (= microseconds the
-  // container actually spent on-CPU during the bucket), summed across
-  // containers, divided by bucket length and 1000 → millicores.
-  cpu: {
-    mvAgg: "sum(cpu_usage_usec_max - cpu_usage_usec_min) / {bucketSeconds: UInt32} / 1000",
-    perContainer: "max(cpu_usage_usec) - min(cpu_usage_usec)",
-    rawAgg: "sum(container_value) / {bucketSeconds: UInt32} / 1000",
-  },
-  // Memory: peak (working-set) bytes per container during the bucket,
-  // summed across containers. max() is monotone so retries don't double-count.
-  memory: {
-    mvAgg: "sum(memory_bytes_max)",
-    perContainer: "max(memory_bytes)",
-    rawAgg: "sum(container_value)",
-  },
-  // Disk: latest used bytes per container during the bucket, summed
-  // across containers. Same shape as memory.
-  disk: {
-    mvAgg: "sum(disk_used_bytes_max)",
-    perContainer: "max(disk_used_bytes)",
-    rawAgg: "sum(container_value)",
-  },
-  // Active instances: distinct container_uid count per bucket. No
-  // per-container reduce — uniq is already a direct aggregation.
-  instances: {
-    mvAgg: "uniq(container_uid)",
-    rawAgg: "uniq(container_uid)",
-  },
-  // Network egress: sum of public + private egress bytes counter delta per
-  // bucket (max - min, monotone like cpu_usage_usec), divided by bucket
-  // length to give bytes/sec. Counters come from the cgroup_skb eBPF
-  // collector. v1 sums public + private into one rate; we can split into
-  // two stacked colours later if customers need to see the breakdown.
-  network_egress: {
-    mvAgg:
-      "sum((network_egress_public_bytes_max - network_egress_public_bytes_min) + (network_egress_private_bytes_max - network_egress_private_bytes_min)) / {bucketSeconds: UInt32}",
-    perContainer:
-      "(max(network_egress_public_bytes) - min(network_egress_public_bytes)) + (max(network_egress_private_bytes) - min(network_egress_private_bytes))",
-    rawAgg: "sum(container_value) / {bucketSeconds: UInt32}",
-  },
-  network_ingress: {
-    mvAgg:
-      "sum((network_ingress_public_bytes_max - network_ingress_public_bytes_min) + (network_ingress_private_bytes_max - network_ingress_private_bytes_min)) / {bucketSeconds: UInt32}",
-    perContainer:
-      "(max(network_ingress_public_bytes) - min(network_ingress_public_bytes)) + (max(network_ingress_private_bytes) - min(network_ingress_private_bytes))",
-    rawAgg: "sum(container_value) / {bucketSeconds: UInt32}",
-  },
+	// CPU: cumulative usec counter delta per container (= microseconds the
+	// container actually spent on-CPU during the bucket), summed across
+	// containers, divided by bucket length and 1000 → millicores.
+	cpu: {
+		mvAgg:
+			"sum(cpu_usage_usec_max - cpu_usage_usec_min) / {bucketSeconds: UInt32} / 1000",
+		perContainer: "max(cpu_usage_usec) - min(cpu_usage_usec)",
+		rawAgg: "sum(container_value) / {bucketSeconds: UInt32} / 1000",
+	},
+	// Memory: peak (working-set) bytes per container during the bucket,
+	// summed across containers. max() is monotone so retries don't double-count.
+	memory: {
+		mvAgg: "sum(memory_bytes_max)",
+		perContainer: "max(memory_bytes)",
+		rawAgg: "sum(container_value)",
+	},
+	// Disk: latest used bytes per container during the bucket, summed
+	// across containers. Same shape as memory.
+	disk: {
+		mvAgg: "sum(disk_used_bytes_max)",
+		perContainer: "max(disk_used_bytes)",
+		rawAgg: "sum(container_value)",
+	},
+	// Active instances: distinct container_uid count per bucket. No
+	// per-container reduce — uniq is already a direct aggregation.
+	instances: {
+		mvAgg: "uniq(container_uid)",
+		rawAgg: "uniq(container_uid)",
+	},
+	// Network egress: sum of public + private egress bytes counter delta per
+	// bucket (max - min, monotone like cpu_usage_usec), divided by bucket
+	// length to give bytes/sec. Counters come from the cgroup_skb eBPF
+	// collector. v1 sums public + private into one rate; we can split into
+	// two stacked colours later if customers need to see the breakdown.
+	network_egress: {
+		mvAgg:
+			"sum((network_egress_public_bytes_max - network_egress_public_bytes_min) + (network_egress_private_bytes_max - network_egress_private_bytes_min)) / {bucketSeconds: UInt32}",
+		perContainer:
+			"(max(network_egress_public_bytes) - min(network_egress_public_bytes)) + (max(network_egress_private_bytes) - min(network_egress_private_bytes))",
+		rawAgg: "sum(container_value) / {bucketSeconds: UInt32}",
+	},
+	network_ingress: {
+		mvAgg:
+			"sum((network_ingress_public_bytes_max - network_ingress_public_bytes_min) + (network_ingress_private_bytes_max - network_ingress_private_bytes_min)) / {bucketSeconds: UInt32}",
+		perContainer:
+			"(max(network_ingress_public_bytes) - min(network_ingress_public_bytes)) + (max(network_ingress_private_bytes) - min(network_ingress_private_bytes))",
+		rawAgg: "sum(container_value) / {bucketSeconds: UInt32}",
+	},
 };
 
 function buildHybridQuery(metric: Metric, mvTable: string): string {
-  // All time bounds (cold/live cutoff, MV window start, WITH FILL FROM/TO)
-  // are computed in specFor() and passed as scalar parameters. This
-  // sidesteps two ClickHouse limits: (1) WITH FILL FROM/TO must be a
-  // non-Nullable constant, and a CTE-derived value comes out as
-  // Nullable(Int64); (2) `now()` evaluated inline at multiple call sites
-  // can resolve to different milliseconds, putting the cold/live cutoff
-  // and the FILL bounds in different buckets. Pinning everything to a
-  // single client-side timestamp avoids both issues.
+	// All time bounds (cold/live cutoff, MV window start, WITH FILL FROM/TO)
+	// are computed in specFor() and passed as scalar parameters. This
+	// sidesteps two ClickHouse limits: (1) WITH FILL FROM/TO must be a
+	// non-Nullable constant, and a CTE-derived value comes out as
+	// Nullable(Int64); (2) `now()` evaluated inline at multiple call sites
+	// can resolve to different milliseconds, putting the cold/live cutoff
+	// and the FILL bounds in different buckets. Pinning everything to a
+	// single client-side timestamp avoids both issues.
 
-  // Live-tip bucketing. Cast ts (DateTime64 millis) down to DateTime seconds
-  // before bucketing so the resulting `time` column has the same type as the
-  // MV's `time` — otherwise the UNION promotes to DateTime64 and the
-  // DateTime-typed WITH FILL bounds below would fail the "types must match
-  // exactly" check.
-  const tipBucket =
-    "toStartOfInterval(toDateTime(intDiv(ts, 1000)), INTERVAL {bucketSeconds: UInt32} SECOND)";
+	// Live-tip bucketing. Cast ts (DateTime64 millis) down to DateTime seconds
+	// before bucketing so the resulting `time` column has the same type as the
+	// MV's `time` — otherwise the UNION promotes to DateTime64 and the
+	// DateTime-typed WITH FILL bounds below would fail the "types must match
+	// exactly" check.
+	const tipBucket =
+		"toStartOfInterval(toDateTime(intDiv(ts, 1000)), INTERVAL {bucketSeconds: UInt32} SECOND)";
 
-  const liveTip = metric.perContainer
-    ? `SELECT time, ${metric.rawAgg} AS y
+	const liveTip = metric.perContainer
+		? `SELECT time, ${metric.rawAgg} AS y
        FROM (
          SELECT
            container_uid,
@@ -293,7 +300,7 @@ function buildHybridQuery(metric: Metric, mvTable: string): string {
          GROUP BY container_uid, time
        )
        GROUP BY time`
-    : `SELECT
+		: `SELECT
          ${tipBucket} AS time,
          ${metric.rawAgg} AS y
        FROM ${CHECKPOINTS_VIEW}
@@ -301,25 +308,25 @@ function buildHybridQuery(metric: Metric, mvTable: string): string {
          AND ts >= {tMs: Int64}
        GROUP BY time`;
 
-  // ORDER BY time WITH FILL FROM/TO pads every missing bucket across the
-  // full window with zero-valued rows, so the chart always has a sample
-  // at every grid position from `now - windowSeconds` to `now`. The
-  // client keeps the overall axis-width decision (anchor to the window
-  // vs contract to data extent): it counts non-zero samples to detect
-  // sparse data and contracts the x-axis domain accordingly, so this
-  // full-window padding doesn't cause the "23h of flat zeros" problem
-  // on a new deployment that picked "Past day".
-  // WITH FILL fills the ORDER BY column with interpolated values for
-  // missing buckets; every OTHER column in the SELECT gets the Int64/
-  // Float64 zero default for those filled rows. That matters here
-  // because the chart's x-axis reads `originalTimestamp` (the alias `x`)
-  // — if we order by `time` and project `x = toUnixTimestamp(time)`,
-  // filled rows arrive with x=0 (Unix epoch) while time is the correct
-  // bucket, and the chart renders a phantom line from x=0 through the
-  // real data. Fix: order by and fill on `x` directly (Int64 millis),
-  // so filled rows get the correct millis in the column the chart
-  // actually reads.
-  return `
+	// ORDER BY time WITH FILL FROM/TO pads every missing bucket across the
+	// full window with zero-valued rows, so the chart always has a sample
+	// at every grid position from `now - windowSeconds` to `now`. The
+	// client keeps the overall axis-width decision (anchor to the window
+	// vs contract to data extent): it counts non-zero samples to detect
+	// sparse data and contracts the x-axis domain accordingly, so this
+	// full-window padding doesn't cause the "23h of flat zeros" problem
+	// on a new deployment that picked "Past day".
+	// WITH FILL fills the ORDER BY column with interpolated values for
+	// missing buckets; every OTHER column in the SELECT gets the Int64/
+	// Float64 zero default for those filled rows. That matters here
+	// because the chart's x-axis reads `originalTimestamp` (the alias `x`)
+	// — if we order by `time` and project `x = toUnixTimestamp(time)`,
+	// filled rows arrive with x=0 (Unix epoch) while time is the correct
+	// bucket, and the chart renders a phantom line from x=0 through the
+	// real data. Fix: order by and fill on `x` directly (Int64 millis),
+	// so filled rows get the correct millis in the column the chart
+	// actually reads.
+	return `
     SELECT x, toFloat64(y) AS y
     FROM (
       SELECT
@@ -343,23 +350,29 @@ function buildHybridQuery(metric: Metric, mvTable: string): string {
 }
 
 function makeTimeseriesQuery(metric: Metric) {
-  return (ch: Querier) => async (args: z.infer<typeof baseParams>) => {
-    const { mvTable, ...params } = specFor(args);
-    const query = ch.query({
-      query: buildHybridQuery(metric, mvTable),
-      params: buildParams(),
-      schema: timeseriesPointSchema,
-    });
-    return query(params);
-  };
+	return (ch: Querier) => async (args: z.infer<typeof baseParams>) => {
+		const { mvTable, ...params } = specFor(args);
+		const query = ch.query({
+			query: buildHybridQuery(metric, mvTable),
+			params: buildParams(),
+			schema: timeseriesPointSchema,
+		});
+		return query(params);
+	};
 }
 
 export const getResourceCpuTimeseries = makeTimeseriesQuery(METRICS.cpu);
 export const getResourceMemoryTimeseries = makeTimeseriesQuery(METRICS.memory);
 export const getResourceDiskTimeseries = makeTimeseriesQuery(METRICS.disk);
-export const getResourceInstanceCountTimeseries = makeTimeseriesQuery(METRICS.instances);
-export const getResourceNetworkEgressTimeseries = makeTimeseriesQuery(METRICS.network_egress);
-export const getResourceNetworkIngressTimeseries = makeTimeseriesQuery(METRICS.network_ingress);
+export const getResourceInstanceCountTimeseries = makeTimeseriesQuery(
+	METRICS.instances,
+);
+export const getResourceNetworkEgressTimeseries = makeTimeseriesQuery(
+	METRICS.network_egress,
+);
+export const getResourceNetworkIngressTimeseries = makeTimeseriesQuery(
+	METRICS.network_ingress,
+);
 
 // ─── Current Resource Summary (latest window from raw FINAL view) ─────
 //
@@ -370,26 +383,27 @@ const RATE_WINDOW_MINUTES = 2;
 const LIVE_WINDOW_SECONDS = 30;
 
 const resourceSummarySchema = z.object({
-  active_instances: z.number().int(),
-  current_cpu_millicores: z.number(),
-  current_memory_bytes: z.number().int(),
-  current_disk_used_bytes: z.number().int(),
-  current_egress_bytes_per_sec: z.number(),
-  current_ingress_bytes_per_sec: z.number(),
-  cpu_allocated_millicores: z.number(),
-  memory_allocated_bytes: z.number(),
+	active_instances: z.number().int(),
+	current_cpu_millicores: z.number(),
+	current_memory_bytes: z.number().int(),
+	current_disk_used_bytes: z.number().int(),
+	current_egress_bytes_per_sec: z.number(),
+	current_ingress_bytes_per_sec: z.number(),
+	cpu_allocated_millicores: z.number(),
+	memory_allocated_bytes: z.number(),
 });
 
 const summaryParams = z.object({
-  workspaceId: z.string(),
-  resourceId: z.string(),
-  instanceName: z.string().default(""),
+	workspaceId: z.string(),
+	resourceId: z.string(),
+	deploymentResourceId: z.string().default(""),
+	instanceName: z.string().default(""),
 });
 
 export function getResourceSummary(ch: Querier) {
-  return async (args: z.infer<typeof summaryParams>) => {
-    const query = ch.query({
-      query: `
+	return async (args: z.infer<typeof summaryParams>) => {
+		const query = ch.query({
+			query: `
         WITH per_container AS (
           SELECT
             container_uid,
@@ -422,17 +436,17 @@ export function getResourceSummary(ch: Querier) {
           sumIf(cpu_alloc_latest, last_seen_ts >= (SELECT cutoff_ms FROM live_cutoff)) AS cpu_allocated_millicores,
           sumIf(memory_alloc_latest, last_seen_ts >= (SELECT cutoff_ms FROM live_cutoff)) AS memory_allocated_bytes
         FROM per_container`,
-      params: summaryParams.extend({
-        rateWindowMinutes: z.number(),
-        liveWindowSeconds: z.number(),
-      }),
-      schema: resourceSummarySchema,
-    });
+			params: summaryParams.extend({
+				rateWindowMinutes: z.number(),
+				liveWindowSeconds: z.number(),
+			}),
+			schema: resourceSummarySchema,
+		});
 
-    return query({
-      ...args,
-      rateWindowMinutes: RATE_WINDOW_MINUTES,
-      liveWindowSeconds: LIVE_WINDOW_SECONDS,
-    });
-  };
+		return query({
+			...args,
+			rateWindowMinutes: RATE_WINDOW_MINUTES,
+			liveWindowSeconds: LIVE_WINDOW_SECONDS,
+		});
+	};
 }

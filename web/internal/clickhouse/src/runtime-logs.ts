@@ -14,41 +14,46 @@ const INGESTION_LAG_GRACE_MS = 2 * 60 * 60 * 1000;
 const MAX_EXECUTION_TIME_SECONDS = 20;
 
 export const runtimeLogsRequestSchema = z.object({
-  workspaceId: z.string(),
-  projectId: z.string(),
-  deploymentId: z.array(z.string()),
-  environmentId: z.array(z.string()),
-  appId: z.string().nullable(),
-  limit: z.int().min(1).max(MAX_PAGE_SIZE),
-  startTime: z.int(),
-  endTime: z.int(),
-  severity: z.array(z.string()).nullable(),
-  region: z.array(z.string()).nullable(),
-  message: z.string().nullable(),
-  k8sPodNames: z.array(z.string()),
-  // 1-based page for offset pagination. Defaults to 1 (offset 0).
-  page: z.number().int().min(1).default(1),
+	workspaceId: z.string(),
+	projectId: z.string(),
+	deploymentId: z.array(z.string()),
+	resourceId: z.array(z.string()),
+	resourceKind: z.array(z.string()),
+	environmentId: z.array(z.string()),
+	appId: z.string().nullable(),
+	limit: z.int().min(1).max(MAX_PAGE_SIZE),
+	startTime: z.int(),
+	endTime: z.int(),
+	severity: z.array(z.string()).nullable(),
+	region: z.array(z.string()).nullable(),
+	message: z.string().nullable(),
+	k8sPodNames: z.array(z.string()),
+	// 1-based page for offset pagination. Defaults to 1 (offset 0).
+	page: z.number().int().min(1).default(1),
 });
 
 export type RuntimeLogsRequest = z.infer<typeof runtimeLogsRequestSchema>;
 
 const runtimeLogsCountParamsSchema = runtimeLogsRequestSchema.extend({
-  partitionStartTime: z.int(),
-  partitionEndTime: z.int(),
+	partitionStartTime: z.int(),
+	partitionEndTime: z.int(),
 });
 
 const runtimeLogsQueryParamsSchema = runtimeLogsCountParamsSchema.extend({
-  offset: z.int(),
+	offset: z.int(),
 });
 
 export const runtimeLog = z.object({
-  time: z.int(),
-  severity: z.string(),
-  message: z.string(),
-  deployment_id: z.string(),
-  region: z.string(),
-  k8s_pod_name: z.string(),
-  attributes: z.record(z.string(), z.unknown()).nullable(),
+	time: z.int(),
+	severity: z.string(),
+	message: z.string(),
+	deployment_id: z.string(),
+	resource_id: z.string(),
+	resource_name: z.string(),
+	resource_kind: z.string(),
+	region: z.string(),
+	k8s_pod_name: z.string(),
+	attributes: z.record(z.string(), z.unknown()).nullable(),
 });
 
 export type RuntimeLog = z.infer<typeof runtimeLog>;
@@ -57,13 +62,16 @@ export type RuntimeLog = z.infer<typeof runtimeLog>;
 // JSON column: JSON fans out into ~1k subcolumn files per part, so on CH
 // Cloud cold queries pay ~1k S3 GetObjects for the marks alone.
 const runtimeLogRow = z.object({
-  time: z.int(),
-  severity: z.string(),
-  message: z.string(),
-  deployment_id: z.string(),
-  region: z.string(),
-  k8s_pod_name: z.string(),
-  attributes_text: z.string().nullable(),
+	time: z.int(),
+	severity: z.string(),
+	message: z.string(),
+	deployment_id: z.string(),
+	resource_id: z.string(),
+	resource_name: z.string(),
+	resource_kind: z.string(),
+	region: z.string(),
+	k8s_pod_name: z.string(),
+	attributes_text: z.string().nullable(),
 });
 
 // `includeTotal` gates the count(*) query. Offset pagination needs a total to
@@ -71,58 +79,66 @@ const runtimeLogRow = z.object({
 // deployment-detail view) should pass `false` to skip the extra ClickHouse
 // round-trip.
 type RuntimeLogsOptions = {
-  includeTotal?: boolean;
+	includeTotal?: boolean;
 };
 
 export function getRuntimeLogs(ch: Querier) {
-  return async (args: RuntimeLogsRequest, options?: RuntimeLogsOptions) => {
-    const includeTotal = options?.includeTotal ?? true;
-    const wheres: string[] = [
-      "workspace_id = {workspaceId: String}",
-      "project_id = {projectId: String}",
-      "time BETWEEN {startTime: Int64} AND {endTime: Int64}",
-      `toDate(fromUnixTimestamp64Milli(inserted_at))
+	return async (args: RuntimeLogsRequest, options?: RuntimeLogsOptions) => {
+		const includeTotal = options?.includeTotal ?? true;
+		const wheres: string[] = [
+			"workspace_id = {workspaceId: String}",
+			"project_id = {projectId: String}",
+			"time BETWEEN {startTime: Int64} AND {endTime: Int64}",
+			`toDate(fromUnixTimestamp64Milli(inserted_at))
             BETWEEN toDate(fromUnixTimestamp64Milli({partitionStartTime: Int64}))
                 AND toDate(fromUnixTimestamp64Milli({partitionEndTime: Int64}))`,
-    ];
+		];
 
-    // null appId = project-wide (every app); a value scopes to one app.
-    if (args.appId !== null) {
-      wheres.push("app_id = {appId: String}");
-    }
-    if (args.environmentId.length > 0) {
-      wheres.push("environment_id IN {environmentId: Array(String)}");
-    }
-    if (args.deploymentId.length > 0) {
-      wheres.push("deployment_id IN {deploymentId: Array(String)}");
-    }
-    if (args.severity !== null && args.severity.length > 0) {
-      wheres.push("severity IN {severity: Array(String)}");
-    }
-    if (args.region !== null && args.region.length > 0) {
-      wheres.push("region IN {region: Array(String)}");
-    }
-    if (args.message !== null && args.message !== "") {
-      // lower() on both sides keeps the ngrambf_v1 skip index eligible.
-      wheres.push("positionCaseInsensitive(lower(message), lower({message: String})) > 0");
-    }
-    if (args.k8sPodNames.length > 0) {
-      wheres.push("k8s_pod_name IN {k8sPodNames: Array(String)}");
-    }
+		// null appId = project-wide (every app); a value scopes to one app.
+		if (args.appId !== null) {
+			wheres.push("app_id = {appId: String}");
+		}
+		if (args.environmentId.length > 0) {
+			wheres.push("environment_id IN {environmentId: Array(String)}");
+		}
+		if (args.deploymentId.length > 0) {
+			wheres.push("deployment_id IN {deploymentId: Array(String)}");
+		}
+		if (args.resourceId.length > 0) {
+			wheres.push("resource_id IN {resourceId: Array(String)}");
+		}
+		if (args.resourceKind.length > 0) {
+			wheres.push("resource_kind IN {resourceKind: Array(String)}");
+		}
+		if (args.severity !== null && args.severity.length > 0) {
+			wheres.push("severity IN {severity: Array(String)}");
+		}
+		if (args.region !== null && args.region.length > 0) {
+			wheres.push("region IN {region: Array(String)}");
+		}
+		if (args.message !== null && args.message !== "") {
+			// lower() on both sides keeps the ngrambf_v1 skip index eligible.
+			wheres.push(
+				"positionCaseInsensitive(lower(message), lower({message: String})) > 0",
+			);
+		}
+		if (args.k8sPodNames.length > 0) {
+			wheres.push("k8s_pod_name IN {k8sPodNames: Array(String)}");
+		}
 
-    const filterConditions = wheres.join("\n          AND ");
+		const filterConditions = wheres.join("\n          AND ");
 
-    const pageSize = Math.min(Math.max(args.limit, 1), MAX_PAGE_SIZE);
-    // Offset pagination. `page` is 1-based; page 1 maps to offset 0.
-    const offset = (args.page - 1) * pageSize;
+		const pageSize = Math.min(Math.max(args.limit, 1), MAX_PAGE_SIZE);
+		// Offset pagination. `page` is 1-based; page 1 maps to offset 0.
+		const offset = (args.page - 1) * pageSize;
 
-    const partitionStartTime = args.startTime - INGESTION_LAG_GRACE_MS;
-    const partitionEndTime = args.endTime + INGESTION_LAG_GRACE_MS;
+		const partitionStartTime = args.startTime - INGESTION_LAG_GRACE_MS;
+		const partitionEndTime = args.endTime + INGESTION_LAG_GRACE_MS;
 
-    const logsQuery = ch.query({
-      query: `
+		const logsQuery = ch.query({
+			query: `
         SELECT
-          time, severity, message, deployment_id,
+          time, severity, message, deployment_id, resource_id, resource_name, resource_kind,
           region, k8s_pod_name, attributes_text
         FROM ${TABLE}
         WHERE ${filterConditions}
@@ -134,67 +150,73 @@ export function getRuntimeLogs(ch: Querier) {
           optimize_read_in_order = 1,
           optimize_move_to_prewhere = 1,
           max_execution_time = ${MAX_EXECUTION_TIME_SECONDS}`,
-      params: runtimeLogsQueryParamsSchema,
-      schema: runtimeLogRow,
-    });
+			params: runtimeLogsQueryParamsSchema,
+			schema: runtimeLogRow,
+		});
 
-    const rowsPromise = logsQuery({
-      ...args,
-      limit: pageSize,
-      offset,
-      partitionStartTime,
-      partitionEndTime,
-    });
+		const rowsPromise = logsQuery({
+			...args,
+			limit: pageSize,
+			offset,
+			partitionStartTime,
+			partitionEndTime,
+		});
 
-    // Offset pagination needs a total to compute the page count, so callers that
-    // page (the default) count the filtered window. This is the count(*) the
-    // cursor-based design avoided; it's bounded by the same partition pruning and
-    // max_execution_time as the page query. Single-page callers pass
-    // includeTotal: false and skip the query entirely.
-    let totalResult: Promise<Result<number, QueryError>> = Promise.resolve(Ok(0));
-    if (includeTotal) {
-      const totalQuery = ch.query({
-        query: `
+		// Offset pagination needs a total to compute the page count, so callers that
+		// page (the default) count the filtered window. This is the count(*) the
+		// cursor-based design avoided; it's bounded by the same partition pruning and
+		// max_execution_time as the page query. Single-page callers pass
+		// includeTotal: false and skip the query entirely.
+		let totalResult: Promise<Result<number, QueryError>> = Promise.resolve(
+			Ok(0),
+		);
+		if (includeTotal) {
+			const totalQuery = ch.query({
+				query: `
         SELECT count(*) as total_count
         FROM ${TABLE}
         WHERE ${filterConditions}
         SETTINGS
           optimize_move_to_prewhere = 1,
           max_execution_time = ${MAX_EXECUTION_TIME_SECONDS}`,
-        params: runtimeLogsCountParamsSchema,
-        schema: z.object({ total_count: z.int() }),
-      });
-      totalResult = totalQuery({ ...args, partitionStartTime, partitionEndTime }).then((res) =>
-        res.err ? Err(res.err) : Ok(res.val[0]?.total_count ?? 0),
-      );
-    }
+				params: runtimeLogsCountParamsSchema,
+				schema: z.object({ total_count: z.int() }),
+			});
+			totalResult = totalQuery({
+				...args,
+				partitionStartTime,
+				partitionEndTime,
+			}).then((res) =>
+				res.err ? Err(res.err) : Ok(res.val[0]?.total_count ?? 0),
+			);
+		}
 
-    return {
-      logsQuery: rowsPromise.then(
-        (res): Result<RuntimeLog[], QueryError> =>
-          res.err ? Err(res.err) : Ok(res.val.map(toRuntimeLog)),
-      ),
-      totalQuery: totalResult,
-    };
-  };
+		return {
+			logsQuery: rowsPromise.then(
+				(res): Result<RuntimeLog[], QueryError> =>
+					res.err ? Err(res.err) : Ok(res.val.map(toRuntimeLog)),
+			),
+			totalQuery: totalResult,
+		};
+	};
 }
 
 function toRuntimeLog(row: z.infer<typeof runtimeLogRow>): RuntimeLog {
-  const { attributes_text, ...rest } = row;
-  return { ...rest, attributes: parseAttributes(attributes_text) };
+	const { attributes_text, ...rest } = row;
+	return { ...rest, attributes: parseAttributes(attributes_text) };
 }
 
 function parseAttributes(text: string | null): RuntimeLog["attributes"] {
-  if (text === null || text === "" || text === "{}") {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as RuntimeLog["attributes"];
-    }
-  } catch {
-    // Malformed JSON: drop attributes rather than fail the whole page.
-  }
-  return null;
+	if (text === null || text === "" || text === "{}") {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(text);
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+			return parsed as RuntimeLog["attributes"];
+		}
+	} catch {
+		// Malformed JSON: drop attributes rather than fail the whole page.
+	}
+	return null;
 }

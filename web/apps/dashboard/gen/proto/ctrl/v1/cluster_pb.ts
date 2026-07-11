@@ -12,17 +12,31 @@
 // a streaming connection to receive incremental updates, enabling real-time deployment
 // orchestration across distributed clusters.
 
-import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Message } from "@bufbuild/protobuf";
+import type {
+	GenEnum,
+	GenFile,
+	GenMessage,
+	GenService,
+} from "@bufbuild/protobuf/codegenv2";
+import {
+	enumDesc,
+	fileDesc,
+	messageDesc,
+	serviceDesc,
+} from "@bufbuild/protobuf/codegenv2";
 import type { EphemeralStorage } from "./deployment_pb";
 import { file_ctrl_v1_deployment } from "./deployment_pb";
-import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file ctrl/v1/cluster.proto.
  */
-export const file_ctrl_v1_cluster: GenFile = /*@__PURE__*/
-  fileDesc("ChVjdHJsL3YxL2NsdXN0ZXIucHJvdG8SB2N0cmwudjEiKwoJUmVnaW9uS2V5EhAKCHBsYXRmb3JtGAEgASgJEgwKBG5hbWUYAiABKAkibgodV2F0Y2hEZXBsb3ltZW50Q2hhbmdlc1JlcXVlc3QSIgoGcmVnaW9uGAEgASgLMhIuY3RybC52MS5SZWdpb25LZXkSGQoRdmVyc2lvbl9sYXN0X3NlZW4YAiABKAQSDgoGcmVwbGF5GAMgASgIIj0KF1N5bmNEZXNpcmVkU3RhdGVSZXF1ZXN0EiIKBnJlZ2lvbhgBIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5ImEKFURlcGxveW1lbnRDaGFuZ2VFdmVudBIPCgd2ZXJzaW9uGAEgASgEEi4KCmRlcGxveW1lbnQYAiABKAsyGC5jdHJsLnYxLkRlcGxveW1lbnRTdGF0ZUgAQgcKBWV2ZW50InIKIEdldERlc2lyZWREZXBsb3ltZW50U3RhdGVSZXF1ZXN0EiIKBnJlZ2lvbhgBIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5EhUKDWRlcGxveW1lbnRfaWQYAiABKAkSEwoLcmVzb3VyY2VfaWQYAyABKAkihQUKHVJlcG9ydERlcGxveW1lbnRTdGF0dXNSZXF1ZXN0EiIKBnJlZ2lvbhgDIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5Ej8KBnVwZGF0ZRgBIAEoCzItLmN0cmwudjEuUmVwb3J0RGVwbG95bWVudFN0YXR1c1JlcXVlc3QuVXBkYXRlSAASPwoGZGVsZXRlGAIgASgLMi0uY3RybC52MS5SZXBvcnREZXBsb3ltZW50U3RhdHVzUmVxdWVzdC5EZWxldGVIABqCAwoGVXBkYXRlEhAKCGs4c19uYW1lGAEgASgJEkkKCWluc3RhbmNlcxgCIAMoCzI2LmN0cmwudjEuUmVwb3J0RGVwbG95bWVudFN0YXR1c1JlcXVlc3QuVXBkYXRlLkluc3RhbmNlEhMKC3Jlc291cmNlX2lkGAMgASgJGoUCCghJbnN0YW5jZRIQCghrOHNfbmFtZRgBIAEoCRIPCgdhZGRyZXNzGAIgASgJEhYKDmNwdV9taWxsaWNvcmVzGAMgASgDEhIKCm1lbW9yeV9taWIYBCABKAMSTQoGc3RhdHVzGAUgASgOMj0uY3RybC52MS5SZXBvcnREZXBsb3ltZW50U3RhdHVzUmVxdWVzdC5VcGRhdGUuSW5zdGFuY2UuU3RhdHVzIlsKBlN0YXR1cxIWChJTVEFUVVNfVU5TUEVDSUZJRUQQABISCg5TVEFUVVNfUEVORElORxABEhIKDlNUQVRVU19SVU5OSU5HEAISEQoNU1RBVFVTX0ZBSUxFRBADGi8KBkRlbGV0ZRIQCghrOHNfbmFtZRgBIAEoCRITCgtyZXNvdXJjZV9pZBgCIAEoCUIICgZjaGFuZ2UiIAoeUmVwb3J0RGVwbG95bWVudFN0YXR1c1Jlc3BvbnNlIokECg1JbnN0YW5jZUV2ZW50Eg8KB3BvZF91aWQYASABKAkSEAoIcG9kX25hbWUYAiABKAkSEQoJbm9kZV9uYW1lGAMgASgJEhYKDmNvbnRhaW5lcl9uYW1lGAQgASgJEhQKDGNvbnRhaW5lcl9pZBgFIAEoCRIVCg1yZXN0YXJ0X2NvdW50GAYgASgFEhQKDHdvcmtzcGFjZV9pZBgHIAEoCRISCgpwcm9qZWN0X2lkGAggASgJEg4KBmFwcF9pZBgJIAEoCRIWCg5lbnZpcm9ubWVudF9pZBgKIAEoCRIVCg1kZXBsb3ltZW50X2lkGAsgASgJEgwKBHRpbWUYDCABKAMSGQoRZXZlbnRfZmluZ2VycHJpbnQYDSABKAkSIwoHcnVubmluZxgOIAEoCzIQLmN0cmwudjEuUnVubmluZ0gAEikKCnRlcm1pbmF0ZWQYDyABKAsyEy5jdHJsLnYxLlRlcm1pbmF0ZWRIABIjCgd3YWl0aW5nGBAgASgLMhAuY3RybC52MS5XYWl0aW5nSAASOgoKYXR0cmlidXRlcxgRIAMoCzImLmN0cmwudjEuSW5zdGFuY2VFdmVudC5BdHRyaWJ1dGVzRW50cnkaMQoPQXR0cmlidXRlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCBwoFc3RhdGUiCQoHUnVubmluZyJQCgpUZXJtaW5hdGVkEhEKCWV4aXRfY29kZRgBIAEoBRIOCgZzaWduYWwYAiABKAUSDgoGcmVhc29uGAMgASgJEg8KB21lc3NhZ2UYBCABKAkiKgoHV2FpdGluZxIOCgZyZWFzb24YASABKAkSDwoHbWVzc2FnZRgCIAEoCSJpChtSZXBvcnRJbnN0YW5jZUV2ZW50c1JlcXVlc3QSJgoGZXZlbnRzGAEgAygLMhYuY3RybC52MS5JbnN0YW5jZUV2ZW50EiIKBnJlZ2lvbhgCIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5Ih4KHFJlcG9ydEluc3RhbmNlRXZlbnRzUmVzcG9uc2UigwEKD0RlcGxveW1lbnRTdGF0ZRIPCgd2ZXJzaW9uGAMgASgEEikKBWFwcGx5GAEgASgLMhguY3RybC52MS5BcHBseURlcGxveW1lbnRIABIrCgZkZWxldGUYAiABKAsyGS5jdHJsLnYxLkRlbGV0ZURlcGxveW1lbnRIAEIHCgVzdGF0ZSJ4Cg5Qcml2YXRlQmluZGluZxIMCgRuYW1lGAEgASgJEhMKC3Jlc291cmNlX2lkGAIgASgJEhUKDXJlc291cmNlX25hbWUYAyABKAkSEAoIcHJvdG9jb2wYBCABKAkSDAoEaG9zdBgFIAEoCRIMCgRwb3J0GAYgASgFIqUICg9BcHBseURlcGxveW1lbnQSFQoNazhzX25hbWVzcGFjZRgBIAEoCRIQCghrOHNfbmFtZRgCIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAyABKAkSEgoKcHJvamVjdF9pZBgEIAEoCRIWCg5lbnZpcm9ubWVudF9pZBgFIAEoCRIVCg1kZXBsb3ltZW50X2lkGAYgASgJEg0KBWltYWdlGAcgASgJEhYKDmNwdV9taWxsaWNvcmVzGAkgASgDEhIKCm1lbW9yeV9taWIYCiABKAMSFQoIYnVpbGRfaWQYCyABKAlIAIgBARInCh9lbmNyeXB0ZWRfZW52aXJvbm1lbnRfdmFyaWFibGVzGAwgASgMEg8KB2NvbW1hbmQYDSADKAkSDAoEcG9ydBgOIAEoBRIXCg9zaHV0ZG93bl9zaWduYWwYDyABKAkSGAoLaGVhbHRoY2hlY2sYESABKAxIAYgBARIOCgZhcHBfaWQYEiABKAkSHQoQZW52aXJvbm1lbnRfc2x1ZxgVIAEoCUgCiAEBEhMKBnJlZ2lvbhgWIAEoCUgDiAEBEhsKDmdpdF9jb21taXRfc2hhGBcgASgJSASIAQESFwoKZ2l0X2JyYW5jaBgYIAEoCUgFiAEBEhUKCGdpdF9yZXBvGBkgASgJSAaIAQESHwoSZ2l0X2NvbW1pdF9tZXNzYWdlGBogASgJSAeIAQESLwoLYXV0b3NjYWxpbmcYGyABKAsyGi5jdHJsLnYxLkF1dG9zY2FsaW5nUG9saWN5EjkKEWVwaGVtZXJhbF9zdG9yYWdlGB0gASgLMhkuY3RybC52MS5FcGhlbWVyYWxTdG9yYWdlSAiIAQESEwoLcmVzb3VyY2VfaWQYHiABKAkSFQoNcmVzb3VyY2VfbmFtZRgfIAEoCRI2Cg1yZXNvdXJjZV9raW5kGCAgASgOMh8uY3RybC52MS5EZXBsb3ltZW50UmVzb3VyY2VLaW5kEg4KBnB1YmxpYxghIAEoCBIQCghzY2hlZHVsZRgiIAEoCRIUCgdydW50aW1lGCMgASgJSAmIAQESFAoHaGFuZGxlchgkIAEoCUgKiAEBEikKCGJpbmRpbmdzGCUgAygLMhcuY3RybC52MS5Qcml2YXRlQmluZGluZxIXCg9hbGxvd2VkX2NhbGxlcnMYJiADKAlCCwoJX2J1aWxkX2lkQg4KDF9oZWFsdGhjaGVja0ITChFfZW52aXJvbm1lbnRfc2x1Z0IJCgdfcmVnaW9uQhEKD19naXRfY29tbWl0X3NoYUINCgtfZ2l0X2JyYW5jaEILCglfZ2l0X3JlcG9CFQoTX2dpdF9jb21taXRfbWVzc2FnZUIUChJfZXBoZW1lcmFsX3N0b3JhZ2VCCgoIX3J1bnRpbWVCCgoIX2hhbmRsZXIioQEKEUF1dG9zY2FsaW5nUG9saWN5EhQKDG1pbl9yZXBsaWNhcxgBIAEoDRIUCgxtYXhfcmVwbGljYXMYAiABKA0SGgoNY3B1X3RocmVzaG9sZBgDIAEoBUgAiAEBEh0KEG1lbW9yeV90aHJlc2hvbGQYBCABKAVIAYgBAUIQCg5fY3B1X3RocmVzaG9sZEITChFfbWVtb3J5X3RocmVzaG9sZCJQChBEZWxldGVEZXBsb3ltZW50EhUKDWs4c19uYW1lc3BhY2UYASABKAkSEAoIazhzX25hbWUYAiABKAkSEwoLcmVzb3VyY2VfaWQYAyABKAkiNgoQSGVhcnRiZWF0UmVxdWVzdBIiCgZyZWdpb24YASABKAsyEi5jdHJsLnYxLlJlZ2lvbktleSITChFIZWFydGJlYXRSZXNwb25zZSpdCgZIZWFsdGgSFgoSSEVBTFRIX1VOU1BFQ0lGSUVEEAASEgoOSEVBTFRIX0hFQUxUSFkQARIUChBIRUFMVEhfVU5IRUFMVEhZEAISEQoNSEVBTFRIX1BBVVNFRBADKtcBChZEZXBsb3ltZW50UmVzb3VyY2VLaW5kEigKJERFUExPWU1FTlRfUkVTT1VSQ0VfS0lORF9VTlNQRUNJRklFRBAAEiQKIERFUExPWU1FTlRfUkVTT1VSQ0VfS0lORF9TRVJWSUNFEAESJQohREVQTE9ZTUVOVF9SRVNPVVJDRV9LSU5EX0ZVTkNUSU9OEAISIwofREVQTE9ZTUVOVF9SRVNPVVJDRV9LSU5EX1dPUktFUhADEiEKHURFUExPWU1FTlRfUkVTT1VSQ0VfS0lORF9DUk9OEAQywgQKDkNsdXN0ZXJTZXJ2aWNlEmIKFldhdGNoRGVwbG95bWVudENoYW5nZXMSJi5jdHJsLnYxLldhdGNoRGVwbG95bWVudENoYW5nZXNSZXF1ZXN0Gh4uY3RybC52MS5EZXBsb3ltZW50Q2hhbmdlRXZlbnQwARJWChBTeW5jRGVzaXJlZFN0YXRlEiAuY3RybC52MS5TeW5jRGVzaXJlZFN0YXRlUmVxdWVzdBoeLmN0cmwudjEuRGVwbG95bWVudENoYW5nZUV2ZW50MAESYAoZR2V0RGVzaXJlZERlcGxveW1lbnRTdGF0ZRIpLmN0cmwudjEuR2V0RGVzaXJlZERlcGxveW1lbnRTdGF0ZVJlcXVlc3QaGC5jdHJsLnYxLkRlcGxveW1lbnRTdGF0ZRJpChZSZXBvcnREZXBsb3ltZW50U3RhdHVzEiYuY3RybC52MS5SZXBvcnREZXBsb3ltZW50U3RhdHVzUmVxdWVzdBonLmN0cmwudjEuUmVwb3J0RGVwbG95bWVudFN0YXR1c1Jlc3BvbnNlEmMKFFJlcG9ydEluc3RhbmNlRXZlbnRzEiQuY3RybC52MS5SZXBvcnRJbnN0YW5jZUV2ZW50c1JlcXVlc3QaJS5jdHJsLnYxLlJlcG9ydEluc3RhbmNlRXZlbnRzUmVzcG9uc2USQgoJSGVhcnRiZWF0EhkuY3RybC52MS5IZWFydGJlYXRSZXF1ZXN0GhouY3RybC52MS5IZWFydGJlYXRSZXNwb25zZUKLAQoLY29tLmN0cmwudjFCDENsdXN0ZXJQcm90b1ABWjFnaXRodWIuY29tL3Vua2V5ZWQvdW5rZXkvZ2VuL3Byb3RvL2N0cmwvdjE7Y3RybHYxogIDQ1hYqgIHQ3RybC5WMcoCB0N0cmxcVjHiAhNDdHJsXFYxXEdQQk1ldGFkYXRh6gIIQ3RybDo6VjFiBnByb3RvMw", [file_ctrl_v1_deployment]);
+export const file_ctrl_v1_cluster: GenFile =
+	/*@__PURE__*/
+	fileDesc(
+		"ChVjdHJsL3YxL2NsdXN0ZXIucHJvdG8SB2N0cmwudjEiKwoJUmVnaW9uS2V5EhAKCHBsYXRmb3JtGAEgASgJEgwKBG5hbWUYAiABKAkibgodV2F0Y2hEZXBsb3ltZW50Q2hhbmdlc1JlcXVlc3QSIgoGcmVnaW9uGAEgASgLMhIuY3RybC52MS5SZWdpb25LZXkSGQoRdmVyc2lvbl9sYXN0X3NlZW4YAiABKAQSDgoGcmVwbGF5GAMgASgIIj0KF1N5bmNEZXNpcmVkU3RhdGVSZXF1ZXN0EiIKBnJlZ2lvbhgBIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5ImEKFURlcGxveW1lbnRDaGFuZ2VFdmVudBIPCgd2ZXJzaW9uGAEgASgEEi4KCmRlcGxveW1lbnQYAiABKAsyGC5jdHJsLnYxLkRlcGxveW1lbnRTdGF0ZUgAQgcKBWV2ZW50InIKIEdldERlc2lyZWREZXBsb3ltZW50U3RhdGVSZXF1ZXN0EiIKBnJlZ2lvbhgBIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5EhUKDWRlcGxveW1lbnRfaWQYAiABKAkSEwoLcmVzb3VyY2VfaWQYAyABKAkihQUKHVJlcG9ydERlcGxveW1lbnRTdGF0dXNSZXF1ZXN0EiIKBnJlZ2lvbhgDIAEoCzISLmN0cmwudjEuUmVnaW9uS2V5Ej8KBnVwZGF0ZRgBIAEoCzItLmN0cmwudjEuUmVwb3J0RGVwbG95bWVudFN0YXR1c1JlcXVlc3QuVXBkYXRlSAASPwoGZGVsZXRlGAIgASgLMi0uY3RybC52MS5SZXBvcnREZXBsb3ltZW50U3RhdHVzUmVxdWVzdC5EZWxldGVIABqCAwoGVXBkYXRlEhAKCGs4c19uYW1lGAEgASgJEkkKCWluc3RhbmNlcxgCIAMoCzI2LmN0cmwudjEuUmVwb3J0RGVwbG95bWVudFN0YXR1c1JlcXVlc3QuVXBkYXRlLkluc3RhbmNlEhMKC3Jlc291cmNlX2lkGAMgASgJGoUCCghJbnN0YW5jZRIQCghrOHNfbmFtZRgBIAEoCRIPCgdhZGRyZXNzGAIgASgJEhYKDmNwdV9taWxsaWNvcmVzGAMgASgDEhIKCm1lbW9yeV9taWIYBCABKAMSTQoGc3RhdHVzGAUgASgOMj0uY3RybC52MS5SZXBvcnREZXBsb3ltZW50U3RhdHVzUmVxdWVzdC5VcGRhdGUuSW5zdGFuY2UuU3RhdHVzIlsKBlN0YXR1cxIWChJTVEFUVVNfVU5TUEVDSUZJRUQQABISCg5TVEFUVVNfUEVORElORxABEhIKDlNUQVRVU19SVU5OSU5HEAISEQoNU1RBVFVTX0ZBSUxFRBADGi8KBkRlbGV0ZRIQCghrOHNfbmFtZRgBIAEoCRITCgtyZXNvdXJjZV9pZBgCIAEoCUIICgZjaGFuZ2UiIAoeUmVwb3J0RGVwbG95bWVudFN0YXR1c1Jlc3BvbnNlIswECg1JbnN0YW5jZUV2ZW50Eg8KB3BvZF91aWQYASABKAkSEAoIcG9kX25hbWUYAiABKAkSEQoJbm9kZV9uYW1lGAMgASgJEhYKDmNvbnRhaW5lcl9uYW1lGAQgASgJEhQKDGNvbnRhaW5lcl9pZBgFIAEoCRIVCg1yZXN0YXJ0X2NvdW50GAYgASgFEhQKDHdvcmtzcGFjZV9pZBgHIAEoCRISCgpwcm9qZWN0X2lkGAggASgJEg4KBmFwcF9pZBgJIAEoCRIWCg5lbnZpcm9ubWVudF9pZBgKIAEoCRIVCg1kZXBsb3ltZW50X2lkGAsgASgJEgwKBHRpbWUYDCABKAMSGQoRZXZlbnRfZmluZ2VycHJpbnQYDSABKAkSIwoHcnVubmluZxgOIAEoCzIQLmN0cmwudjEuUnVubmluZ0gAEikKCnRlcm1pbmF0ZWQYDyABKAsyEy5jdHJsLnYxLlRlcm1pbmF0ZWRIABIjCgd3YWl0aW5nGBAgASgLMhAuY3RybC52MS5XYWl0aW5nSAASOgoKYXR0cmlidXRlcxgRIAMoCzImLmN0cmwudjEuSW5zdGFuY2VFdmVudC5BdHRyaWJ1dGVzRW50cnkSEwoLcmVzb3VyY2VfaWQYEiABKAkSFQoNcmVzb3VyY2VfbmFtZRgTIAEoCRIVCg1yZXNvdXJjZV9raW5kGBQgASgJGjEKD0F0dHJpYnV0ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQgcKBXN0YXRlIgkKB1J1bm5pbmciUAoKVGVybWluYXRlZBIRCglleGl0X2NvZGUYASABKAUSDgoGc2lnbmFsGAIgASgFEg4KBnJlYXNvbhgDIAEoCRIPCgdtZXNzYWdlGAQgASgJIioKB1dhaXRpbmcSDgoGcmVhc29uGAEgASgJEg8KB21lc3NhZ2UYAiABKAkiaQobUmVwb3J0SW5zdGFuY2VFdmVudHNSZXF1ZXN0EiYKBmV2ZW50cxgBIAMoCzIWLmN0cmwudjEuSW5zdGFuY2VFdmVudBIiCgZyZWdpb24YAiABKAsyEi5jdHJsLnYxLlJlZ2lvbktleSIeChxSZXBvcnRJbnN0YW5jZUV2ZW50c1Jlc3BvbnNlIoMBCg9EZXBsb3ltZW50U3RhdGUSDwoHdmVyc2lvbhgDIAEoBBIpCgVhcHBseRgBIAEoCzIYLmN0cmwudjEuQXBwbHlEZXBsb3ltZW50SAASKwoGZGVsZXRlGAIgASgLMhkuY3RybC52MS5EZWxldGVEZXBsb3ltZW50SABCBwoFc3RhdGUieAoOUHJpdmF0ZUJpbmRpbmcSDAoEbmFtZRgBIAEoCRITCgtyZXNvdXJjZV9pZBgCIAEoCRIVCg1yZXNvdXJjZV9uYW1lGAMgASgJEhAKCHByb3RvY29sGAQgASgJEgwKBGhvc3QYBSABKAkSDAoEcG9ydBgGIAEoBSKlCAoPQXBwbHlEZXBsb3ltZW50EhUKDWs4c19uYW1lc3BhY2UYASABKAkSEAoIazhzX25hbWUYAiABKAkSFAoMd29ya3NwYWNlX2lkGAMgASgJEhIKCnByb2plY3RfaWQYBCABKAkSFgoOZW52aXJvbm1lbnRfaWQYBSABKAkSFQoNZGVwbG95bWVudF9pZBgGIAEoCRINCgVpbWFnZRgHIAEoCRIWCg5jcHVfbWlsbGljb3JlcxgJIAEoAxISCgptZW1vcnlfbWliGAogASgDEhUKCGJ1aWxkX2lkGAsgASgJSACIAQESJwofZW5jcnlwdGVkX2Vudmlyb25tZW50X3ZhcmlhYmxlcxgMIAEoDBIPCgdjb21tYW5kGA0gAygJEgwKBHBvcnQYDiABKAUSFwoPc2h1dGRvd25fc2lnbmFsGA8gASgJEhgKC2hlYWx0aGNoZWNrGBEgASgMSAGIAQESDgoGYXBwX2lkGBIgASgJEh0KEGVudmlyb25tZW50X3NsdWcYFSABKAlIAogBARITCgZyZWdpb24YFiABKAlIA4gBARIbCg5naXRfY29tbWl0X3NoYRgXIAEoCUgEiAEBEhcKCmdpdF9icmFuY2gYGCABKAlIBYgBARIVCghnaXRfcmVwbxgZIAEoCUgGiAEBEh8KEmdpdF9jb21taXRfbWVzc2FnZRgaIAEoCUgHiAEBEi8KC2F1dG9zY2FsaW5nGBsgASgLMhouY3RybC52MS5BdXRvc2NhbGluZ1BvbGljeRI5ChFlcGhlbWVyYWxfc3RvcmFnZRgdIAEoCzIZLmN0cmwudjEuRXBoZW1lcmFsU3RvcmFnZUgIiAEBEhMKC3Jlc291cmNlX2lkGB4gASgJEhUKDXJlc291cmNlX25hbWUYHyABKAkSNgoNcmVzb3VyY2Vfa2luZBggIAEoDjIfLmN0cmwudjEuRGVwbG95bWVudFJlc291cmNlS2luZBIOCgZwdWJsaWMYISABKAgSEAoIc2NoZWR1bGUYIiABKAkSFAoHcnVudGltZRgjIAEoCUgJiAEBEhQKB2hhbmRsZXIYJCABKAlICogBARIpCghiaW5kaW5ncxglIAMoCzIXLmN0cmwudjEuUHJpdmF0ZUJpbmRpbmcSFwoPYWxsb3dlZF9jYWxsZXJzGCYgAygJQgsKCV9idWlsZF9pZEIOCgxfaGVhbHRoY2hlY2tCEwoRX2Vudmlyb25tZW50X3NsdWdCCQoHX3JlZ2lvbkIRCg9fZ2l0X2NvbW1pdF9zaGFCDQoLX2dpdF9icmFuY2hCCwoJX2dpdF9yZXBvQhUKE19naXRfY29tbWl0X21lc3NhZ2VCFAoSX2VwaGVtZXJhbF9zdG9yYWdlQgoKCF9ydW50aW1lQgoKCF9oYW5kbGVyIqEBChFBdXRvc2NhbGluZ1BvbGljeRIUCgxtaW5fcmVwbGljYXMYASABKA0SFAoMbWF4X3JlcGxpY2FzGAIgASgNEhoKDWNwdV90aHJlc2hvbGQYAyABKAVIAIgBARIdChBtZW1vcnlfdGhyZXNob2xkGAQgASgFSAGIAQFCEAoOX2NwdV90aHJlc2hvbGRCEwoRX21lbW9yeV90aHJlc2hvbGQiUAoQRGVsZXRlRGVwbG95bWVudBIVCg1rOHNfbmFtZXNwYWNlGAEgASgJEhAKCGs4c19uYW1lGAIgASgJEhMKC3Jlc291cmNlX2lkGAMgASgJIjYKEEhlYXJ0YmVhdFJlcXVlc3QSIgoGcmVnaW9uGAEgASgLMhIuY3RybC52MS5SZWdpb25LZXkiEwoRSGVhcnRiZWF0UmVzcG9uc2UqXQoGSGVhbHRoEhYKEkhFQUxUSF9VTlNQRUNJRklFRBAAEhIKDkhFQUxUSF9IRUFMVEhZEAESFAoQSEVBTFRIX1VOSEVBTFRIWRACEhEKDUhFQUxUSF9QQVVTRUQQAyrXAQoWRGVwbG95bWVudFJlc291cmNlS2luZBIoCiRERVBMT1lNRU5UX1JFU09VUkNFX0tJTkRfVU5TUEVDSUZJRUQQABIkCiBERVBMT1lNRU5UX1JFU09VUkNFX0tJTkRfU0VSVklDRRABEiUKIURFUExPWU1FTlRfUkVTT1VSQ0VfS0lORF9GVU5DVElPThACEiMKH0RFUExPWU1FTlRfUkVTT1VSQ0VfS0lORF9XT1JLRVIQAxIhCh1ERVBMT1lNRU5UX1JFU09VUkNFX0tJTkRfQ1JPThAEMsIECg5DbHVzdGVyU2VydmljZRJiChZXYXRjaERlcGxveW1lbnRDaGFuZ2VzEiYuY3RybC52MS5XYXRjaERlcGxveW1lbnRDaGFuZ2VzUmVxdWVzdBoeLmN0cmwudjEuRGVwbG95bWVudENoYW5nZUV2ZW50MAESVgoQU3luY0Rlc2lyZWRTdGF0ZRIgLmN0cmwudjEuU3luY0Rlc2lyZWRTdGF0ZVJlcXVlc3QaHi5jdHJsLnYxLkRlcGxveW1lbnRDaGFuZ2VFdmVudDABEmAKGUdldERlc2lyZWREZXBsb3ltZW50U3RhdGUSKS5jdHJsLnYxLkdldERlc2lyZWREZXBsb3ltZW50U3RhdGVSZXF1ZXN0GhguY3RybC52MS5EZXBsb3ltZW50U3RhdGUSaQoWUmVwb3J0RGVwbG95bWVudFN0YXR1cxImLmN0cmwudjEuUmVwb3J0RGVwbG95bWVudFN0YXR1c1JlcXVlc3QaJy5jdHJsLnYxLlJlcG9ydERlcGxveW1lbnRTdGF0dXNSZXNwb25zZRJjChRSZXBvcnRJbnN0YW5jZUV2ZW50cxIkLmN0cmwudjEuUmVwb3J0SW5zdGFuY2VFdmVudHNSZXF1ZXN0GiUuY3RybC52MS5SZXBvcnRJbnN0YW5jZUV2ZW50c1Jlc3BvbnNlEkIKCUhlYXJ0YmVhdBIZLmN0cmwudjEuSGVhcnRiZWF0UmVxdWVzdBoaLmN0cmwudjEuSGVhcnRiZWF0UmVzcG9uc2VCiwEKC2NvbS5jdHJsLnYxQgxDbHVzdGVyUHJvdG9QAVoxZ2l0aHViLmNvbS91bmtleWVkL3Vua2V5L2dlbi9wcm90by9jdHJsL3YxO2N0cmx2MaICA0NYWKoCB0N0cmwuVjHKAgdDdHJsXFYx4gITQ3RybFxWMVxHUEJNZXRhZGF0YeoCCEN0cmw6OlYxYgZwcm90bzM",
+		[file_ctrl_v1_deployment],
+	);
 
 /**
  * RegionKey identifies a region on the wire. Every ClusterService RPC scoped
@@ -31,132 +45,142 @@ export const file_ctrl_v1_cluster: GenFile = /*@__PURE__*/
  * @generated from message ctrl.v1.RegionKey
  */
 export type RegionKey = Message<"ctrl.v1.RegionKey"> & {
-  /**
-   * platform is the infrastructure provider (e.g. "aws", "gcp", "local").
-   *
-   * @generated from field: string platform = 1;
-   */
-  platform: string;
+	/**
+	 * platform is the infrastructure provider (e.g. "aws", "gcp", "local").
+	 *
+	 * @generated from field: string platform = 1;
+	 */
+	platform: string;
 
-  /**
-   * name is the geographic region name (e.g. "us-east-1").
-   *
-   * @generated from field: string name = 2;
-   */
-  name: string;
+	/**
+	 * name is the geographic region name (e.g. "us-east-1").
+	 *
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
 };
 
 /**
  * Describes the message ctrl.v1.RegionKey.
  * Use `create(RegionKeySchema)` to create a new message.
  */
-export const RegionKeySchema: GenMessage<RegionKey> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 0);
+export const RegionKeySchema: GenMessage<RegionKey> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 0);
 
 /**
  * @generated from message ctrl.v1.WatchDeploymentChangesRequest
  */
-export type WatchDeploymentChangesRequest = Message<"ctrl.v1.WatchDeploymentChangesRequest"> & {
-  /**
-   * @generated from field: ctrl.v1.RegionKey region = 1;
-   */
-  region?: RegionKey;
+export type WatchDeploymentChangesRequest =
+	Message<"ctrl.v1.WatchDeploymentChangesRequest"> & {
+		/**
+		 * @generated from field: ctrl.v1.RegionKey region = 1;
+		 */
+		region?: RegionKey;
 
-  /**
-   * @generated from field: uint64 version_last_seen = 2;
-   */
-  versionLastSeen: bigint;
+		/**
+		 * @generated from field: uint64 version_last_seen = 2;
+		 */
+		versionLastSeen: bigint;
 
-  /**
-   * When true and version_last_seen is 0, replay all changes from the
-   * beginning instead of jumping to the current max version. Default false.
-   *
-   * @generated from field: bool replay = 3;
-   */
-  replay: boolean;
-};
+		/**
+		 * When true and version_last_seen is 0, replay all changes from the
+		 * beginning instead of jumping to the current max version. Default false.
+		 *
+		 * @generated from field: bool replay = 3;
+		 */
+		replay: boolean;
+	};
 
 /**
  * Describes the message ctrl.v1.WatchDeploymentChangesRequest.
  * Use `create(WatchDeploymentChangesRequestSchema)` to create a new message.
  */
-export const WatchDeploymentChangesRequestSchema: GenMessage<WatchDeploymentChangesRequest> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 1);
+export const WatchDeploymentChangesRequestSchema: GenMessage<WatchDeploymentChangesRequest> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 1);
 
 /**
  * @generated from message ctrl.v1.SyncDesiredStateRequest
  */
-export type SyncDesiredStateRequest = Message<"ctrl.v1.SyncDesiredStateRequest"> & {
-  /**
-   * @generated from field: ctrl.v1.RegionKey region = 1;
-   */
-  region?: RegionKey;
-};
+export type SyncDesiredStateRequest =
+	Message<"ctrl.v1.SyncDesiredStateRequest"> & {
+		/**
+		 * @generated from field: ctrl.v1.RegionKey region = 1;
+		 */
+		region?: RegionKey;
+	};
 
 /**
  * Describes the message ctrl.v1.SyncDesiredStateRequest.
  * Use `create(SyncDesiredStateRequestSchema)` to create a new message.
  */
-export const SyncDesiredStateRequestSchema: GenMessage<SyncDesiredStateRequest> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 2);
+export const SyncDesiredStateRequestSchema: GenMessage<SyncDesiredStateRequest> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 2);
 
 /**
  * @generated from message ctrl.v1.DeploymentChangeEvent
  */
 export type DeploymentChangeEvent = Message<"ctrl.v1.DeploymentChangeEvent"> & {
-  /**
-   * @generated from field: uint64 version = 1;
-   */
-  version: bigint;
+	/**
+	 * @generated from field: uint64 version = 1;
+	 */
+	version: bigint;
 
-  /**
-   * @generated from oneof ctrl.v1.DeploymentChangeEvent.event
-   */
-  event: {
-    /**
-     * @generated from field: ctrl.v1.DeploymentState deployment = 2;
-     */
-    value: DeploymentState;
-    case: "deployment";
-  } | { case: undefined; value?: undefined };
+	/**
+	 * @generated from oneof ctrl.v1.DeploymentChangeEvent.event
+	 */
+	event:
+		| {
+				/**
+				 * @generated from field: ctrl.v1.DeploymentState deployment = 2;
+				 */
+				value: DeploymentState;
+				case: "deployment";
+		  }
+		| { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message ctrl.v1.DeploymentChangeEvent.
  * Use `create(DeploymentChangeEventSchema)` to create a new message.
  */
-export const DeploymentChangeEventSchema: GenMessage<DeploymentChangeEvent> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 3);
+export const DeploymentChangeEventSchema: GenMessage<DeploymentChangeEvent> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 3);
 
 /**
  * @generated from message ctrl.v1.GetDesiredDeploymentStateRequest
  */
-export type GetDesiredDeploymentStateRequest = Message<"ctrl.v1.GetDesiredDeploymentStateRequest"> & {
-  /**
-   * @generated from field: ctrl.v1.RegionKey region = 1;
-   */
-  region?: RegionKey;
+export type GetDesiredDeploymentStateRequest =
+	Message<"ctrl.v1.GetDesiredDeploymentStateRequest"> & {
+		/**
+		 * @generated from field: ctrl.v1.RegionKey region = 1;
+		 */
+		region?: RegionKey;
 
-  /**
-   * @generated from field: string deployment_id = 2;
-   */
-  deploymentId: string;
+		/**
+		 * @generated from field: string deployment_id = 2;
+		 */
+		deploymentId: string;
 
-  /**
-   * resource_id scopes reconciliation to one independently materialized
-   * workload. Empty preserves the legacy single-container deployment path.
-   *
-   * @generated from field: string resource_id = 3;
-   */
-  resourceId: string;
-};
+		/**
+		 * resource_id scopes reconciliation to one independently materialized
+		 * workload. Empty preserves the legacy single-container deployment path.
+		 *
+		 * @generated from field: string resource_id = 3;
+		 */
+		resourceId: string;
+	};
 
 /**
  * Describes the message ctrl.v1.GetDesiredDeploymentStateRequest.
  * Use `create(GetDesiredDeploymentStateRequestSchema)` to create a new message.
  */
-export const GetDesiredDeploymentStateRequestSchema: GenMessage<GetDesiredDeploymentStateRequest> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 4);
+export const GetDesiredDeploymentStateRequestSchema: GenMessage<GetDesiredDeploymentStateRequest> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 4);
 
 /**
  * ReportDeploymentStatusRequest reports the actual state of a deployment from the agent.
@@ -164,172 +188,185 @@ export const GetDesiredDeploymentStateRequestSchema: GenMessage<GetDesiredDeploy
  *
  * @generated from message ctrl.v1.ReportDeploymentStatusRequest
  */
-export type ReportDeploymentStatusRequest = Message<"ctrl.v1.ReportDeploymentStatusRequest"> & {
-  /**
-   * @generated from field: ctrl.v1.RegionKey region = 3;
-   */
-  region?: RegionKey;
+export type ReportDeploymentStatusRequest =
+	Message<"ctrl.v1.ReportDeploymentStatusRequest"> & {
+		/**
+		 * @generated from field: ctrl.v1.RegionKey region = 3;
+		 */
+		region?: RegionKey;
 
-  /**
-   * @generated from oneof ctrl.v1.ReportDeploymentStatusRequest.change
-   */
-  change: {
-    /**
-     * @generated from field: ctrl.v1.ReportDeploymentStatusRequest.Update update = 1;
-     */
-    value: ReportDeploymentStatusRequest_Update;
-    case: "update";
-  } | {
-    /**
-     * @generated from field: ctrl.v1.ReportDeploymentStatusRequest.Delete delete = 2;
-     */
-    value: ReportDeploymentStatusRequest_Delete;
-    case: "delete";
-  } | { case: undefined; value?: undefined };
-};
+		/**
+		 * @generated from oneof ctrl.v1.ReportDeploymentStatusRequest.change
+		 */
+		change:
+			| {
+					/**
+					 * @generated from field: ctrl.v1.ReportDeploymentStatusRequest.Update update = 1;
+					 */
+					value: ReportDeploymentStatusRequest_Update;
+					case: "update";
+			  }
+			| {
+					/**
+					 * @generated from field: ctrl.v1.ReportDeploymentStatusRequest.Delete delete = 2;
+					 */
+					value: ReportDeploymentStatusRequest_Delete;
+					case: "delete";
+			  }
+			| { case: undefined; value?: undefined };
+	};
 
 /**
  * Describes the message ctrl.v1.ReportDeploymentStatusRequest.
  * Use `create(ReportDeploymentStatusRequestSchema)` to create a new message.
  */
-export const ReportDeploymentStatusRequestSchema: GenMessage<ReportDeploymentStatusRequest> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 5);
+export const ReportDeploymentStatusRequestSchema: GenMessage<ReportDeploymentStatusRequest> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 5);
 
 /**
  * @generated from message ctrl.v1.ReportDeploymentStatusRequest.Update
  */
-export type ReportDeploymentStatusRequest_Update = Message<"ctrl.v1.ReportDeploymentStatusRequest.Update"> & {
-  /**
-   * @generated from field: string k8s_name = 1;
-   */
-  k8sName: string;
+export type ReportDeploymentStatusRequest_Update =
+	Message<"ctrl.v1.ReportDeploymentStatusRequest.Update"> & {
+		/**
+		 * @generated from field: string k8s_name = 1;
+		 */
+		k8sName: string;
 
-  /**
-   * @generated from field: repeated ctrl.v1.ReportDeploymentStatusRequest.Update.Instance instances = 2;
-   */
-  instances: ReportDeploymentStatusRequest_Update_Instance[];
+		/**
+		 * @generated from field: repeated ctrl.v1.ReportDeploymentStatusRequest.Update.Instance instances = 2;
+		 */
+		instances: ReportDeploymentStatusRequest_Update_Instance[];
 
-  /**
-   * @generated from field: string resource_id = 3;
-   */
-  resourceId: string;
-};
+		/**
+		 * @generated from field: string resource_id = 3;
+		 */
+		resourceId: string;
+	};
 
 /**
  * Describes the message ctrl.v1.ReportDeploymentStatusRequest.Update.
  * Use `create(ReportDeploymentStatusRequest_UpdateSchema)` to create a new message.
  */
-export const ReportDeploymentStatusRequest_UpdateSchema: GenMessage<ReportDeploymentStatusRequest_Update> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 5, 0);
+export const ReportDeploymentStatusRequest_UpdateSchema: GenMessage<ReportDeploymentStatusRequest_Update> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 5, 0);
 
 /**
  * @generated from message ctrl.v1.ReportDeploymentStatusRequest.Update.Instance
  */
-export type ReportDeploymentStatusRequest_Update_Instance = Message<"ctrl.v1.ReportDeploymentStatusRequest.Update.Instance"> & {
-  /**
-   * @generated from field: string k8s_name = 1;
-   */
-  k8sName: string;
+export type ReportDeploymentStatusRequest_Update_Instance =
+	Message<"ctrl.v1.ReportDeploymentStatusRequest.Update.Instance"> & {
+		/**
+		 * @generated from field: string k8s_name = 1;
+		 */
+		k8sName: string;
 
-  /**
-   * @generated from field: string address = 2;
-   */
-  address: string;
+		/**
+		 * @generated from field: string address = 2;
+		 */
+		address: string;
 
-  /**
-   * @generated from field: int64 cpu_millicores = 3;
-   */
-  cpuMillicores: bigint;
+		/**
+		 * @generated from field: int64 cpu_millicores = 3;
+		 */
+		cpuMillicores: bigint;
 
-  /**
-   * @generated from field: int64 memory_mib = 4;
-   */
-  memoryMib: bigint;
+		/**
+		 * @generated from field: int64 memory_mib = 4;
+		 */
+		memoryMib: bigint;
 
-  /**
-   * @generated from field: ctrl.v1.ReportDeploymentStatusRequest.Update.Instance.Status status = 5;
-   */
-  status: ReportDeploymentStatusRequest_Update_Instance_Status;
-};
+		/**
+		 * @generated from field: ctrl.v1.ReportDeploymentStatusRequest.Update.Instance.Status status = 5;
+		 */
+		status: ReportDeploymentStatusRequest_Update_Instance_Status;
+	};
 
 /**
  * Describes the message ctrl.v1.ReportDeploymentStatusRequest.Update.Instance.
  * Use `create(ReportDeploymentStatusRequest_Update_InstanceSchema)` to create a new message.
  */
-export const ReportDeploymentStatusRequest_Update_InstanceSchema: GenMessage<ReportDeploymentStatusRequest_Update_Instance> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 5, 0, 0);
+export const ReportDeploymentStatusRequest_Update_InstanceSchema: GenMessage<ReportDeploymentStatusRequest_Update_Instance> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 5, 0, 0);
 
 /**
  * @generated from enum ctrl.v1.ReportDeploymentStatusRequest.Update.Instance.Status
  */
 export enum ReportDeploymentStatusRequest_Update_Instance_Status {
-  /**
-   * @generated from enum value: STATUS_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: STATUS_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * Deployment request accepted, container/pod creation in progress
-   *
-   * @generated from enum value: STATUS_PENDING = 1;
-   */
-  PENDING = 1,
+	/**
+	 * Deployment request accepted, container/pod creation in progress
+	 *
+	 * @generated from enum value: STATUS_PENDING = 1;
+	 */
+	PENDING = 1,
 
-  /**
-   * Container/pod is running and healthy
-   *
-   * @generated from enum value: STATUS_RUNNING = 2;
-   */
-  RUNNING = 2,
+	/**
+	 * Container/pod is running and healthy
+	 *
+	 * @generated from enum value: STATUS_RUNNING = 2;
+	 */
+	RUNNING = 2,
 
-  /**
-   * Container/pod failed to start
-   *
-   * @generated from enum value: STATUS_FAILED = 3;
-   */
-  FAILED = 3,
+	/**
+	 * Container/pod failed to start
+	 *
+	 * @generated from enum value: STATUS_FAILED = 3;
+	 */
+	FAILED = 3,
 }
 
 /**
  * Describes the enum ctrl.v1.ReportDeploymentStatusRequest.Update.Instance.Status.
  */
-export const ReportDeploymentStatusRequest_Update_Instance_StatusSchema: GenEnum<ReportDeploymentStatusRequest_Update_Instance_Status> = /*@__PURE__*/
-  enumDesc(file_ctrl_v1_cluster, 5, 0, 0, 0);
+export const ReportDeploymentStatusRequest_Update_Instance_StatusSchema: GenEnum<ReportDeploymentStatusRequest_Update_Instance_Status> =
+	/*@__PURE__*/
+	enumDesc(file_ctrl_v1_cluster, 5, 0, 0, 0);
 
 /**
  * @generated from message ctrl.v1.ReportDeploymentStatusRequest.Delete
  */
-export type ReportDeploymentStatusRequest_Delete = Message<"ctrl.v1.ReportDeploymentStatusRequest.Delete"> & {
-  /**
-   * @generated from field: string k8s_name = 1;
-   */
-  k8sName: string;
+export type ReportDeploymentStatusRequest_Delete =
+	Message<"ctrl.v1.ReportDeploymentStatusRequest.Delete"> & {
+		/**
+		 * @generated from field: string k8s_name = 1;
+		 */
+		k8sName: string;
 
-  /**
-   * @generated from field: string resource_id = 2;
-   */
-  resourceId: string;
-};
+		/**
+		 * @generated from field: string resource_id = 2;
+		 */
+		resourceId: string;
+	};
 
 /**
  * Describes the message ctrl.v1.ReportDeploymentStatusRequest.Delete.
  * Use `create(ReportDeploymentStatusRequest_DeleteSchema)` to create a new message.
  */
-export const ReportDeploymentStatusRequest_DeleteSchema: GenMessage<ReportDeploymentStatusRequest_Delete> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 5, 1);
+export const ReportDeploymentStatusRequest_DeleteSchema: GenMessage<ReportDeploymentStatusRequest_Delete> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 5, 1);
 
 /**
  * @generated from message ctrl.v1.ReportDeploymentStatusResponse
  */
-export type ReportDeploymentStatusResponse = Message<"ctrl.v1.ReportDeploymentStatusResponse"> & {
-};
+export type ReportDeploymentStatusResponse =
+	Message<"ctrl.v1.ReportDeploymentStatusResponse"> & {};
 
 /**
  * Describes the message ctrl.v1.ReportDeploymentStatusResponse.
  * Use `create(ReportDeploymentStatusResponseSchema)` to create a new message.
  */
-export const ReportDeploymentStatusResponseSchema: GenMessage<ReportDeploymentStatusResponse> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 6);
+export const ReportDeploymentStatusResponseSchema: GenMessage<ReportDeploymentStatusResponse> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 6);
 
 /**
  * InstanceEvent describes a single container lifecycle transition observed
@@ -344,130 +381,152 @@ export const ReportDeploymentStatusResponseSchema: GenMessage<ReportDeploymentSt
  * @generated from message ctrl.v1.InstanceEvent
  */
 export type InstanceEvent = Message<"ctrl.v1.InstanceEvent"> & {
-  /**
-   * K8s identity of the container life this event is about.
-   *
-   * @generated from field: string pod_uid = 1;
-   */
-  podUid: string;
+	/**
+	 * K8s identity of the container life this event is about.
+	 *
+	 * @generated from field: string pod_uid = 1;
+	 */
+	podUid: string;
 
-  /**
-   * @generated from field: string pod_name = 2;
-   */
-  podName: string;
+	/**
+	 * @generated from field: string pod_name = 2;
+	 */
+	podName: string;
 
-  /**
-   * @generated from field: string node_name = 3;
-   */
-  nodeName: string;
+	/**
+	 * @generated from field: string node_name = 3;
+	 */
+	nodeName: string;
 
-  /**
-   * @generated from field: string container_name = 4;
-   */
-  containerName: string;
+	/**
+	 * @generated from field: string container_name = 4;
+	 */
+	containerName: string;
 
-  /**
-   * @generated from field: string container_id = 5;
-   */
-  containerId: string;
+	/**
+	 * @generated from field: string container_id = 5;
+	 */
+	containerId: string;
 
-  /**
-   * @generated from field: int32 restart_count = 6;
-   */
-  restartCount: number;
+	/**
+	 * @generated from field: int32 restart_count = 6;
+	 */
+	restartCount: number;
 
-  /**
-   * Tenant identifiers extracted from pod labels by krane. Field order
-   * matches the canonical hierarchy: workspace > project > app >
-   * environment > deployment.
-   *
-   * @generated from field: string workspace_id = 7;
-   */
-  workspaceId: string;
+	/**
+	 * Tenant identifiers extracted from pod labels by krane. Field order
+	 * matches the canonical hierarchy: workspace > project > app >
+	 * environment > deployment.
+	 *
+	 * @generated from field: string workspace_id = 7;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string project_id = 8;
-   */
-  projectId: string;
+	/**
+	 * @generated from field: string project_id = 8;
+	 */
+	projectId: string;
 
-  /**
-   * @generated from field: string app_id = 9;
-   */
-  appId: string;
+	/**
+	 * @generated from field: string app_id = 9;
+	 */
+	appId: string;
 
-  /**
-   * @generated from field: string environment_id = 10;
-   */
-  environmentId: string;
+	/**
+	 * @generated from field: string environment_id = 10;
+	 */
+	environmentId: string;
 
-  /**
-   * @generated from field: string deployment_id = 11;
-   */
-  deploymentId: string;
+	/**
+	 * @generated from field: string deployment_id = 11;
+	 */
+	deploymentId: string;
 
-  /**
-   * When this event happened (unix milliseconds). For Running it's the
-   * container's StartedAt; for Terminated it's FinishedAt; for Waiting
-   * it's when kubelet last published the waiting state.
-   *
-   * @generated from field: int64 time = 12;
-   */
-  time: bigint;
+	/**
+	 * When this event happened (unix milliseconds). For Running it's the
+	 * container's StartedAt; for Terminated it's FinishedAt; for Waiting
+	 * it's when kubelet last published the waiting state.
+	 *
+	 * @generated from field: int64 time = 12;
+	 */
+	time: bigint;
 
-  /**
-   * Stable hash krane computes so the dashboard can group identical
-   * incidents without an aggregate table. Inputs differ by state:
-   *   Running    — (image_id, "running")
-   *   Terminated — (image_id, exit_code, reason, message[:200])
-   *   Waiting    — (image_id, 0, reason, message[:200])
-   *
-   * @generated from field: string event_fingerprint = 13;
-   */
-  eventFingerprint: string;
+	/**
+	 * Stable hash krane computes so the dashboard can group identical
+	 * incidents without an aggregate table. Inputs differ by state:
+	 *   Running    — (image_id, "running")
+	 *   Terminated — (image_id, exit_code, reason, message[:200])
+	 *   Waiting    — (image_id, 0, reason, message[:200])
+	 *
+	 * @generated from field: string event_fingerprint = 13;
+	 */
+	eventFingerprint: string;
 
-  /**
-   * Mirrors corev1.ContainerState. Exactly one case is set per event.
-   *
-   * @generated from oneof ctrl.v1.InstanceEvent.state
-   */
-  state: {
-    /**
-     * @generated from field: ctrl.v1.Running running = 14;
-     */
-    value: Running;
-    case: "running";
-  } | {
-    /**
-     * @generated from field: ctrl.v1.Terminated terminated = 15;
-     */
-    value: Terminated;
-    case: "terminated";
-  } | {
-    /**
-     * @generated from field: ctrl.v1.Waiting waiting = 16;
-     */
-    value: Waiting;
-    case: "waiting";
-  } | { case: undefined; value?: undefined };
+	/**
+	 * Mirrors corev1.ContainerState. Exactly one case is set per event.
+	 *
+	 * @generated from oneof ctrl.v1.InstanceEvent.state
+	 */
+	state:
+		| {
+				/**
+				 * @generated from field: ctrl.v1.Running running = 14;
+				 */
+				value: Running;
+				case: "running";
+		  }
+		| {
+				/**
+				 * @generated from field: ctrl.v1.Terminated terminated = 15;
+				 */
+				value: Terminated;
+				case: "terminated";
+		  }
+		| {
+				/**
+				 * @generated from field: ctrl.v1.Waiting waiting = 16;
+				 */
+				value: Waiting;
+				case: "waiting";
+		  }
+		| { case: undefined; value?: undefined };
 
-  /**
-   * Selected k8s metadata for the event row. Stored verbatim into the
-   * ClickHouse `attributes` Map column. Known keys (krane populates):
-   *   image, image_id, cpu_limit_millicores, memory_limit_mib,
-   *   cpu_request_millicores, memory_request_mib, build_id.
-   * Numbers are stringified so the wire shape matches the column type.
-   *
-   * @generated from field: map<string, string> attributes = 17;
-   */
-  attributes: { [key: string]: string };
+	/**
+	 * Selected k8s metadata for the event row. Stored verbatim into the
+	 * ClickHouse `attributes` Map column. Known keys (krane populates):
+	 *   image, image_id, cpu_limit_millicores, memory_limit_mib,
+	 *   cpu_request_millicores, memory_request_mib, build_id.
+	 * Numbers are stringified so the wire shape matches the column type.
+	 *
+	 * @generated from field: map<string, string> attributes = 17;
+	 */
+	attributes: { [key: string]: string };
+
+	/**
+	 * Independently materialized output identity. Empty on legacy workloads.
+	 *
+	 * @generated from field: string resource_id = 18;
+	 */
+	resourceId: string;
+
+	/**
+	 * @generated from field: string resource_name = 19;
+	 */
+	resourceName: string;
+
+	/**
+	 * @generated from field: string resource_kind = 20;
+	 */
+	resourceKind: string;
 };
 
 /**
  * Describes the message ctrl.v1.InstanceEvent.
  * Use `create(InstanceEventSchema)` to create a new message.
  */
-export const InstanceEventSchema: GenMessage<InstanceEvent> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 7);
+export const InstanceEventSchema: GenMessage<InstanceEvent> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 7);
 
 /**
  * Running means the container is healthy and serving. The event itself
@@ -478,15 +537,15 @@ export const InstanceEventSchema: GenMessage<InstanceEvent> = /*@__PURE__*/
  *
  * @generated from message ctrl.v1.Running
  */
-export type Running = Message<"ctrl.v1.Running"> & {
-};
+export type Running = Message<"ctrl.v1.Running"> & {};
 
 /**
  * Describes the message ctrl.v1.Running.
  * Use `create(RunningSchema)` to create a new message.
  */
-export const RunningSchema: GenMessage<Running> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 8);
+export const RunningSchema: GenMessage<Running> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 8);
 
 /**
  * Terminated captures kubelet's ContainerStateTerminated. The container
@@ -495,46 +554,47 @@ export const RunningSchema: GenMessage<Running> = /*@__PURE__*/
  * @generated from message ctrl.v1.Terminated
  */
 export type Terminated = Message<"ctrl.v1.Terminated"> & {
-  /**
-   * Process exit code reported by the kernel.
-   *
-   * @generated from field: int32 exit_code = 1;
-   */
-  exitCode: number;
+	/**
+	 * Process exit code reported by the kernel.
+	 *
+	 * @generated from field: int32 exit_code = 1;
+	 */
+	exitCode: number;
 
-  /**
-   * Signal that delivered the termination, or 0 if the process exited
-   * without a signal. SIGTERM (15) usually means k8s/user requested
-   * shutdown; SIGKILL (9) typically pairs with OOMKilled or grace period
-   * expiry.
-   *
-   * @generated from field: int32 signal = 2;
-   */
-  signal: number;
+	/**
+	 * Signal that delivered the termination, or 0 if the process exited
+	 * without a signal. SIGTERM (15) usually means k8s/user requested
+	 * shutdown; SIGKILL (9) typically pairs with OOMKilled or grace period
+	 * expiry.
+	 *
+	 * @generated from field: int32 signal = 2;
+	 */
+	signal: number;
 
-  /**
-   * Kubelet-supplied label: "OOMKilled", "Error", "Completed",
-   * "ContainerCannotRun", "DeadlineExceeded", …
-   *
-   * @generated from field: string reason = 3;
-   */
-  reason: string;
+	/**
+	 * Kubelet-supplied label: "OOMKilled", "Error", "Completed",
+	 * "ContainerCannotRun", "DeadlineExceeded", …
+	 *
+	 * @generated from field: string reason = 3;
+	 */
+	reason: string;
 
-  /**
-   * Free-form kubelet message; truncated past 200 bytes when fed into
-   * event_fingerprint so retries of the same failure collapse.
-   *
-   * @generated from field: string message = 4;
-   */
-  message: string;
+	/**
+	 * Free-form kubelet message; truncated past 200 bytes when fed into
+	 * event_fingerprint so retries of the same failure collapse.
+	 *
+	 * @generated from field: string message = 4;
+	 */
+	message: string;
 };
 
 /**
  * Describes the message ctrl.v1.Terminated.
  * Use `create(TerminatedSchema)` to create a new message.
  */
-export const TerminatedSchema: GenMessage<Terminated> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 9);
+export const TerminatedSchema: GenMessage<Terminated> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 9);
 
 /**
  * Waiting captures kubelet's ContainerStateWaiting. Krane currently only
@@ -544,26 +604,27 @@ export const TerminatedSchema: GenMessage<Terminated> = /*@__PURE__*/
  * @generated from message ctrl.v1.Waiting
  */
 export type Waiting = Message<"ctrl.v1.Waiting"> & {
-  /**
-   * Kubelet-supplied label: "CrashLoopBackOff", "ImagePullBackOff",
-   * "ContainerCreating", "ErrImagePull", …
-   *
-   * @generated from field: string reason = 1;
-   */
-  reason: string;
+	/**
+	 * Kubelet-supplied label: "CrashLoopBackOff", "ImagePullBackOff",
+	 * "ContainerCreating", "ErrImagePull", …
+	 *
+	 * @generated from field: string reason = 1;
+	 */
+	reason: string;
 
-  /**
-   * @generated from field: string message = 2;
-   */
-  message: string;
+	/**
+	 * @generated from field: string message = 2;
+	 */
+	message: string;
 };
 
 /**
  * Describes the message ctrl.v1.Waiting.
  * Use `create(WaitingSchema)` to create a new message.
  */
-export const WaitingSchema: GenMessage<Waiting> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 10);
+export const WaitingSchema: GenMessage<Waiting> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 10);
 
 /**
  * ReportInstanceEventsRequest carries one or more events from a single krane
@@ -572,40 +633,43 @@ export const WaitingSchema: GenMessage<Waiting> = /*@__PURE__*/
  *
  * @generated from message ctrl.v1.ReportInstanceEventsRequest
  */
-export type ReportInstanceEventsRequest = Message<"ctrl.v1.ReportInstanceEventsRequest"> & {
-  /**
-   * @generated from field: repeated ctrl.v1.InstanceEvent events = 1;
-   */
-  events: InstanceEvent[];
+export type ReportInstanceEventsRequest =
+	Message<"ctrl.v1.ReportInstanceEventsRequest"> & {
+		/**
+		 * @generated from field: repeated ctrl.v1.InstanceEvent events = 1;
+		 */
+		events: InstanceEvent[];
 
-  /**
-   * region scopes the report to one cluster's krane agent. Same convention as
-   * every other ClusterService RPC (ReportDeploymentStatus, ReportSentinelStatus).
-   *
-   * @generated from field: ctrl.v1.RegionKey region = 2;
-   */
-  region?: RegionKey;
-};
+		/**
+		 * region scopes the report to one cluster's krane agent. Same convention as
+		 * every other ClusterService RPC (ReportDeploymentStatus, ReportSentinelStatus).
+		 *
+		 * @generated from field: ctrl.v1.RegionKey region = 2;
+		 */
+		region?: RegionKey;
+	};
 
 /**
  * Describes the message ctrl.v1.ReportInstanceEventsRequest.
  * Use `create(ReportInstanceEventsRequestSchema)` to create a new message.
  */
-export const ReportInstanceEventsRequestSchema: GenMessage<ReportInstanceEventsRequest> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 11);
+export const ReportInstanceEventsRequestSchema: GenMessage<ReportInstanceEventsRequest> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 11);
 
 /**
  * @generated from message ctrl.v1.ReportInstanceEventsResponse
  */
-export type ReportInstanceEventsResponse = Message<"ctrl.v1.ReportInstanceEventsResponse"> & {
-};
+export type ReportInstanceEventsResponse =
+	Message<"ctrl.v1.ReportInstanceEventsResponse"> & {};
 
 /**
  * Describes the message ctrl.v1.ReportInstanceEventsResponse.
  * Use `create(ReportInstanceEventsResponseSchema)` to create a new message.
  */
-export const ReportInstanceEventsResponseSchema: GenMessage<ReportInstanceEventsResponse> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 12);
+export const ReportInstanceEventsResponseSchema: GenMessage<ReportInstanceEventsResponse> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 12);
 
 /**
  * DeploymentState represents a lifecycle event for an application deployment.
@@ -617,50 +681,54 @@ export const ReportInstanceEventsResponseSchema: GenMessage<ReportInstanceEvents
  * @generated from message ctrl.v1.DeploymentState
  */
 export type DeploymentState = Message<"ctrl.v1.DeploymentState"> & {
-  /**
-   * version is the deployment-specific resource version for this state update.
-   * Clients should track the max version seen and use it when reconnecting to
-   * the WatchDeployments stream to resume from the correct position.
-   * When returned from GetDesiredDeploymentState, this field is not set.
-   *
-   * @generated from field: uint64 version = 3;
-   */
-  version: bigint;
+	/**
+	 * version is the deployment-specific resource version for this state update.
+	 * Clients should track the max version seen and use it when reconnecting to
+	 * the WatchDeployments stream to resume from the correct position.
+	 * When returned from GetDesiredDeploymentState, this field is not set.
+	 *
+	 * @generated from field: uint64 version = 3;
+	 */
+	version: bigint;
 
-  /**
-   * state contains the specific deployment operation to perform.
-   * Only one state type is set per message, determining the action the agent should take.
-   *
-   * @generated from oneof ctrl.v1.DeploymentState.state
-   */
-  state: {
-    /**
-     * apply indicates the deployment should exist with this configuration.
-     * The agent will create the deployment if it doesn't exist or update it if it does.
-     * This follows the same semantics as "kubectl apply" - declare desired state
-     * and let the agent determine the appropriate action.
-     *
-     * @generated from field: ctrl.v1.ApplyDeployment apply = 1;
-     */
-    value: ApplyDeployment;
-    case: "apply";
-  } | {
-    /**
-     * delete indicates the deployment should be removed from the cluster.
-     *
-     * @generated from field: ctrl.v1.DeleteDeployment delete = 2;
-     */
-    value: DeleteDeployment;
-    case: "delete";
-  } | { case: undefined; value?: undefined };
+	/**
+	 * state contains the specific deployment operation to perform.
+	 * Only one state type is set per message, determining the action the agent should take.
+	 *
+	 * @generated from oneof ctrl.v1.DeploymentState.state
+	 */
+	state:
+		| {
+				/**
+				 * apply indicates the deployment should exist with this configuration.
+				 * The agent will create the deployment if it doesn't exist or update it if it does.
+				 * This follows the same semantics as "kubectl apply" - declare desired state
+				 * and let the agent determine the appropriate action.
+				 *
+				 * @generated from field: ctrl.v1.ApplyDeployment apply = 1;
+				 */
+				value: ApplyDeployment;
+				case: "apply";
+		  }
+		| {
+				/**
+				 * delete indicates the deployment should be removed from the cluster.
+				 *
+				 * @generated from field: ctrl.v1.DeleteDeployment delete = 2;
+				 */
+				value: DeleteDeployment;
+				case: "delete";
+		  }
+		| { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message ctrl.v1.DeploymentState.
  * Use `create(DeploymentStateSchema)` to create a new message.
  */
-export const DeploymentStateSchema: GenMessage<DeploymentState> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 13);
+export const DeploymentStateSchema: GenMessage<DeploymentState> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 13);
 
 /**
  * PrivateBinding is a resolved, immutable endpoint grant from one resource to
@@ -669,43 +737,44 @@ export const DeploymentStateSchema: GenMessage<DeploymentState> = /*@__PURE__*/
  * @generated from message ctrl.v1.PrivateBinding
  */
 export type PrivateBinding = Message<"ctrl.v1.PrivateBinding"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 1;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string resource_id = 2;
-   */
-  resourceId: string;
+	/**
+	 * @generated from field: string resource_id = 2;
+	 */
+	resourceId: string;
 
-  /**
-   * @generated from field: string resource_name = 3;
-   */
-  resourceName: string;
+	/**
+	 * @generated from field: string resource_name = 3;
+	 */
+	resourceName: string;
 
-  /**
-   * @generated from field: string protocol = 4;
-   */
-  protocol: string;
+	/**
+	 * @generated from field: string protocol = 4;
+	 */
+	protocol: string;
 
-  /**
-   * @generated from field: string host = 5;
-   */
-  host: string;
+	/**
+	 * @generated from field: string host = 5;
+	 */
+	host: string;
 
-  /**
-   * @generated from field: int32 port = 6;
-   */
-  port: number;
+	/**
+	 * @generated from field: int32 port = 6;
+	 */
+	port: number;
 };
 
 /**
  * Describes the message ctrl.v1.PrivateBinding.
  * Use `create(PrivateBindingSchema)` to create a new message.
  */
-export const PrivateBindingSchema: GenMessage<PrivateBinding> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 14);
+export const PrivateBindingSchema: GenMessage<PrivateBinding> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 14);
 
 /**
  * ApplyDeployment contains the desired configuration for a deployment.
@@ -717,230 +786,231 @@ export const PrivateBindingSchema: GenMessage<PrivateBinding> = /*@__PURE__*/
  * @generated from message ctrl.v1.ApplyDeployment
  */
 export type ApplyDeployment = Message<"ctrl.v1.ApplyDeployment"> & {
-  /**
-   * namespace is the Kubernetes namespace in which the deployment should exist.
-   *
-   * @generated from field: string k8s_namespace = 1;
-   */
-  k8sNamespace: string;
+	/**
+	 * namespace is the Kubernetes namespace in which the deployment should exist.
+	 *
+	 * @generated from field: string k8s_namespace = 1;
+	 */
+	k8sNamespace: string;
 
-  /**
-   * @generated from field: string k8s_name = 2;
-   */
-  k8sName: string;
+	/**
+	 * @generated from field: string k8s_name = 2;
+	 */
+	k8sName: string;
 
-  /**
-   * workspace_id identifies the workspace that owns this deployment.
-   * Used for multi-tenancy and access control.
-   *
-   * @generated from field: string workspace_id = 3;
-   */
-  workspaceId: string;
+	/**
+	 * workspace_id identifies the workspace that owns this deployment.
+	 * Used for multi-tenancy and access control.
+	 *
+	 * @generated from field: string workspace_id = 3;
+	 */
+	workspaceId: string;
 
-  /**
-   * project_id identifies the project within the workspace.
-   * Deployments are scoped to projects for organizational purposes.
-   *
-   * @generated from field: string project_id = 4;
-   */
-  projectId: string;
+	/**
+	 * project_id identifies the project within the workspace.
+	 * Deployments are scoped to projects for organizational purposes.
+	 *
+	 * @generated from field: string project_id = 4;
+	 */
+	projectId: string;
 
-  /**
-   * environment_id specifies the environment .
-   * Used for environment-specific configuration and isolation.
-   *
-   * @generated from field: string environment_id = 5;
-   */
-  environmentId: string;
+	/**
+	 * environment_id specifies the environment .
+	 * Used for environment-specific configuration and isolation.
+	 *
+	 * @generated from field: string environment_id = 5;
+	 */
+	environmentId: string;
 
-  /**
-   * deployment_id is the unique identifier for this deployment within the namespace.
-   *
-   * @generated from field: string deployment_id = 6;
-   */
-  deploymentId: string;
+	/**
+	 * deployment_id is the unique identifier for this deployment within the namespace.
+	 *
+	 * @generated from field: string deployment_id = 6;
+	 */
+	deploymentId: string;
 
-  /**
-   * image is the container image to deploy.
-   * Must be a valid container registry URL accessible by the cluster.
-   * Example: "gcr.io/myproject/app:v2.1.0"
-   *
-   * @generated from field: string image = 7;
-   */
-  image: string;
+	/**
+	 * image is the container image to deploy.
+	 * Must be a valid container registry URL accessible by the cluster.
+	 * Example: "gcr.io/myproject/app:v2.1.0"
+	 *
+	 * @generated from field: string image = 7;
+	 */
+	image: string;
 
-  /**
-   * cpu_millicores is the CPU request/limit in millicores (1000 = 1 CPU core).
-   * This ensures each pod has sufficient CPU resources.
-   * Example: 250 = 0.25 CPU cores
-   *
-   * @generated from field: int64 cpu_millicores = 9;
-   */
-  cpuMillicores: bigint;
+	/**
+	 * cpu_millicores is the CPU request/limit in millicores (1000 = 1 CPU core).
+	 * This ensures each pod has sufficient CPU resources.
+	 * Example: 250 = 0.25 CPU cores
+	 *
+	 * @generated from field: int64 cpu_millicores = 9;
+	 */
+	cpuMillicores: bigint;
 
-  /**
-   * memory_mib is the memory request/limit in mebibytes.
-   * This ensures each pod has sufficient memory.
-   * Example: 256 = 256 MiB
-   *
-   * @generated from field: int64 memory_mib = 10;
-   */
-  memoryMib: bigint;
+	/**
+	 * memory_mib is the memory request/limit in mebibytes.
+	 * This ensures each pod has sufficient memory.
+	 * Example: 256 = 256 MiB
+	 *
+	 * @generated from field: int64 memory_mib = 10;
+	 */
+	memoryMib: bigint;
 
-  /**
-   * @generated from field: optional string build_id = 11;
-   */
-  buildId?: string;
+	/**
+	 * @generated from field: optional string build_id = 11;
+	 */
+	buildId?: string;
 
-  /**
-   * @generated from field: bytes encrypted_environment_variables = 12;
-   */
-  encryptedEnvironmentVariables: Uint8Array;
+	/**
+	 * @generated from field: bytes encrypted_environment_variables = 12;
+	 */
+	encryptedEnvironmentVariables: Uint8Array;
 
-  /**
-   * command is the container command override (e.g., ["./app", "serve"]).
-   * If empty, the container's default entrypoint/cmd from the Dockerfile is used.
-   *
-   * @generated from field: repeated string command = 13;
-   */
-  command: string[];
+	/**
+	 * command is the container command override (e.g., ["./app", "serve"]).
+	 * If empty, the container's default entrypoint/cmd from the Dockerfile is used.
+	 *
+	 * @generated from field: repeated string command = 13;
+	 */
+	command: string[];
 
-  /**
-   * port is the container port the application listens on.
-   *
-   * @generated from field: int32 port = 14;
-   */
-  port: number;
+	/**
+	 * port is the container port the application listens on.
+	 *
+	 * @generated from field: int32 port = 14;
+	 */
+	port: number;
 
-  /**
-   * shutdown_signal is the signal sent to the container for graceful shutdown.
-   * "SIGTERM", "SIGINT", "SIGQUIT", or "SIGKILL".
-   *
-   * @generated from field: string shutdown_signal = 15;
-   */
-  shutdownSignal: string;
+	/**
+	 * shutdown_signal is the signal sent to the container for graceful shutdown.
+	 * "SIGTERM", "SIGINT", "SIGQUIT", or "SIGKILL".
+	 *
+	 * @generated from field: string shutdown_signal = 15;
+	 */
+	shutdownSignal: string;
 
-  /**
-   * healthcheck is a JSON-encoded Healthcheck struct for configuring liveness/readiness probes.
-   * If empty, no probes are configured.
-   *
-   * @generated from field: optional bytes healthcheck = 17;
-   */
-  healthcheck?: Uint8Array;
+	/**
+	 * healthcheck is a JSON-encoded Healthcheck struct for configuring liveness/readiness probes.
+	 * If empty, no probes are configured.
+	 *
+	 * @generated from field: optional bytes healthcheck = 17;
+	 */
+	healthcheck?: Uint8Array;
 
-  /**
-   * app_id identifies the app within the project.
-   * Used for pod labels so Vector can extract it into runtime logs.
-   *
-   * @generated from field: string app_id = 18;
-   */
-  appId: string;
+	/**
+	 * app_id identifies the app within the project.
+	 * Used for pod labels so Vector can extract it into runtime logs.
+	 *
+	 * @generated from field: string app_id = 18;
+	 */
+	appId: string;
 
-  /**
-   * Runtime environment variable fields for user workloads.
-   *
-   * @generated from field: optional string environment_slug = 21;
-   */
-  environmentSlug?: string;
+	/**
+	 * Runtime environment variable fields for user workloads.
+	 *
+	 * @generated from field: optional string environment_slug = 21;
+	 */
+	environmentSlug?: string;
 
-  /**
-   * @generated from field: optional string region = 22;
-   */
-  region?: string;
+	/**
+	 * @generated from field: optional string region = 22;
+	 */
+	region?: string;
 
-  /**
-   * @generated from field: optional string git_commit_sha = 23;
-   */
-  gitCommitSha?: string;
+	/**
+	 * @generated from field: optional string git_commit_sha = 23;
+	 */
+	gitCommitSha?: string;
 
-  /**
-   * @generated from field: optional string git_branch = 24;
-   */
-  gitBranch?: string;
+	/**
+	 * @generated from field: optional string git_branch = 24;
+	 */
+	gitBranch?: string;
 
-  /**
-   * @generated from field: optional string git_repo = 25;
-   */
-  gitRepo?: string;
+	/**
+	 * @generated from field: optional string git_repo = 25;
+	 */
+	gitRepo?: string;
 
-  /**
-   * @generated from field: optional string git_commit_message = 26;
-   */
-  gitCommitMessage?: string;
+	/**
+	 * @generated from field: optional string git_commit_message = 26;
+	 */
+	gitCommitMessage?: string;
 
-  /**
-   * Horizontal autoscaling policy. Krane creates an HPA with these values.
-   * Populated from the horizontal_autoscaling_policies table via app_regional_settings.
-   *
-   * @generated from field: ctrl.v1.AutoscalingPolicy autoscaling = 27;
-   */
-  autoscaling?: AutoscalingPolicy;
+	/**
+	 * Horizontal autoscaling policy. Krane creates an HPA with these values.
+	 * Populated from the horizontal_autoscaling_policies table via app_regional_settings.
+	 *
+	 * @generated from field: ctrl.v1.AutoscalingPolicy autoscaling = 27;
+	 */
+	autoscaling?: AutoscalingPolicy;
 
-  /**
-   * ephemeral_storage configures an EBS-backed scratch volume for the deployment.
-   * When present, Krane provisions a PVC per pod using the specified storage class.
-   * The volume is created when the pod starts and deleted when the pod terminates.
-   * When absent, no ephemeral volume is attached.
-   *
-   * @generated from field: optional ctrl.v1.EphemeralStorage ephemeral_storage = 29;
-   */
-  ephemeralStorage?: EphemeralStorage;
+	/**
+	 * ephemeral_storage configures an EBS-backed scratch volume for the deployment.
+	 * When present, Krane provisions a PVC per pod using the specified storage class.
+	 * The volume is created when the pod starts and deleted when the pod terminates.
+	 * When absent, no ephemeral volume is attached.
+	 *
+	 * @generated from field: optional ctrl.v1.EphemeralStorage ephemeral_storage = 29;
+	 */
+	ephemeralStorage?: EphemeralStorage;
 
-  /**
-   * Resource identity separates independently materialized outputs that share
-   * a parent deployment and, potentially, the same built image.
-   *
-   * @generated from field: string resource_id = 30;
-   */
-  resourceId: string;
+	/**
+	 * Resource identity separates independently materialized outputs that share
+	 * a parent deployment and, potentially, the same built image.
+	 *
+	 * @generated from field: string resource_id = 30;
+	 */
+	resourceId: string;
 
-  /**
-   * @generated from field: string resource_name = 31;
-   */
-  resourceName: string;
+	/**
+	 * @generated from field: string resource_name = 31;
+	 */
+	resourceName: string;
 
-  /**
-   * @generated from field: ctrl.v1.DeploymentResourceKind resource_kind = 32;
-   */
-  resourceKind: DeploymentResourceKind;
+	/**
+	 * @generated from field: ctrl.v1.DeploymentResourceKind resource_kind = 32;
+	 */
+	resourceKind: DeploymentResourceKind;
 
-  /**
-   * @generated from field: bool public = 33;
-   */
-  public: boolean;
+	/**
+	 * @generated from field: bool public = 33;
+	 */
+	public: boolean;
 
-  /**
-   * @generated from field: string schedule = 34;
-   */
-  schedule: string;
+	/**
+	 * @generated from field: string schedule = 34;
+	 */
+	schedule: string;
 
-  /**
-   * @generated from field: optional string runtime = 35;
-   */
-  runtime?: string;
+	/**
+	 * @generated from field: optional string runtime = 35;
+	 */
+	runtime?: string;
 
-  /**
-   * @generated from field: optional string handler = 36;
-   */
-  handler?: string;
+	/**
+	 * @generated from field: optional string handler = 36;
+	 */
+	handler?: string;
 
-  /**
-   * @generated from field: repeated ctrl.v1.PrivateBinding bindings = 37;
-   */
-  bindings: PrivateBinding[];
+	/**
+	 * @generated from field: repeated ctrl.v1.PrivateBinding bindings = 37;
+	 */
+	bindings: PrivateBinding[];
 
-  /**
-   * @generated from field: repeated string allowed_callers = 38;
-   */
-  allowedCallers: string[];
+	/**
+	 * @generated from field: repeated string allowed_callers = 38;
+	 */
+	allowedCallers: string[];
 };
 
 /**
  * Describes the message ctrl.v1.ApplyDeployment.
  * Use `create(ApplyDeploymentSchema)` to create a new message.
  */
-export const ApplyDeploymentSchema: GenMessage<ApplyDeployment> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 15);
+export const ApplyDeploymentSchema: GenMessage<ApplyDeployment> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 15);
 
 /**
  * AutoscalingPolicy configures horizontal pod autoscaling for a deployment.
@@ -949,43 +1019,44 @@ export const ApplyDeploymentSchema: GenMessage<ApplyDeployment> = /*@__PURE__*/
  * @generated from message ctrl.v1.AutoscalingPolicy
  */
 export type AutoscalingPolicy = Message<"ctrl.v1.AutoscalingPolicy"> & {
-  /**
-   * Minimum number of pod replicas the HPA will maintain.
-   *
-   * @generated from field: uint32 min_replicas = 1;
-   */
-  minReplicas: number;
+	/**
+	 * Minimum number of pod replicas the HPA will maintain.
+	 *
+	 * @generated from field: uint32 min_replicas = 1;
+	 */
+	minReplicas: number;
 
-  /**
-   * Maximum number of pod replicas the HPA can scale to.
-   *
-   * @generated from field: uint32 max_replicas = 2;
-   */
-  maxReplicas: number;
+	/**
+	 * Maximum number of pod replicas the HPA can scale to.
+	 *
+	 * @generated from field: uint32 max_replicas = 2;
+	 */
+	maxReplicas: number;
 
-  /**
-   * Average CPU utilization percentage (0-100) that triggers scale-up.
-   * When omitted, defaults to 80%.
-   *
-   * @generated from field: optional int32 cpu_threshold = 3;
-   */
-  cpuThreshold?: number;
+	/**
+	 * Average CPU utilization percentage (0-100) that triggers scale-up.
+	 * When omitted, defaults to 80%.
+	 *
+	 * @generated from field: optional int32 cpu_threshold = 3;
+	 */
+	cpuThreshold?: number;
 
-  /**
-   * Average memory utilization percentage (0-100) that triggers scale-up.
-   * When omitted, memory is not used as a scaling signal.
-   *
-   * @generated from field: optional int32 memory_threshold = 4;
-   */
-  memoryThreshold?: number;
+	/**
+	 * Average memory utilization percentage (0-100) that triggers scale-up.
+	 * When omitted, memory is not used as a scaling signal.
+	 *
+	 * @generated from field: optional int32 memory_threshold = 4;
+	 */
+	memoryThreshold?: number;
 };
 
 /**
  * Describes the message ctrl.v1.AutoscalingPolicy.
  * Use `create(AutoscalingPolicySchema)` to create a new message.
  */
-export const AutoscalingPolicySchema: GenMessage<AutoscalingPolicy> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 16);
+export const AutoscalingPolicySchema: GenMessage<AutoscalingPolicy> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 16);
 
 /**
  * DeleteDeployment identifies a deployment to remove from the cluster.
@@ -997,28 +1068,29 @@ export const AutoscalingPolicySchema: GenMessage<AutoscalingPolicy> = /*@__PURE_
  * @generated from message ctrl.v1.DeleteDeployment
  */
 export type DeleteDeployment = Message<"ctrl.v1.DeleteDeployment"> & {
-  /**
-   * @generated from field: string k8s_namespace = 1;
-   */
-  k8sNamespace: string;
+	/**
+	 * @generated from field: string k8s_namespace = 1;
+	 */
+	k8sNamespace: string;
 
-  /**
-   * @generated from field: string k8s_name = 2;
-   */
-  k8sName: string;
+	/**
+	 * @generated from field: string k8s_name = 2;
+	 */
+	k8sName: string;
 
-  /**
-   * @generated from field: string resource_id = 3;
-   */
-  resourceId: string;
+	/**
+	 * @generated from field: string resource_id = 3;
+	 */
+	resourceId: string;
 };
 
 /**
  * Describes the message ctrl.v1.DeleteDeployment.
  * Use `create(DeleteDeploymentSchema)` to create a new message.
  */
-export const DeleteDeploymentSchema: GenMessage<DeleteDeployment> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 17);
+export const DeleteDeploymentSchema: GenMessage<DeleteDeployment> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 17);
 
 /**
  * HeartbeatRequest is sent periodically by krane agents to register their
@@ -1028,31 +1100,32 @@ export const DeleteDeploymentSchema: GenMessage<DeleteDeployment> = /*@__PURE__*
  * @generated from message ctrl.v1.HeartbeatRequest
  */
 export type HeartbeatRequest = Message<"ctrl.v1.HeartbeatRequest"> & {
-  /**
-   * @generated from field: ctrl.v1.RegionKey region = 1;
-   */
-  region?: RegionKey;
+	/**
+	 * @generated from field: ctrl.v1.RegionKey region = 1;
+	 */
+	region?: RegionKey;
 };
 
 /**
  * Describes the message ctrl.v1.HeartbeatRequest.
  * Use `create(HeartbeatRequestSchema)` to create a new message.
  */
-export const HeartbeatRequestSchema: GenMessage<HeartbeatRequest> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 18);
+export const HeartbeatRequestSchema: GenMessage<HeartbeatRequest> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 18);
 
 /**
  * @generated from message ctrl.v1.HeartbeatResponse
  */
-export type HeartbeatResponse = Message<"ctrl.v1.HeartbeatResponse"> & {
-};
+export type HeartbeatResponse = Message<"ctrl.v1.HeartbeatResponse"> & {};
 
 /**
  * Describes the message ctrl.v1.HeartbeatResponse.
  * Use `create(HeartbeatResponseSchema)` to create a new message.
  */
-export const HeartbeatResponseSchema: GenMessage<HeartbeatResponse> = /*@__PURE__*/
-  messageDesc(file_ctrl_v1_cluster, 19);
+export const HeartbeatResponseSchema: GenMessage<HeartbeatResponse> =
+	/*@__PURE__*/
+	messageDesc(file_ctrl_v1_cluster, 19);
 
 /**
  * Health represents the health state of a resource (deployment instance, etc.)
@@ -1060,32 +1133,33 @@ export const HeartbeatResponseSchema: GenMessage<HeartbeatResponse> = /*@__PURE_
  * @generated from enum ctrl.v1.Health
  */
 export enum Health {
-  /**
-   * @generated from enum value: HEALTH_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: HEALTH_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: HEALTH_HEALTHY = 1;
-   */
-  HEALTHY = 1,
+	/**
+	 * @generated from enum value: HEALTH_HEALTHY = 1;
+	 */
+	HEALTHY = 1,
 
-  /**
-   * @generated from enum value: HEALTH_UNHEALTHY = 2;
-   */
-  UNHEALTHY = 2,
+	/**
+	 * @generated from enum value: HEALTH_UNHEALTHY = 2;
+	 */
+	UNHEALTHY = 2,
 
-  /**
-   * @generated from enum value: HEALTH_PAUSED = 3;
-   */
-  PAUSED = 3,
+	/**
+	 * @generated from enum value: HEALTH_PAUSED = 3;
+	 */
+	PAUSED = 3,
 }
 
 /**
  * Describes the enum ctrl.v1.Health.
  */
-export const HealthSchema: GenEnum<Health> = /*@__PURE__*/
-  enumDesc(file_ctrl_v1_cluster, 0);
+export const HealthSchema: GenEnum<Health> =
+	/*@__PURE__*/
+	enumDesc(file_ctrl_v1_cluster, 0);
 
 /**
  * DeploymentResourceKind identifies the execution model Krane must
@@ -1094,37 +1168,38 @@ export const HealthSchema: GenEnum<Health> = /*@__PURE__*/
  * @generated from enum ctrl.v1.DeploymentResourceKind
  */
 export enum DeploymentResourceKind {
-  /**
-   * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_SERVICE = 1;
-   */
-  SERVICE = 1,
+	/**
+	 * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_SERVICE = 1;
+	 */
+	SERVICE = 1,
 
-  /**
-   * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_FUNCTION = 2;
-   */
-  FUNCTION = 2,
+	/**
+	 * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_FUNCTION = 2;
+	 */
+	FUNCTION = 2,
 
-  /**
-   * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_WORKER = 3;
-   */
-  WORKER = 3,
+	/**
+	 * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_WORKER = 3;
+	 */
+	WORKER = 3,
 
-  /**
-   * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_CRON = 4;
-   */
-  CRON = 4,
+	/**
+	 * @generated from enum value: DEPLOYMENT_RESOURCE_KIND_CRON = 4;
+	 */
+	CRON = 4,
 }
 
 /**
  * Describes the enum ctrl.v1.DeploymentResourceKind.
  */
-export const DeploymentResourceKindSchema: GenEnum<DeploymentResourceKind> = /*@__PURE__*/
-  enumDesc(file_ctrl_v1_cluster, 1);
+export const DeploymentResourceKindSchema: GenEnum<DeploymentResourceKind> =
+	/*@__PURE__*/
+	enumDesc(file_ctrl_v1_cluster, 1);
 
 /**
  * ClusterService coordinates deployment configurations across multiple clusters.
@@ -1137,80 +1212,78 @@ export const DeploymentResourceKindSchema: GenEnum<DeploymentResourceKind> = /*@
  * @generated from service ctrl.v1.ClusterService
  */
 export const ClusterService: GenService<{
-  /**
-   * WatchDeploymentChanges streams incremental resource changes from the
-   * deployment_changes outbox table. When version_last_seen is 0, the server
-   * jumps to the current max version and polls from there (no replay).
-   * The stream stays open indefinitely, polling for new changes.
-   *
-   * @generated from rpc ctrl.v1.ClusterService.WatchDeploymentChanges
-   */
-  watchDeploymentChanges: {
-    methodKind: "server_streaming";
-    input: typeof WatchDeploymentChangesRequestSchema;
-    output: typeof DeploymentChangeEventSchema;
-  },
-  /**
-   * SyncDesiredState streams the full desired state for a region: all running
-   * deployments and Cilium policies. The server closes the stream after all
-   * state has been sent. Krane calls this on startup and periodically as a
-   * safety net to reconcile any drift.
-   *
-   * @generated from rpc ctrl.v1.ClusterService.SyncDesiredState
-   */
-  syncDesiredState: {
-    methodKind: "server_streaming";
-    input: typeof SyncDesiredStateRequestSchema;
-    output: typeof DeploymentChangeEventSchema;
-  },
-  /**
-   * GetDesiredDeploymentState returns the current desired state for a single deployment.
-   * Used by the resync loop to verify consistency for existing resources.
-   *
-   * @generated from rpc ctrl.v1.ClusterService.GetDesiredDeploymentState
-   */
-  getDesiredDeploymentState: {
-    methodKind: "unary";
-    input: typeof GetDesiredDeploymentStateRequestSchema;
-    output: typeof DeploymentStateSchema;
-  },
-  /**
-   * ReportDeploymentStatus reports actual deployment state from the agent to the control plane.
-   * Called when K8s watch events indicate ReplicaSet changes.
-   *
-   * @generated from rpc ctrl.v1.ClusterService.ReportDeploymentStatus
-   */
-  reportDeploymentStatus: {
-    methodKind: "unary";
-    input: typeof ReportDeploymentStatusRequestSchema;
-    output: typeof ReportDeploymentStatusResponseSchema;
-  },
-  /**
-   * ReportInstanceEvents reports container lifecycle events (starts, exits,
-   * CrashLoopBackOff transitions) from the agent. Krane batches one or more
-   * events per RPC; the control plane writes them to ClickHouse and
-   * denormalizes the latest exit info onto the matching instances row so the
-   * dashboard can render exit reasons without a CH round-trip.
-   *
-   * @generated from rpc ctrl.v1.ClusterService.ReportInstanceEvents
-   */
-  reportInstanceEvents: {
-    methodKind: "unary";
-    input: typeof ReportInstanceEventsRequestSchema;
-    output: typeof ReportInstanceEventsResponseSchema;
-  },
-  /**
-   * Heartbeat is called periodically by krane agents to register their cluster
-   * and region with the control plane. This populates the regions and
-   * clusters tables, making regions dynamically discoverable.
-   *
-   * @generated from rpc ctrl.v1.ClusterService.Heartbeat
-   */
-  heartbeat: {
-    methodKind: "unary";
-    input: typeof HeartbeatRequestSchema;
-    output: typeof HeartbeatResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_ctrl_v1_cluster, 0);
-
+	/**
+	 * WatchDeploymentChanges streams incremental resource changes from the
+	 * deployment_changes outbox table. When version_last_seen is 0, the server
+	 * jumps to the current max version and polls from there (no replay).
+	 * The stream stays open indefinitely, polling for new changes.
+	 *
+	 * @generated from rpc ctrl.v1.ClusterService.WatchDeploymentChanges
+	 */
+	watchDeploymentChanges: {
+		methodKind: "server_streaming";
+		input: typeof WatchDeploymentChangesRequestSchema;
+		output: typeof DeploymentChangeEventSchema;
+	};
+	/**
+	 * SyncDesiredState streams the full desired state for a region: all running
+	 * deployments and Cilium policies. The server closes the stream after all
+	 * state has been sent. Krane calls this on startup and periodically as a
+	 * safety net to reconcile any drift.
+	 *
+	 * @generated from rpc ctrl.v1.ClusterService.SyncDesiredState
+	 */
+	syncDesiredState: {
+		methodKind: "server_streaming";
+		input: typeof SyncDesiredStateRequestSchema;
+		output: typeof DeploymentChangeEventSchema;
+	};
+	/**
+	 * GetDesiredDeploymentState returns the current desired state for a single deployment.
+	 * Used by the resync loop to verify consistency for existing resources.
+	 *
+	 * @generated from rpc ctrl.v1.ClusterService.GetDesiredDeploymentState
+	 */
+	getDesiredDeploymentState: {
+		methodKind: "unary";
+		input: typeof GetDesiredDeploymentStateRequestSchema;
+		output: typeof DeploymentStateSchema;
+	};
+	/**
+	 * ReportDeploymentStatus reports actual deployment state from the agent to the control plane.
+	 * Called when K8s watch events indicate ReplicaSet changes.
+	 *
+	 * @generated from rpc ctrl.v1.ClusterService.ReportDeploymentStatus
+	 */
+	reportDeploymentStatus: {
+		methodKind: "unary";
+		input: typeof ReportDeploymentStatusRequestSchema;
+		output: typeof ReportDeploymentStatusResponseSchema;
+	};
+	/**
+	 * ReportInstanceEvents reports container lifecycle events (starts, exits,
+	 * CrashLoopBackOff transitions) from the agent. Krane batches one or more
+	 * events per RPC; the control plane writes them to ClickHouse and
+	 * denormalizes the latest exit info onto the matching instances row so the
+	 * dashboard can render exit reasons without a CH round-trip.
+	 *
+	 * @generated from rpc ctrl.v1.ClusterService.ReportInstanceEvents
+	 */
+	reportInstanceEvents: {
+		methodKind: "unary";
+		input: typeof ReportInstanceEventsRequestSchema;
+		output: typeof ReportInstanceEventsResponseSchema;
+	};
+	/**
+	 * Heartbeat is called periodically by krane agents to register their cluster
+	 * and region with the control plane. This populates the regions and
+	 * clusters tables, making regions dynamically discoverable.
+	 *
+	 * @generated from rpc ctrl.v1.ClusterService.Heartbeat
+	 */
+	heartbeat: {
+		methodKind: "unary";
+		input: typeof HeartbeatRequestSchema;
+		output: typeof HeartbeatResponseSchema;
+	};
+}> = /*@__PURE__*/ serviceDesc(file_ctrl_v1_cluster, 0);

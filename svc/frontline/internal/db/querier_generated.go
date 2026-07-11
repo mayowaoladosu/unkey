@@ -50,6 +50,9 @@ type Querier interface {
 	//  SELECT
 	//    fr.environment_id,
 	//    fr.deployment_id,
+	//    COALESCE(public_dr.id, '') AS resource_id,
+	//    COALESCE(public_dr.name, '') AS resource_name,
+	//    COALESCE(public_dr.kind, '') AS resource_kind,
 	//    d.workspace_id,
 	//    d.project_id,
 	//    d.app_id,
@@ -61,6 +64,14 @@ type Querier interface {
 	//    da.metadata AS static_metadata
 	//  FROM frontline_routes fr
 	//  INNER JOIN deployments d ON fr.deployment_id = d.id
+	//  LEFT JOIN deployment_resources public_dr
+	//    ON public_dr.deployment_id = d.id
+	//    AND public_dr.public = true
+	//    AND public_dr.pk = (
+	//      SELECT MIN(candidate.pk)
+	//      FROM deployment_resources candidate
+	//      WHERE candidate.deployment_id = d.id AND candidate.public = true
+	//    )
 	//  LEFT JOIN deployment_artifacts da
 	//    ON da.deployment_id = d.id
 	//    AND da.kind = 'static_bundle'
@@ -80,6 +91,8 @@ type Querier interface {
 	//
 	//  SELECT
 	//    i.pk, i.id, i.deployment_id, i.resource_id, i.workspace_id, i.project_id, i.app_id, i.region_id, i.k8s_name, i.address, i.cpu_millicores, i.memory_mib, i.storage_mib, i.status, i.container_status,
+	//    COALESCE(dr.name, '') AS resource_name,
+	//    COALESCE(dr.kind, '') AS resource_kind,
 	//    r.name AS region_name,
 	//    r.platform AS region_platform
 	//  FROM instances i

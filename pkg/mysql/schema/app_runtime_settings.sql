@@ -8,6 +8,7 @@ CREATE TABLE `app_runtime_settings` (
 	`memory_mib` int NOT NULL DEFAULT 256,
 	`storage_mib` int unsigned NOT NULL DEFAULT 0,
 	`command` json NOT NULL DEFAULT ('[]'),
+	`outputs` json NOT NULL DEFAULT (JSON_ARRAY()),
 	`healthcheck` json,
 	`shutdown_signal` enum('SIGTERM','SIGINT','SIGQUIT','SIGKILL') NOT NULL DEFAULT 'SIGTERM',
 	`upstream_protocol` enum('http1','h2c') NOT NULL DEFAULT 'http1',

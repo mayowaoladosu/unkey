@@ -14,6 +14,7 @@ import { Cpu } from "./components/runtime-settings/cpu";
 import { Healthcheck } from "./components/runtime-settings/healthcheck";
 import { Instances } from "./components/runtime-settings/instances";
 import { Memory } from "./components/runtime-settings/memory";
+import { Outputs } from "./components/runtime-settings/outputs";
 import { Port } from "./components/runtime-settings/port-settings";
 import { Regions } from "./components/runtime-settings/regions";
 import { Storage } from "./components/runtime-settings/storage";
@@ -27,57 +28,58 @@ import { SettingsGroup } from "./components/shared/settings-group";
 type DeploymentSection = "advanced" | "sentinel" | "runtime" | "build";
 
 type DeploymentSettingsProps = {
-  githubReadOnly?: boolean;
-  sections?: Partial<Record<DeploymentSection, true>>;
-  onBeforeNavigate?: () => void;
+	githubReadOnly?: boolean;
+	sections?: Partial<Record<DeploymentSection, true>>;
+	onBeforeNavigate?: () => void;
 };
 
 export const DeploymentSettings = ({
-  githubReadOnly = false,
-  sections = { build: true, runtime: true, advanced: true, sentinel: true },
-  onBeforeNavigate,
+	githubReadOnly = false,
+	sections = { build: true, runtime: true, advanced: true, sentinel: true },
+	onBeforeNavigate,
 }: DeploymentSettingsProps) => {
-  return (
-    <div className="flex flex-col gap-6">
-      <SettingCardGroup>
-        <GitHub readOnly={githubReadOnly} onBeforeNavigate={onBeforeNavigate} />
-        <RootDirectory />
-        <Dockerfile />
-        <BuildCommand />
-        <WatchPaths />
-        <AutoDeploy />
-      </SettingCardGroup>
-      <SettingsGroup
-        icon={<CircleHalfDottedClock iconSize="md-medium" />}
-        title="Runtime settings"
-        defaultExpanded={Boolean(sections.runtime)}
-      >
-        <SettingCardGroup>
-          <Regions />
-          <Instances />
-          <Cpu />
-          <Memory />
-          <Storage />
-          <Healthcheck />
-          <Port />
-          <Command />
-          {/* Temporarily disabled */}
-          {/* <Scaling /> */}
-        </SettingCardGroup>
-      </SettingsGroup>
-      <SettingsGroup
-        icon={<Gear iconSize="md-medium" />}
-        title="Advanced configurations"
-        defaultExpanded={Boolean(sections.advanced)}
-      >
-        <SettingCardGroup>
-          <div id="custom-domains" className="scroll-mt-24">
-            <CustomDomains />
-          </div>
-          <OpenapiSpecPath />
-          <UpstreamProtocol />
-        </SettingCardGroup>
-      </SettingsGroup>
-    </div>
-  );
+	return (
+		<div className="flex flex-col gap-6">
+			<SettingCardGroup>
+				<GitHub readOnly={githubReadOnly} onBeforeNavigate={onBeforeNavigate} />
+				<RootDirectory />
+				<Dockerfile />
+				<BuildCommand />
+				<WatchPaths />
+				<AutoDeploy />
+			</SettingCardGroup>
+			<SettingsGroup
+				icon={<CircleHalfDottedClock iconSize="md-medium" />}
+				title="Runtime settings"
+				defaultExpanded={Boolean(sections.runtime)}
+			>
+				<SettingCardGroup>
+					<Outputs />
+					<Regions />
+					<Instances />
+					<Cpu />
+					<Memory />
+					<Storage />
+					<Healthcheck />
+					<Port />
+					<Command />
+					{/* Temporarily disabled */}
+					{/* <Scaling /> */}
+				</SettingCardGroup>
+			</SettingsGroup>
+			<SettingsGroup
+				icon={<Gear iconSize="md-medium" />}
+				title="Advanced configurations"
+				defaultExpanded={Boolean(sections.advanced)}
+			>
+				<SettingCardGroup>
+					<div id="custom-domains" className="scroll-mt-24">
+						<CustomDomains />
+					</div>
+					<OpenapiSpecPath />
+					<UpstreamProtocol />
+				</SettingCardGroup>
+			</SettingsGroup>
+		</div>
+	);
 };

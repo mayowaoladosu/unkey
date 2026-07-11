@@ -1,75 +1,114 @@
 import { relations, sql } from "drizzle-orm";
 import {
-  bigint,
-  int,
-  json,
-  mysqlEnum,
-  mysqlTable,
-  uniqueIndex,
-  varchar,
+	bigint,
+	int,
+	json,
+	mysqlEnum,
+	mysqlTable,
+	uniqueIndex,
+	varchar,
 } from "drizzle-orm/mysql-core";
 import { apps } from "./apps";
 import { environments } from "./environments";
 
 export type Healthcheck = {
-  method: "GET" | "POST";
-  path: string;
-  intervalSeconds: number;
-  timeoutSeconds: number;
-  failureThreshold: number;
-  initialDelaySeconds: number;
+	method: "GET" | "POST";
+	path: string;
+	intervalSeconds: number;
+	timeoutSeconds: number;
+	failureThreshold: number;
+	initialDelaySeconds: number;
+};
+
+export type DeploymentOutputBinding = {
+	name: string;
+	resource: string;
+	protocol?: "http" | "tcp";
+};
+
+export type DeploymentOutput = {
+	kind: "container" | "static" | "function" | "worker" | "cron";
+	name: string;
+	port?: number;
+	upstreamProtocol?: "http1" | "h2c";
+	directory?: string;
+	spaFallback?: boolean;
+	runtime?: string;
+	handler?: string;
+	command?: string[];
+	schedule?: string;
+	public?: boolean;
+	bindings?: DeploymentOutputBinding[];
 };
 import { lifecycleDates } from "./util/lifecycle_dates";
 import { longblob } from "./util/longblob";
 import { workspaces } from "./workspaces";
 
 export const appRuntimeSettings = mysqlTable(
-  "app_runtime_settings",
-  {
-    pk: bigint("pk", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+	"app_runtime_settings",
+	{
+		pk: bigint("pk", { mode: "number", unsigned: true })
+			.autoincrement()
+			.primaryKey(),
 
-    workspaceId: varchar("workspace_id", { length: 256 }).notNull(),
-    appId: varchar("app_id", { length: 64 }).notNull(),
-    environmentId: varchar("environment_id", { length: 128 }).notNull(),
+		workspaceId: varchar("workspace_id", { length: 256 }).notNull(),
+		appId: varchar("app_id", { length: 64 }).notNull(),
+		environmentId: varchar("environment_id", { length: 128 }).notNull(),
 
-    port: int("port").notNull().default(8080),
-    // CPU allocation in millicores (1000 millicores = 1 CPU).
-    cpuMillicores: int("cpu_millicores").notNull().default(250),
-    memoryMib: int("memory_mib").notNull().default(256),
-    storageMib: int("storage_mib", { unsigned: true }).notNull().default(0),
-    command: json("command").$type<string[]>().notNull().default(sql`('[]')`),
+		port: int("port").notNull().default(8080),
+		// CPU allocation in millicores (1000 millicores = 1 CPU).
+		cpuMillicores: int("cpu_millicores").notNull().default(250),
+		memoryMib: int("memory_mib").notNull().default(256),
+		storageMib: int("storage_mib", { unsigned: true }).notNull().default(0),
+		command: json("command").$type<string[]>().notNull().default(sql`('[]')`),
+		outputs: json("outputs").$type<DeploymentOutput[]>().notNull().default(sql`(JSON_ARRAY())`),
 
-    // null = no healthcheck configured
-    healthcheck: json("healthcheck").$type<Healthcheck>(),
+		// null = no healthcheck configured
+		healthcheck: json("healthcheck").$type<Healthcheck>(),
 
-    shutdownSignal: mysqlEnum("shutdown_signal", ["SIGTERM", "SIGINT", "SIGQUIT", "SIGKILL"])
-      .notNull()
-      .default("SIGTERM"),
+		shutdownSignal: mysqlEnum("shutdown_signal", [
+			"SIGTERM",
+			"SIGINT",
+			"SIGQUIT",
+			"SIGKILL",
+		])
+			.notNull()
+			.default("SIGTERM"),
 
-    // Protocol sentinel uses to proxy to the instance (h2c enables gRPC/Connect)
-    upstreamProtocol: mysqlEnum("upstream_protocol", ["http1", "h2c"]).notNull().default("http1"),
+		// Protocol sentinel uses to proxy to the instance (h2c enables gRPC/Connect)
+		upstreamProtocol: mysqlEnum("upstream_protocol", ["http1", "h2c"])
+			.notNull()
+			.default("http1"),
 
-    sentinelConfig: longblob("sentinel_config").notNull(),
+		sentinelConfig: longblob("sentinel_config").notNull(),
 
-    // null = scraping disabled; non-null path (e.g. /openapi.yaml) enables scraping
-    openapiSpecPath: varchar("openapi_spec_path", { length: 512 }),
+		// null = scraping disabled; non-null path (e.g. /openapi.yaml) enables scraping
+		openapiSpecPath: varchar("openapi_spec_path", { length: 512 }),
 
-    ...lifecycleDates,
-  },
-  (table) => [uniqueIndex("app_runtime_settings_app_env_idx").on(table.appId, table.environmentId)],
+		...lifecycleDates,
+	},
+	(table) => [
+		uniqueIndex("app_runtime_settings_app_env_idx").on(
+			table.appId,
+			table.environmentId,
+		),
+	],
 );
 
-export const appRuntimeSettingsRelations = relations(appRuntimeSettings, ({ one }) => ({
-  workspace: one(workspaces, {
-    fields: [appRuntimeSettings.workspaceId],
-    references: [workspaces.id],
-  }),
-  app: one(apps, {
-    fields: [appRuntimeSettings.appId],
-    references: [apps.id],
-  }),
-  environment: one(environments, {
-    fields: [appRuntimeSettings.environmentId],
-    references: [environments.id],
-  }),
-}));
+export const appRuntimeSettingsRelations = relations(
+	appRuntimeSettings,
+	({ one }) => ({
+		workspace: one(workspaces, {
+			fields: [appRuntimeSettings.workspaceId],
+			references: [workspaces.id],
+		}),
+		app: one(apps, {
+			fields: [appRuntimeSettings.appId],
+			references: [apps.id],
+		}),
+		environment: one(environments, {
+			fields: [appRuntimeSettings.environmentId],
+			references: [environments.id],
+		}),
+	}),
+);

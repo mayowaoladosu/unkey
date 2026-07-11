@@ -3,6 +3,8 @@
 -- with region metadata for instance-aware routing decisions.
 SELECT
   i.*,
+  COALESCE(dr.name, '') AS resource_name,
+  COALESCE(dr.kind, '') AS resource_kind,
   r.name AS region_name,
   r.platform AS region_platform
 FROM instances i

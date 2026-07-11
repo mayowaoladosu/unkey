@@ -24,6 +24,9 @@ type RequestTracking struct {
 	RequestID     string
 	StartTime     time.Time
 	DeploymentID  string
+	ResourceID    string
+	ResourceName  string
+	ResourceKind  string
 	WorkspaceID   string
 	ProjectID     string
 	AppID         string

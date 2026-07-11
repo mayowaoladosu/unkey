@@ -42,6 +42,9 @@ type StaticArtifact struct {
 type RouteDecision struct {
 	Destination         Destination
 	DeploymentID        string
+	ResourceID          string
+	ResourceName        string
+	ResourceKind        string
 	EnvironmentID       string
 	WorkspaceID         string
 	ProjectID           string

@@ -59,7 +59,7 @@ func (InstanceCheckpoint) Table() string {
 
 // InsertColumns implements [Row]; derived from InstanceCheckpoint's ch tags.
 func (InstanceCheckpoint) InsertColumns() string {
-	return "`node_id`, `workspace_id`, `project_id`, `environment_id`, `resource_type`, `resource_id`, `pod_uid`, `instance_id`, `container_uid`, `restart_count`, `ts`, `event_kind`, `cpu_usage_usec`, `memory_bytes`, `cpu_allocated_millicores`, `memory_allocated_bytes`, `disk_allocated_bytes`, `disk_used_bytes`, `network_egress_public_bytes`, `network_egress_private_bytes`, `network_ingress_public_bytes`, `network_ingress_private_bytes`, `region`, `platform`, `attributes`"
+	return "`node_id`, `workspace_id`, `project_id`, `environment_id`, `resource_type`, `resource_id`, `deployment_resource_id`, `deployment_resource_name`, `deployment_resource_kind`, `pod_uid`, `instance_id`, `container_uid`, `restart_count`, `ts`, `event_kind`, `cpu_usage_usec`, `memory_bytes`, `cpu_allocated_millicores`, `memory_allocated_bytes`, `disk_allocated_bytes`, `disk_used_bytes`, `network_egress_public_bytes`, `network_egress_private_bytes`, `network_ingress_public_bytes`, `network_ingress_private_bytes`, `region`, `platform`, `attributes`"
 }
 
 // Table implements [Row].
@@ -69,7 +69,7 @@ func (InstanceEventV1) Table() string {
 
 // InsertColumns implements [Row]; derived from InstanceEventV1's ch tags.
 func (InstanceEventV1) InsertColumns() string {
-	return "`time`, `workspace_id`, `project_id`, `app_id`, `environment_id`, `deployment_id`, `pod_uid`, `pod_name`, `node_name`, `container_name`, `container_id`, `restart_count`, `event_kind`, `exit_code`, `signal`, `reason`, `message`, `region`, `platform`, `event_fingerprint`, `attributes`"
+	return "`time`, `workspace_id`, `project_id`, `app_id`, `environment_id`, `deployment_id`, `resource_id`, `resource_name`, `resource_kind`, `pod_uid`, `pod_name`, `node_name`, `container_name`, `container_id`, `restart_count`, `event_kind`, `exit_code`, `signal`, `reason`, `message`, `region`, `platform`, `event_fingerprint`, `attributes`"
 }
 
 // Table implements [Row].
@@ -79,7 +79,7 @@ func (FrontlineRequest) Table() string {
 
 // InsertColumns implements [Row]; derived from FrontlineRequest's ch tags.
 func (FrontlineRequest) InsertColumns() string {
-	return "`request_id`, `time`, `workspace_id`, `project_id`, `app_id`, `environment_id`, `frontline_id`, `deployment_id`, `instance_id`, `instance_address`, `region`, `platform`, `method`, `host`, `path`, `query_string`, `query_params`, `request_headers`, `request_body`, `response_status`, `response_headers`, `response_body`, `user_agent`, `ip_address`, `total_latency`, `instance_latency`, `frontline_latency`"
+	return "`request_id`, `time`, `workspace_id`, `project_id`, `app_id`, `environment_id`, `frontline_id`, `deployment_id`, `resource_id`, `resource_name`, `resource_kind`, `instance_id`, `instance_address`, `region`, `platform`, `method`, `host`, `path`, `query_string`, `query_params`, `request_headers`, `request_body`, `response_status`, `response_headers`, `response_body`, `user_agent`, `ip_address`, `total_latency`, `instance_latency`, `frontline_latency`"
 }
 
 // Table implements [Row].

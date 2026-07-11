@@ -1319,6 +1319,7 @@ type AppRuntimeSetting struct {
 	MemoryMib        int32                              `db:"memory_mib"`
 	StorageMib       uint32                             `db:"storage_mib"`
 	Command          dbtype.StringSlice                 `db:"command"`
+	Outputs          json.RawMessage                    `db:"outputs"`
 	Healthcheck      dbtype.NullHealthcheck             `db:"healthcheck"`
 	ShutdownSignal   AppRuntimeSettingsShutdownSignal   `db:"shutdown_signal"`
 	UpstreamProtocol AppRuntimeSettingsUpstreamProtocol `db:"upstream_protocol"`

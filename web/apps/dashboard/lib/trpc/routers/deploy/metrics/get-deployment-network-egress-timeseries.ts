@@ -6,38 +6,43 @@ import { TIME_WINDOWS } from "@unkey/clickhouse";
 import { z } from "zod";
 
 export const getDeploymentNetworkEgressTimeseries = workspaceProcedure
-  .use(withRatelimit(ratelimit.read))
-  .input(
-    z.object({
-      resourceId: z.string(),
-      instanceName: z.string().optional(),
-      window: z.enum(TIME_WINDOWS).default("1h"),
-    }),
-  )
-  .query(async ({ ctx, input }) => {
-    const resource = await db.query.deployments.findFirst({
-      where: (table, { eq, and }) =>
-        and(eq(table.id, input.resourceId), eq(table.workspaceId, ctx.workspace.id)),
-    });
+	.use(withRatelimit(ratelimit.read))
+	.input(
+		z.object({
+			resourceId: z.string(),
+			deploymentResourceId: z.string().optional(),
+			instanceName: z.string().optional(),
+			window: z.enum(TIME_WINDOWS).default("1h"),
+		}),
+	)
+	.query(async ({ ctx, input }) => {
+		const resource = await db.query.deployments.findFirst({
+			where: (table, { eq, and }) =>
+				and(
+					eq(table.id, input.resourceId),
+					eq(table.workspaceId, ctx.workspace.id),
+				),
+		});
 
-    if (!resource) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found" });
-    }
+		if (!resource) {
+			throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found" });
+		}
 
-    const result = await clickhouse.resources.network.egress.timeseries({
-      workspaceId: ctx.workspace.id,
-      resourceId: input.resourceId,
-      instanceName: input.instanceName ?? "",
-      window: input.window,
-    });
+		const result = await clickhouse.resources.network.egress.timeseries({
+			workspaceId: ctx.workspace.id,
+			resourceId: input.resourceId,
+			deploymentResourceId: input.deploymentResourceId ?? "",
+			instanceName: input.instanceName ?? "",
+			window: input.window,
+		});
 
-    if (result.err) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to fetch network egress timeseries",
-        cause: result.err,
-      });
-    }
+		if (result.err) {
+			throw new TRPCError({
+				code: "INTERNAL_SERVER_ERROR",
+				message: "Failed to fetch network egress timeseries",
+				cause: result.err,
+			});
+		}
 
-    return result.val;
-  });
+		return result.val;
+	});

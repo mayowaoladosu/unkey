@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -66,4 +67,54 @@ func TestCompileDeploymentManifestMapsGitIntentAndAcceptedDetection(t *testing.T
 		{Kind: deploymanifest.RouteKindLive},
 	}, compiled.Manifest.Routes)
 	require.Equal(t, []string{"node", "server.js"}, compiled.Manifest.Runtime.Command)
+}
+
+func TestCompileDeploymentManifestPrefersAuthoredResources(t *testing.T) {
+	authored := []deploymanifest.Output{
+		{Kind: deploymanifest.OutputKindContainer, Name: "api", Port: 8080, Public: true},
+		{
+			Kind:    deploymanifest.OutputKindWorker,
+			Name:    "emails",
+			Command: []string{"node", "worker.js"},
+			Bindings: []deploymanifest.Binding{{
+				Name:     "API",
+				Resource: "api",
+				Protocol: deploymanifest.BindingProtocolHTTP,
+			}},
+		},
+	}
+	encoded, err := json.Marshal(authored)
+	require.NoError(t, err)
+	context := deploymentContext{
+		workspaceID: "ws_test",
+		project:     db.Project{ID: "prj_test"},
+		app:         db.App{ID: "app_test", Slug: "web"},
+		env: db.FindEnvironmentByAppIdAndSlugRow{Environment: db.Environment{
+			ID: "env_test", Slug: "production",
+		}},
+		appRuntimeSettings: db.AppRuntimeSetting{
+			Port:             3000,
+			CpuMillicores:    250,
+			MemoryMib:        256,
+			ShutdownSignal:   db.AppRuntimeSettingsShutdownSignalSIGTERM,
+			UpstreamProtocol: db.AppRuntimeSettingsUpstreamProtocolHttp1,
+			Outputs:          encoded,
+		},
+		appliedFrameworkDetection: &db.FindAppliedFrameworkDetectionRow{
+			Fingerprint: "ignored-detection",
+			Detection:   []byte(`{"output":{"mode":"static","directory":"dist"}}`),
+		},
+	}
+	request := &hydrav1.DeployRequest{
+		DeploymentId: "d_test",
+		Source: &hydrav1.DeployRequest_DockerImage{DockerImage: &hydrav1.DockerImage{
+			Image: "registry.example/app:v1",
+		}},
+	}
+
+	compiled, adapterID, outputMode, err := compileDeploymentManifest(context, request)
+	require.NoError(t, err)
+	require.Equal(t, "authored-resources", adapterID)
+	require.Equal(t, db.DeploymentManifestsOutputModeContainer, outputMode)
+	require.Equal(t, authored, compiled.Manifest.Outputs)
 }

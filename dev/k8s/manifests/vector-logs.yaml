@@ -119,6 +119,9 @@ data:
     .project_id = .kubernetes.pod_labels."unkey.com/project.id" || ""
     .environment_id = .kubernetes.pod_labels."unkey.com/environment.id" || ""
     .deployment_id = .kubernetes.pod_labels."unkey.com/deployment.id" || ""
+    .resource_id = .kubernetes.pod_labels."unkey.com/resource.id" || ""
+    .resource_name = .kubernetes.pod_annotations."layerrail.com/resource.name" || ""
+    .resource_kind = .kubernetes.pod_labels."unkey.com/resource.kind" || ""
     .app_id = .kubernetes.pod_labels."unkey.com/app.id" || ""
     .platform = .kubernetes.pod_labels."unkey.com/platform" || ""
 
@@ -226,7 +229,7 @@ data:
     [transforms.dedupe]
     type = "dedupe"
     inputs = ["extract_labels"]
-    fields.match = ["message", "workspace_id", "deployment_id", "severity", "attributes"]
+    fields.match = ["message", "workspace_id", "deployment_id", "resource_id", "severity", "attributes"]
     cache.num_events = 5000
 
     # Sink: ClickHouse (local)

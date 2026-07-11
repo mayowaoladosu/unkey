@@ -68,6 +68,9 @@ func (h *Handler) Handle(ctx context.Context, sess *zen.Session) error {
 	}
 	tracking.RequestID = sess.RequestID()
 	tracking.DeploymentID = decision.DeploymentID
+	tracking.ResourceID = decision.ResourceID
+	tracking.ResourceName = decision.ResourceName
+	tracking.ResourceKind = decision.ResourceKind
 	tracking.WorkspaceID = decision.WorkspaceID
 	tracking.ProjectID = decision.ProjectID
 	tracking.AppID = decision.AppID
@@ -138,6 +141,9 @@ func (h *Handler) Handle(ctx context.Context, sess *zen.Session) error {
 	for _, instance := range decision.LocalInstances {
 		tracking.InstanceID = instance.ID
 		tracking.Address = instance.Address
+		tracking.ResourceID = instance.ResourceID
+		tracking.ResourceName = instance.ResourceName
+		tracking.ResourceKind = string(instance.ResourceKind)
 
 		forwardErr = h.ProxyService.ForwardToInstance(ctx, sess, decision.UpstreamProtocol, instance)
 		if forwardErr == nil {

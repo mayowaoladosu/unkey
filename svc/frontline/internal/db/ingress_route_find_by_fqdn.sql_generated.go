@@ -14,6 +14,9 @@ const findFrontlineRouteByFQDN = `-- name: FindFrontlineRouteByFQDN :one
 SELECT
   fr.environment_id,
   fr.deployment_id,
+  COALESCE(public_dr.id, '') AS resource_id,
+  COALESCE(public_dr.name, '') AS resource_name,
+  COALESCE(public_dr.kind, '') AS resource_kind,
   d.workspace_id,
   d.project_id,
   d.app_id,
@@ -25,6 +28,14 @@ SELECT
   da.metadata AS static_metadata
 FROM frontline_routes fr
 INNER JOIN deployments d ON fr.deployment_id = d.id
+LEFT JOIN deployment_resources public_dr
+  ON public_dr.deployment_id = d.id
+  AND public_dr.public = true
+  AND public_dr.pk = (
+    SELECT MIN(candidate.pk)
+    FROM deployment_resources candidate
+    WHERE candidate.deployment_id = d.id AND candidate.public = true
+  )
 LEFT JOIN deployment_artifacts da
   ON da.deployment_id = d.id
   AND da.kind = 'static_bundle'
@@ -34,6 +45,9 @@ WHERE fr.fully_qualified_domain_name = ?
 type FindFrontlineRouteByFQDNRow struct {
 	EnvironmentID    string                      `db:"environment_id"`
 	DeploymentID     string                      `db:"deployment_id"`
+	ResourceID       string                      `db:"resource_id"`
+	ResourceName     string                      `db:"resource_name"`
+	ResourceKind     DeploymentResourcesKind     `db:"resource_kind"`
 	WorkspaceID      string                      `db:"workspace_id"`
 	ProjectID        string                      `db:"project_id"`
 	AppID            string                      `db:"app_id"`
@@ -53,6 +67,9 @@ type FindFrontlineRouteByFQDNRow struct {
 //	SELECT
 //	  fr.environment_id,
 //	  fr.deployment_id,
+//	  COALESCE(public_dr.id, '') AS resource_id,
+//	  COALESCE(public_dr.name, '') AS resource_name,
+//	  COALESCE(public_dr.kind, '') AS resource_kind,
 //	  d.workspace_id,
 //	  d.project_id,
 //	  d.app_id,
@@ -64,6 +81,14 @@ type FindFrontlineRouteByFQDNRow struct {
 //	  da.metadata AS static_metadata
 //	FROM frontline_routes fr
 //	INNER JOIN deployments d ON fr.deployment_id = d.id
+//	LEFT JOIN deployment_resources public_dr
+//	  ON public_dr.deployment_id = d.id
+//	  AND public_dr.public = true
+//	  AND public_dr.pk = (
+//	    SELECT MIN(candidate.pk)
+//	    FROM deployment_resources candidate
+//	    WHERE candidate.deployment_id = d.id AND candidate.public = true
+//	  )
 //	LEFT JOIN deployment_artifacts da
 //	  ON da.deployment_id = d.id
 //	  AND da.kind = 'static_bundle'
@@ -74,6 +99,9 @@ func (q *Queries) FindFrontlineRouteByFQDN(ctx context.Context, fqdn string) (Fi
 	err := row.Scan(
 		&i.EnvironmentID,
 		&i.DeploymentID,
+		&i.ResourceID,
+		&i.ResourceName,
+		&i.ResourceKind,
 		&i.WorkspaceID,
 		&i.ProjectID,
 		&i.AppID,

@@ -1,133 +1,157 @@
 import { clickhouse } from "@/lib/clickhouse";
 import { and, db, eq, inArray, schema } from "@/lib/db";
 import {
-  type RuntimeLogsResponseSchema,
-  runtimeLogsRequestSchema,
-  runtimeLogsResponseSchema,
+	type RuntimeLogsResponseSchema,
+	runtimeLogsRequestSchema,
+	runtimeLogsResponseSchema,
 } from "@/lib/schemas/runtime-logs.schema";
 import { ratelimit, withRatelimit, workspaceProcedure } from "@/lib/trpc/trpc";
 import { TRPCError } from "@trpc/server";
 import {
-  resolveK8sNamesToInstanceIds,
-  toInstanceKey,
-  transformFilters,
-  uniqueK8sRegionEntries,
+	resolveK8sNamesToInstanceIds,
+	toInstanceKey,
+	transformFilters,
+	uniqueK8sRegionEntries,
 } from "./utils";
 
 export const queryRuntimeLogs = workspaceProcedure
-  .use(withRatelimit(ratelimit.read))
-  .input(runtimeLogsRequestSchema)
-  .output(runtimeLogsResponseSchema)
-  .query(async ({ ctx, input }) => {
-    const project = await db.query.projects.findFirst({
-      where: (table, { and, eq }) =>
-        and(eq(table.id, input.projectId), eq(table.workspaceId, ctx.workspace.id)),
-      columns: { id: true },
-      with: {
-        environments: {
-          columns: { id: true, appId: true, slug: true },
-        },
-      },
-    });
+	.use(withRatelimit(ratelimit.read))
+	.input(runtimeLogsRequestSchema)
+	.output(runtimeLogsResponseSchema)
+	.query(async ({ ctx, input }) => {
+		const project = await db.query.projects.findFirst({
+			where: (table, { and, eq }) =>
+				and(
+					eq(table.id, input.projectId),
+					eq(table.workspaceId, ctx.workspace.id),
+				),
+			columns: { id: true },
+			with: {
+				environments: {
+					columns: { id: true, appId: true, slug: true },
+				},
+			},
+		});
 
-    if (!project) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Project not found or access denied",
-      });
-    }
+		if (!project) {
+			throw new TRPCError({
+				code: "NOT_FOUND",
+				message: "Project not found or access denied",
+			});
+		}
 
-    if (project.environments.length === 0) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "No environment found for this project",
-      });
-    }
+		if (project.environments.length === 0) {
+			throw new TRPCError({
+				code: "NOT_FOUND",
+				message: "No environment found for this project",
+			});
+		}
 
-    const defaultEnvironment = project.environments[0];
+		const defaultEnvironment = project.environments[0];
 
-    // Resolve instanceIds to k8sPodNames for ClickHouse filtering,
-    // and build the reverse map to avoid a redundant DB query later.
-    const instanceIds = input.instanceId?.filters?.map((f) => f.value) ?? [];
-    let k8sPodNames: string[] = [];
-    const knownK8sToInstanceId = new Map<string, string>();
+		// Resolve instanceIds to k8sPodNames for ClickHouse filtering,
+		// and build the reverse map to avoid a redundant DB query later.
+		const instanceIds = input.instanceId?.filters?.map((f) => f.value) ?? [];
+		let k8sPodNames: string[] = [];
+		const knownK8sToInstanceId = new Map<string, string>();
 
-    if (instanceIds.length > 0) {
-      const instances = await db.query.instances.findMany({
-        where: and(
-          inArray(schema.instances.id, instanceIds),
-          eq(schema.instances.workspaceId, ctx.workspace.id),
-        ),
-        columns: { id: true, k8sName: true },
-        with: { region: { columns: { name: true } } },
-      });
+		if (instanceIds.length > 0) {
+			const instances = await db.query.instances.findMany({
+				where: and(
+					inArray(schema.instances.id, instanceIds),
+					eq(schema.instances.workspaceId, ctx.workspace.id),
+				),
+				columns: { id: true, k8sName: true },
+				with: { region: { columns: { name: true } } },
+			});
 
-      if (instances.length === 0) {
-        return { logs: [], total: 0 };
-      }
+			if (instances.length === 0) {
+				return { logs: [], total: 0 };
+			}
 
-      k8sPodNames = instances.map((inst) => inst.k8sName);
-      for (const inst of instances) {
-        knownK8sToInstanceId.set(toInstanceKey(inst.k8sName, inst.region.name), inst.id);
-      }
-    }
+			k8sPodNames = instances.map((inst) => inst.k8sName);
+			for (const inst of instances) {
+				knownK8sToInstanceId.set(
+					toInstanceKey(inst.k8sName, inst.region.name),
+					inst.id,
+				);
+			}
+		}
 
-    const transformedInputs = transformFilters(input);
+		const transformedInputs = transformFilters(input);
 
-    // App-scoped view: default to the production environment when the user
-    // hasn't picked one. Without an appId the view is project-wide: every
-    // app, no forced environment.
-    const appId = input.appId || null;
-    if (appId && transformedInputs.environmentId.length === 0) {
-      const prod =
-        project.environments.find((e) => e.appId === appId && e.slug === "production") ??
-        project.environments.find((e) => e.appId === appId) ??
-        defaultEnvironment;
-      transformedInputs.environmentId = [prod.id];
-    }
+		// App-scoped view: default to the production environment when the user
+		// hasn't picked one. Without an appId the view is project-wide: every
+		// app, no forced environment.
+		const appId = input.appId || null;
+		if (appId && transformedInputs.environmentId.length === 0) {
+			const prod =
+				project.environments.find(
+					(e) => e.appId === appId && e.slug === "production",
+				) ??
+				project.environments.find((e) => e.appId === appId) ??
+				defaultEnvironment;
+			transformedInputs.environmentId = [prod.id];
+		}
 
-    const { logsQuery, totalQuery } = await clickhouse.runtimeLogs.logs(
-      {
-        ...transformedInputs,
-        k8sPodNames,
-        workspaceId: ctx.workspace.id,
-        projectId: project.id,
-        deploymentId: input.deploymentId,
-        appId,
-      },
-      { includeTotal: input.includeTotal },
-    );
+		const { logsQuery, totalQuery } = await clickhouse.runtimeLogs.logs(
+			{
+				...transformedInputs,
+				k8sPodNames,
+				workspaceId: ctx.workspace.id,
+				projectId: project.id,
+				deploymentId: input.deploymentId,
+				resourceId: input.resourceId,
+				resourceKind: input.resourceKind,
+				appId,
+			},
+			{ includeTotal: input.includeTotal },
+		);
 
-    const [logsResult, totalResult] = await Promise.all([logsQuery, totalQuery]);
+		const [logsResult, totalResult] = await Promise.all([
+			logsQuery,
+			totalQuery,
+		]);
 
-    if (logsResult.err || totalResult.err) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Something went wrong when fetching data from clickhouse.",
-      });
-    }
+		if (logsResult.err || totalResult.err) {
+			throw new TRPCError({
+				code: "INTERNAL_SERVER_ERROR",
+				message: "Something went wrong when fetching data from clickhouse.",
+			});
+		}
 
-    const chLogs = logsResult.val;
-    const total = totalResult.val;
+		const chLogs = logsResult.val;
+		const total = totalResult.val;
 
-    const unknownEntries = uniqueK8sRegionEntries(chLogs, knownK8sToInstanceId);
-    const resolvedMapping = await resolveK8sNamesToInstanceIds(unknownEntries, ctx.workspace.id);
-    const k8sNameToInstanceId = new Map([...knownK8sToInstanceId, ...resolvedMapping]);
+		const unknownEntries = uniqueK8sRegionEntries(chLogs, knownK8sToInstanceId);
+		const resolvedMapping = await resolveK8sNamesToInstanceIds(
+			unknownEntries,
+			ctx.workspace.id,
+		);
+		const k8sNameToInstanceId = new Map([
+			...knownK8sToInstanceId,
+			...resolvedMapping,
+		]);
 
-    const logs = chLogs.map((log) => ({
-      time: log.time,
-      severity: log.severity,
-      message: log.message,
-      deployment_id: log.deployment_id,
-      region: log.region,
-      instance_id: k8sNameToInstanceId.get(toInstanceKey(log.k8s_pod_name, log.region)) ?? "—",
-      attributes: log.attributes,
-    }));
+		const logs = chLogs.map((log) => ({
+			time: log.time,
+			severity: log.severity,
+			message: log.message,
+			deployment_id: log.deployment_id,
+			resource_id: log.resource_id,
+			resource_name: log.resource_name,
+			resource_kind: log.resource_kind,
+			region: log.region,
+			instance_id:
+				k8sNameToInstanceId.get(toInstanceKey(log.k8s_pod_name, log.region)) ??
+				"—",
+			attributes: log.attributes,
+		}));
 
-    const response: RuntimeLogsResponseSchema = {
-      logs,
-      total,
-    };
+		const response: RuntimeLogsResponseSchema = {
+			logs,
+			total,
+		};
 
-    return response;
-  });
+		return response;
+	});

@@ -162,6 +162,9 @@ type tenantContext struct {
 	appID         string
 	environmentID string
 	deploymentID  string
+	resourceID    string
+	resourceName  string
+	resourceKind  string
 }
 
 func extractTenantContext(pod *corev1.Pod) tenantContext {
@@ -172,6 +175,9 @@ func extractTenantContext(pod *corev1.Pod) tenantContext {
 		appID:         l[labels.LabelKeyAppID],
 		environmentID: l[labels.LabelKeyEnvironmentID],
 		deploymentID:  l[labels.LabelKeyDeploymentID],
+		resourceID:    l[labels.LabelKeyResourceID],
+		resourceName:  pod.Annotations[labels.AnnotationKeyResourceName],
+		resourceKind:  l[labels.LabelKeyResourceKind],
 	}
 }
 
@@ -197,6 +203,9 @@ func newEvent(
 		AppId:         tenant.appID,
 		EnvironmentId: tenant.environmentID,
 		DeploymentId:  tenant.deploymentID,
+		ResourceId:    tenant.resourceID,
+		ResourceName:  tenant.resourceName,
+		ResourceKind:  tenant.resourceKind,
 		Time:          when,
 		Attributes:    extractAttributes(pod, cs),
 	}

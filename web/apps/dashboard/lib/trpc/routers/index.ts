@@ -85,6 +85,7 @@ import { updateHealthcheck } from "./deploy/environment-settings/runtime/update-
 import { updateInstances } from "./deploy/environment-settings/runtime/update-instances";
 import { updateMemory } from "./deploy/environment-settings/runtime/update-memory";
 import { updateOpenapiSpecPath } from "./deploy/environment-settings/runtime/update-openapi-spec-path";
+import { updateOutputs } from "./deploy/environment-settings/runtime/update-outputs";
 import { updatePort } from "./deploy/environment-settings/runtime/update-port";
 import { updateRegions } from "./deploy/environment-settings/runtime/update-regions";
 import { updateStorage } from "./deploy/environment-settings/runtime/update-storage";
@@ -506,6 +507,7 @@ export const router = t.router({
         updateStorage,
         updatePort,
         updateCommand,
+        updateOutputs,
         updateHealthcheck,
         updateRegions,
         updateInstances,

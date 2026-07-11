@@ -31,7 +31,10 @@ func TestScanInstanceEvents(t *testing.T) {
 					labels.LabelKeyAppID:         "app_1",
 					labels.LabelKeyEnvironmentID: "env_1",
 					labels.LabelKeyDeploymentID:  "dep_1",
+					labels.LabelKeyResourceID:    "resource_web",
+					labels.LabelKeyResourceKind:  "service",
 				},
+				Annotations: map[string]string{labels.AnnotationKeyResourceName: "web"},
 			},
 			Spec:   corev1.PodSpec{NodeName: "node-1"},
 			Status: corev1.PodStatus{ContainerStatuses: statuses},
@@ -70,6 +73,9 @@ func TestScanInstanceEvents(t *testing.T) {
 		}
 		if ev.GetTerminated() != nil || ev.GetWaiting() != nil {
 			t.Errorf("Running event must not carry terminated/waiting metadata")
+		}
+		if ev.GetResourceId() != "resource_web" || ev.GetResourceName() != "web" || ev.GetResourceKind() != "service" {
+			t.Errorf("resource identity mismatch: %q/%q/%q", ev.GetResourceId(), ev.GetResourceName(), ev.GetResourceKind())
 		}
 	})
 

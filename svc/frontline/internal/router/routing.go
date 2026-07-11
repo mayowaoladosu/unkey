@@ -75,6 +75,9 @@ func (s *service) selectDestination(
 		return RouteDecision{
 			Destination:      DestinationStaticArtifact,
 			DeploymentID:     route.DeploymentID,
+			ResourceID:       route.ResourceID,
+			ResourceName:     route.ResourceName,
+			ResourceKind:     string(route.ResourceKind),
 			EnvironmentID:    route.EnvironmentID,
 			WorkspaceID:      route.WorkspaceID,
 			ProjectID:        route.ProjectID,
@@ -128,6 +131,9 @@ func (s *service) selectDestination(
 		return RouteDecision{
 			Destination:         DestinationLocalInstance,
 			DeploymentID:        route.DeploymentID,
+			ResourceID:          localRunning[0].ResourceID,
+			ResourceName:        localRunning[0].ResourceName,
+			ResourceKind:        string(localRunning[0].ResourceKind),
 			EnvironmentID:       route.EnvironmentID,
 			WorkspaceID:         localRunning[0].WorkspaceID,
 			ProjectID:           localRunning[0].ProjectID,

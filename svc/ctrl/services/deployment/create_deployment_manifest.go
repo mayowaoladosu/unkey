@@ -90,8 +90,20 @@ func compileDeploymentManifest(
 			UpstreamProtocol: string(context.appRuntimeSettings.UpstreamProtocol),
 		},
 	}
+	authoredOutputs := []deploymanifest.Output{}
+	if len(context.appRuntimeSettings.Outputs) > 0 {
+		if err := json.Unmarshal(context.appRuntimeSettings.Outputs, &authoredOutputs); err != nil {
+			return deploymanifest.Compiled{}, "", "", fmt.Errorf("decode authored deployment outputs: %w", err)
+		}
+	}
 
-	if source.Kind == deploymanifest.SourceKindGit && build.Strategy == deploymanifest.BuildStrategyRailpack && context.appliedFrameworkDetection != nil {
+	if len(authoredOutputs) > 0 {
+		outputs = authoredOutputs
+		adapterID = "authored-resources"
+		if outputsAreStaticOnly(outputs) {
+			outputMode = db.DeploymentManifestsOutputModeStatic
+		}
+	} else if source.Kind == deploymanifest.SourceKindGit && build.Strategy == deploymanifest.BuildStrategyRailpack && context.appliedFrameworkDetection != nil {
 		var detected appliedDetectionDocument
 		if err := json.Unmarshal(context.appliedFrameworkDetection.Detection, &detected); err != nil {
 			return deploymanifest.Compiled{}, "", "", fmt.Errorf("decode applied framework detection: %w", err)
@@ -140,4 +152,16 @@ func compileDeploymentManifest(
 	}
 
 	return compiled, adapterID, outputMode, nil
+}
+
+func outputsAreStaticOnly(outputs []deploymanifest.Output) bool {
+	if len(outputs) == 0 {
+		return false
+	}
+	for _, output := range outputs {
+		if output.Kind != deploymanifest.OutputKindStatic {
+			return false
+		}
+	}
+	return true
 }

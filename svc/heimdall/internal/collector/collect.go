@@ -21,15 +21,18 @@ import (
 // one container. It is populated from the informer cache at the start of each
 // tick (we never block a cgroup read on an API call).
 type podInfo struct {
-	name          string
-	uid           types.UID
-	qosClass      corev1.PodQOSClass
-	workspaceID   string
-	projectID     string
-	environmentID string
-	resourceType  string
-	resourceID    string
-	restartCount  int32
+	name                   string
+	uid                    types.UID
+	qosClass               corev1.PodQOSClass
+	workspaceID            string
+	projectID              string
+	environmentID          string
+	resourceType           string
+	resourceID             string
+	deploymentResourceID   string
+	deploymentResourceName string
+	deploymentResourceKind string
+	restartCount           int32
 	// restartCountKnown is false when Status.ContainerStatuses has not yet
 	// caught up with the primary container. The collect loop skips pods
 	// with restartCountKnown=false for this tick; the next tick retries.
@@ -129,6 +132,9 @@ func (c *Collector) collect(_ context.Context) error {
 			EnvironmentID:              info.environmentID,
 			ResourceType:               info.resourceType,
 			ResourceID:                 info.resourceID,
+			DeploymentResourceID:       info.deploymentResourceID,
+			DeploymentResourceName:     info.deploymentResourceName,
+			DeploymentResourceKind:     info.deploymentResourceKind,
 			PodUID:                     string(info.uid),
 			InstanceID:                 info.name,
 			ContainerUID:               containerUID,
@@ -232,6 +238,9 @@ func buildPodInfo(pod *corev1.Pod) podInfo {
 		environmentID:          pod.Labels[LabelEnv],
 		resourceType:           component,
 		resourceID:             resourceID,
+		deploymentResourceID:   pod.Labels[LabelDeploymentResource],
+		deploymentResourceName: pod.Annotations[AnnotationDeploymentResourceName],
+		deploymentResourceKind: pod.Labels[LabelDeploymentResourceKind],
 		restartCount:           restartCount,
 		restartCountKnown:      restartCountKnown,
 		hostNetwork:            pod.Spec.HostNetwork,
