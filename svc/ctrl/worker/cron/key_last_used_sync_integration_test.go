@@ -12,7 +12,7 @@ import (
 )
 
 func TestRunKeyLastUsedSync_Integration(t *testing.T) {
-	h := harness.New(t)
+	h := harness.New(t, harness.WithDedicatedContainers())
 
 	t.Run("syncs last_used_at from ClickHouse to MySQL", func(t *testing.T) {
 		ws := h.Seed.CreateWorkspace(h.Ctx)

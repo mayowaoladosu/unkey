@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/unkeyed/unkey/pkg/mysql/sqlcomment"
 	"github.com/unkeyed/unkey/pkg/testutil/containers"
+	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/pkg/webhook"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 )
@@ -113,18 +114,21 @@ func TestInvoiceCreated_IgnoresMismatchedSubscription(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close()) })
 
+	workspaceID := uid.New(uid.WorkspacePrefix)
+	customerID := uid.New("cus")
+	subscriptionID := uid.New("sub")
 	_, err = database.RW().ExecContext(context.Background(),
 		`INSERT INTO workspaces (id, org_id, name, slug, beta_features) VALUES (?, ?, ?, ?, ?)`,
-		"ws_deploy", "org_test", "Deploy WS", "deploy-ws", "[]",
+		workspaceID, uid.New(uid.OrgPrefix), "Deploy WS", uid.New("deploy-ws"), "[]",
 	)
 	require.NoError(t, err)
 	_, err = database.RW().ExecContext(context.Background(),
 		`UPDATE workspaces SET deploy_plan = ?, stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?`,
-		"pro", "cus_deploy", "sub_deploy", "ws_deploy",
+		"pro", customerID, subscriptionID, workspaceID,
 	)
 	require.NoError(t, err)
 
 	h := &handler{db: database} //nolint:exhaustruct // stripe/restate unused on ignore path
-	err = h.invoiceCreated(context.Background(), webhook.Event{}, renewalInvoice("cus_deploy", "sub_other_product"))
+	err = h.invoiceCreated(context.Background(), webhook.Event{}, renewalInvoice(customerID, uid.New("sub-other")))
 	require.ErrorIs(t, err, webhook.ErrIgnore)
 }

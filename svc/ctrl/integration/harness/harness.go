@@ -96,12 +96,13 @@ type Harness struct {
 type Option func(*harnessOpts)
 
 type harnessOpts struct {
-	diskMySQL          bool
-	timeout            time.Duration
-	clock              clock.Clock
-	billingUsageReader deploybilling.UsageReader
-	billingPusher      billingmeter.Pusher
-	billingCloser      invoicecloser.Closer
+	diskMySQL           bool
+	dedicatedContainers bool
+	timeout             time.Duration
+	clock               clock.Clock
+	billingUsageReader  deploybilling.UsageReader
+	billingPusher       billingmeter.Pusher
+	billingCloser       invoicecloser.Closer
 }
 
 // WithDiskMySQL starts MySQL with disk-backed storage instead of the default
@@ -109,6 +110,16 @@ type harnessOpts struct {
 func WithDiskMySQL() Option {
 	return func(o *harnessOpts) {
 		o.diskMySQL = true
+	}
+}
+
+// WithDedicatedContainers starts per-test MySQL, ClickHouse, Restate, and
+// MinIO containers instead of attaching to the reusable process-wide set.
+// Use this for tests whose behavior intentionally depends on service state,
+// such as persisted Restate virtual-object cursors.
+func WithDedicatedContainers() Option {
+	return func(o *harnessOpts) {
+		o.dedicatedContainers = true
 	}
 }
 
@@ -182,7 +193,11 @@ func New(t *testing.T, opts ...Option) *Harness {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		restateCfg = containers.Restate(t)
+		var restateOpts []containers.Opt
+		if o.dedicatedContainers {
+			restateOpts = append(restateOpts, containers.WithDedicatedContainer())
+		}
+		restateCfg = containers.Restate(t, restateOpts...)
 		t.Logf("Restate started in %s", time.Since(s))
 	}()
 
@@ -193,6 +208,9 @@ func New(t *testing.T, opts ...Option) *Harness {
 		if o.diskMySQL {
 			mysqlOpts = append(mysqlOpts, containers.WithDiskStorage())
 		}
+		if o.dedicatedContainers {
+			mysqlOpts = append(mysqlOpts, containers.WithDedicatedContainer())
+		}
 		mysqlCfg = containers.MySQL(t, mysqlOpts...)
 		t.Logf("MySQL started in %s", time.Since(s))
 	}()
@@ -200,14 +218,22 @@ func New(t *testing.T, opts ...Option) *Harness {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		chCfg = containers.ClickHouse(t)
+		var clickhouseOpts []containers.Opt
+		if o.dedicatedContainers {
+			clickhouseOpts = append(clickhouseOpts, containers.WithDedicatedContainer())
+		}
+		chCfg = containers.ClickHouse(t, clickhouseOpts...)
 		t.Logf("ClickHouse started in %s", time.Since(s))
 	}()
 
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		testVault = vaulttestutil.StartTestVault(t)
+		var vaultOpts []containers.Opt
+		if o.dedicatedContainers {
+			vaultOpts = append(vaultOpts, containers.WithDedicatedContainer())
+		}
+		testVault = vaulttestutil.StartTestVault(t, vaultOpts...)
 		t.Logf("Vault started in %s", time.Since(s))
 	}()
 

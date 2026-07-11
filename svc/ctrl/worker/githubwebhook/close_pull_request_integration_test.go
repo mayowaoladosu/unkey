@@ -18,8 +18,8 @@ import (
 func TestPullRequestDeploymentQueries_IsolateLifecycle(t *testing.T) {
 	h := harness.New(t)
 	ctx := h.Ctx
-	installationID := int64(101)
-	repositoryID := int64(202)
+	installationID := time.Now().UnixNano()
+	repositoryID := installationID + 1
 
 	ws := h.Seed.CreateWorkspace(ctx)
 	project := h.Seed.CreateProject(ctx, seed.CreateProjectRequest{

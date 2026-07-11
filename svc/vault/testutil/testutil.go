@@ -7,12 +7,14 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
 	"github.com/unkeyed/unkey/gen/proto/vault/v1/vaultv1connect"
 	"github.com/unkeyed/unkey/pkg/testutil/containers"
+	"github.com/unkeyed/unkey/pkg/uid"
 	"github.com/unkeyed/unkey/svc/vault/internal/storage"
 	"github.com/unkeyed/unkey/svc/vault/internal/vault"
 	"github.com/unkeyed/unkey/svc/vault/keys"
@@ -28,20 +30,22 @@ type TestVault struct {
 	Client vaultv1connect.VaultServiceClient
 }
 
-// StartTestVault creates an in-memory vault with S3 storage and HTTP server.
+// StartTestVault creates a vault with isolated S3 storage and an HTTP server.
 // Returns a TestVault with a VaultServiceClient configured to connect to it.
 // The vault uses MinIO for S3-compatible storage and generates a fresh master key.
-// All resources are cleaned up when the test completes.
-func StartTestVault(t *testing.T) *TestVault {
+// Each call uses a unique bucket so reusable MinIO containers cannot leak
+// keyrings encrypted by a previous test's master key.
+func StartTestVault(t *testing.T, opts ...containers.Opt) *TestVault {
 	t.Helper()
 
 	// Start S3 for vault storage
-	s3 := containers.S3(t)
+	s3 := containers.S3(t, opts...)
+	bucket := "vault-test-" + strings.ToLower(uid.New(""))
 
 	// Create S3 storage
 	st, err := storage.NewS3(storage.S3Config{
 		S3URL:             s3.URL,
-		S3Bucket:          "vault-test",
+		S3Bucket:          bucket,
 		S3AccessKeyID:     s3.AccessKeyID,
 		S3AccessKeySecret: s3.SecretAccessKey,
 	})
