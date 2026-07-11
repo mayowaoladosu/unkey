@@ -90,6 +90,13 @@ export const projectRoutes = {
       );
     },
 
+    environments(scope: AppScope): Route {
+      return buildRoute(
+        "/[workspaceSlug]/projects/[projectId]/apps/[appId]/environments",
+        appParams(scope),
+      );
+    },
+
     sentinelPolicies(scope: AppScope): Route {
       return buildRoute(
         "/[workspaceSlug]/projects/[projectId]/apps/[appId]/sentinel-policies",

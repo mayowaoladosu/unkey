@@ -139,6 +139,11 @@ import { llmSearch as sentinelLogsLlmSearch } from "./deploy/sentinel-logs/llm-s
 import { querySentinelLogs } from "./deploy/sentinel-logs/query";
 import { listEnvironments } from "./environment/list";
 import { listAllEnvironments } from "./environment/list-all";
+import { createEnvironment } from "./deploy/environment/create";
+import { deleteEnvironment } from "./deploy/environment/delete";
+import { listManagedEnvironments } from "./deploy/environment/list";
+import { setEnvironmentDeleteProtection } from "./deploy/environment/set-protection";
+import { updateEnvironment } from "./deploy/environment/update";
 import { githubRouter } from "./github";
 import { createIdentity } from "./identity/create";
 import { deleteIdentity } from "./identity/delete";
@@ -533,6 +538,11 @@ export const router = t.router({
     environment: t.router({
       list: listEnvironments,
       listAll: listAllEnvironments,
+      listManaged: listManagedEnvironments,
+      create: createEnvironment,
+      update: updateEnvironment,
+      setDeleteProtection: setEnvironmentDeleteProtection,
+      delete: deleteEnvironment,
     }),
     envVar: t.router({
       list: listEnvVars,

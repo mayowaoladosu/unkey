@@ -188,6 +188,13 @@ export function buildAppLinks(
 			isActive: page === "services",
 		},
 		{
+			key: "environments",
+			label: "Environments",
+			href: routes.projects.apps.environments(scope),
+			icon: Layers3,
+			isActive: page === "environments",
+		},
+		{
 			key: "env-vars",
 			label: "Environment Variables",
 			href: routes.projects.apps.envVars(scope),

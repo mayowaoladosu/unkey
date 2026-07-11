@@ -1,4 +1,5 @@
 import { AppService } from "@/gen/proto/ctrl/v1/app_pb";
+import { EnvironmentService } from "@/gen/proto/ctrl/v1/environment_pb";
 import { ProjectService } from "@/gen/proto/ctrl/v1/project_pb";
 import { env } from "@/lib/env";
 import { createClient } from "@connectrpc/connect";
@@ -30,6 +31,7 @@ export function getCtrlClients() {
   return {
     project: createClient(ProjectService, transport),
     app: createClient(AppService, transport),
+    environment: createClient(EnvironmentService, transport),
     // more typed clients can be added here
   };
 }
