@@ -14,6 +14,7 @@ import { DeploymentInfo } from "./(deployment-progress)/deployment-info";
 import { DeploymentProgress } from "./(deployment-progress)/deployment-progress";
 import { DeploymentSkipped } from "./(deployment-progress)/deployment-skipped";
 import { DeploymentNetworkSection } from "./(overview)/components/sections/deployment-network-section";
+import { DeploymentResourcesSection } from "./(overview)/components/sections/deployment-resources-section";
 import { useDeployment } from "./layout-provider";
 import { useDeploymentStatus } from "./use-deployment-status";
 
@@ -69,6 +70,7 @@ export default function DeploymentOverview() {
     .with("ready", () => (
       <div key="ready" className="flex flex-col gap-5 animate-fade-slide-in">
         <DeploymentDomainsCard />
+        <DeploymentResourcesSection />
         <DeploymentNetworkSection />
       </div>
     ))

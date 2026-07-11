@@ -55,6 +55,7 @@ import { listDeployments } from "./deploy/deployment/list";
 import { searchDeployments } from "./deploy/deployment/llm-search";
 import { promote } from "./deploy/deployment/promote";
 import { redeploy } from "./deploy/deployment/redeploy";
+import { getDeploymentResources } from "./deploy/deployment/resources";
 import { rollback } from "./deploy/deployment/rollback";
 import { getDeploymentRuntimeLogs } from "./deploy/deployment/runtime-logs";
 import { stopDeployment } from "./deploy/deployment/stop";
@@ -547,6 +548,7 @@ export const router = t.router({
     deployment: t.router({
       list: listDeployments,
       getById: getDeploymentById,
+      resources: getDeploymentResources,
       buildSteps: getDeploymentBuildSteps,
       runtimeLogs: getDeploymentRuntimeLogs,
       instanceEvents: getDeploymentInstanceEvents,
