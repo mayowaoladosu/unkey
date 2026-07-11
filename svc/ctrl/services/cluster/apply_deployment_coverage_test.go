@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,6 +47,22 @@ func fullDeploymentRow() deploymentRow {
 				Valid:       true,
 				Healthcheck: &dbtype.Healthcheck{Method: "GET", Path: "/sentinel-healthz"},
 			},
+		},
+		resource: &db.DeploymentResource{
+			ID:            "resource_sentinel",
+			Name:          "web-sentinel",
+			Kind:          db.DeploymentResourcesKindService,
+			K8sName:       sql.NullString{Valid: true, String: "k8s-name-sentinel"},
+			Image:         sql.NullString{Valid: true, String: "registry.io/sentinel:v1"},
+			Command:       json.RawMessage(`["/sentinel-app","serve"]`),
+			Port:          8080,
+			Public:        true,
+			Schedule:      sql.NullString{Valid: true, String: "*/5 * * * *"},
+			Runtime:       sql.NullString{Valid: true, String: "nodejs22"},
+			Handler:       sql.NullString{Valid: true, String: "src/index.handler"},
+			CpuMillicores: 250,
+			MemoryMib:     256,
+			StorageMib:    2048,
 		},
 		k8sNamespace:    sql.NullString{Valid: true, String: "ns-sentinel"},
 		environmentSlug: "production",
@@ -135,6 +152,27 @@ var producerFieldAssertions = map[string]func(t *testing.T, a *ctrlv1.ApplyDeplo
 	"ephemeral_storage": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
 		require.NotNil(t, a.GetEphemeralStorage())
 		require.Equal(t, int64(2048), a.GetEphemeralStorage().GetSizeMib())
+	},
+	"resource_id": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, "resource_sentinel", a.GetResourceId())
+	},
+	"resource_name": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, "web-sentinel", a.GetResourceName())
+	},
+	"resource_kind": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_SERVICE, a.GetResourceKind())
+	},
+	"public": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.True(t, a.GetPublic())
+	},
+	"schedule": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, "*/5 * * * *", a.GetSchedule())
+	},
+	"runtime": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, "nodejs22", a.GetRuntime())
+	},
+	"handler": func(t *testing.T, a *ctrlv1.ApplyDeployment) {
+		require.Equal(t, "src/index.handler", a.GetHandler())
 	},
 }
 

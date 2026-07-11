@@ -85,6 +85,43 @@ func (s *Service) syncDeployments(
 			metrics.SyncDesiredStateEventsSentTotal.WithLabelValues("deployment").Inc()
 		}
 		if len(rows) < changePageSize {
+			break
+		}
+	}
+
+	afterPk = 0
+	for {
+		rows, err := s.db.ListDeploymentResourceTopologiesByRegion(ctx, db.ListDeploymentResourceTopologiesByRegionParams{
+			RegionID: regionID,
+			AfterPk:  afterPk,
+			Limit:    changePageSize,
+		})
+		if err != nil {
+			return connect.NewError(connect.CodeInternal, err)
+		}
+		for _, row := range rows {
+			afterPk = row.DeploymentTopology.Pk
+			state, err := deploymentRowToState(deploymentRow{
+				dt:              row.DeploymentTopology,
+				d:               row.Deployment,
+				resource:        &row.DeploymentResource,
+				k8sNamespace:    row.K8sNamespace,
+				environmentSlug: row.EnvironmentSlug,
+				regionName:      row.RegionName,
+				gitRepo:         row.GitRepo,
+			}, 0)
+			if err != nil {
+				logger.Error("full sync: failed to convert deployment resource row", "error", err, "resource_id", row.DeploymentResource.ID)
+				continue
+			}
+			if err := stream.Send(&ctrlv1.DeploymentChangeEvent{
+				Event: &ctrlv1.DeploymentChangeEvent_Deployment{Deployment: state},
+			}); err != nil {
+				return err
+			}
+			metrics.SyncDesiredStateEventsSentTotal.WithLabelValues("deployment_resource").Inc()
+		}
+		if len(rows) < changePageSize {
 			return nil
 		}
 	}

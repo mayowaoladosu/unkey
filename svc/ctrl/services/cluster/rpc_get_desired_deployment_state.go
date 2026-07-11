@@ -30,6 +30,32 @@ func (s *Service) GetDesiredDeploymentState(ctx context.Context, req *connect.Re
 	if err != nil {
 		return nil, err
 	}
+	if req.Msg.GetResourceId() != "" {
+		row, err := s.db.FindDeploymentResourceTopology(ctx, db.FindDeploymentResourceTopologyParams{
+			DeploymentID: req.Msg.GetDeploymentId(),
+			ResourceID:   req.Msg.GetResourceId(),
+			RegionID:     region.ID,
+		})
+		if err != nil {
+			if db.IsNotFound(err) {
+				return nil, connect.NewError(connect.CodeNotFound, err)
+			}
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		state, err := deploymentRowToState(deploymentRow{
+			dt:              row.DeploymentTopology,
+			d:               row.Deployment,
+			resource:        &row.DeploymentResource,
+			k8sNamespace:    row.K8sNamespace,
+			environmentSlug: row.EnvironmentSlug,
+			regionName:      row.RegionName,
+			gitRepo:         row.GitRepo,
+		}, 0)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		return connect.NewResponse(state), nil
+	}
 
 	row, err := s.db.FindDeploymentTopologyByDeploymentAndRegion(ctx, db.FindDeploymentTopologyByDeploymentAndRegionParams{
 		DeploymentID: req.Msg.GetDeploymentId(),

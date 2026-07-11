@@ -95,6 +95,9 @@ message DeploymentChangeEvent {
 message GetDesiredDeploymentStateRequest {
   RegionKey region = 1;
   string deployment_id = 2;
+  // resource_id scopes reconciliation to one independently materialized
+  // workload. Empty preserves the legacy single-container deployment path.
+  string resource_id = 3;
 }
 
 // ReportDeploymentStatusRequest reports the actual state of a deployment from the agent.
@@ -117,9 +120,11 @@ message ReportDeploymentStatusRequest {
 
     string k8s_name = 1;
     repeated Instance instances = 2;
+    string resource_id = 3;
   }
   message Delete {
     string k8s_name = 1;
+    string resource_id = 2;
   }
 
   RegionKey region = 3;
@@ -258,6 +263,16 @@ message DeploymentState {
   }
 }
 
+// DeploymentResourceKind identifies the execution model Krane must
+// materialize for an immutable manifest output.
+enum DeploymentResourceKind {
+  DEPLOYMENT_RESOURCE_KIND_UNSPECIFIED = 0;
+  DEPLOYMENT_RESOURCE_KIND_SERVICE = 1;
+  DEPLOYMENT_RESOURCE_KIND_FUNCTION = 2;
+  DEPLOYMENT_RESOURCE_KIND_WORKER = 3;
+  DEPLOYMENT_RESOURCE_KIND_CRON = 4;
+}
+
 // ApplyDeployment contains the desired configuration for a deployment.
 //
 // The cluster agent will ensure a deployment exists with this exact configuration, creating it if
@@ -337,6 +352,16 @@ message ApplyDeployment {
   // The volume is created when the pod starts and deleted when the pod terminates.
   // When absent, no ephemeral volume is attached.
   optional EphemeralStorage ephemeral_storage = 29;
+
+  // Resource identity separates independently materialized outputs that share
+  // a parent deployment and, potentially, the same built image.
+  string resource_id = 30;
+  string resource_name = 31;
+  DeploymentResourceKind resource_kind = 32;
+  bool public = 33;
+  string schedule = 34;
+  optional string runtime = 35;
+  optional string handler = 36;
 }
 
 // AutoscalingPolicy configures horizontal pod autoscaling for a deployment.
@@ -362,6 +387,7 @@ message AutoscalingPolicy {
 message DeleteDeployment {
   string k8s_namespace = 1;
   string k8s_name = 2;
+  string resource_id = 3;
 }
 
 // HeartbeatRequest is sent periodically by krane agents to register their

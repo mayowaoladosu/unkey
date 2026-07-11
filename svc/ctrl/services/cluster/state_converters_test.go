@@ -2,9 +2,11 @@ package cluster
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	"github.com/unkeyed/unkey/svc/ctrl/internal/db"
 )
 
@@ -70,4 +72,52 @@ func TestDeploymentRowToState_Stopped(t *testing.T) {
 	require.NotNil(t, del, "stopped status should produce a DeleteDeployment")
 	require.Equal(t, "my-app", del.GetK8SName())
 	require.Equal(t, "ws-namespace", del.GetK8SNamespace())
+}
+
+func TestDeploymentRowToState_ResourceWorker(t *testing.T) {
+	row := deploymentRow{
+		dt: db.DeploymentTopology{
+			DesiredStatus:          db.DeploymentTopologyDesiredStatusRunning,
+			AutoscalingReplicasMin: 1,
+			AutoscalingReplicasMax: 2,
+		},
+		d: db.Deployment{
+			ID:                            "deploy_123",
+			K8sName:                       "legacy-name",
+			WorkspaceID:                   "ws_1",
+			ProjectID:                     "prj_1",
+			EnvironmentID:                 "env_1",
+			AppID:                         "app_1",
+			EncryptedEnvironmentVariables: []byte(`{}`),
+			ShutdownSignal:                db.DeploymentsShutdownSignalSIGTERM,
+		},
+		resource: &db.DeploymentResource{
+			ID:            "resource_worker",
+			Name:          "emails",
+			Kind:          db.DeploymentResourcesKindWorker,
+			K8sName:       sql.NullString{Valid: true, String: "deploy-emails"},
+			Image:         sql.NullString{Valid: true, String: "registry.io/app:v2"},
+			Command:       json.RawMessage(`["node","worker.js"]`),
+			CpuMillicores: 500,
+			MemoryMib:     512,
+		},
+		k8sNamespace: sql.NullString{Valid: true, String: "ws-namespace"},
+	}
+
+	state, err := deploymentRowToState(row, 9)
+	require.NoError(t, err)
+	apply := state.GetApply()
+	require.Equal(t, "resource_worker", apply.GetResourceId())
+	require.Equal(t, "deploy-emails", apply.GetK8SName())
+	require.Equal(t, ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_WORKER, apply.GetResourceKind())
+	require.Equal(t, []string{"node", "worker.js"}, apply.GetCommand())
+	require.Zero(t, apply.GetPort())
+	require.False(t, apply.GetPublic())
+	require.Empty(t, apply.GetHealthcheck())
+
+	row.dt.DesiredStatus = db.DeploymentTopologyDesiredStatusStopped
+	state, err = deploymentRowToState(row, 10)
+	require.NoError(t, err)
+	require.Equal(t, "resource_worker", state.GetDelete().GetResourceId())
+	require.Equal(t, "deploy-emails", state.GetDelete().GetK8SName())
 }

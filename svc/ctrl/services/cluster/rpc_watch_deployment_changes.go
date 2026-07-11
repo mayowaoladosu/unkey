@@ -127,6 +127,33 @@ func (s *Service) fetchDeploymentChangeEvents(ctx context.Context, regionID stri
 func (s *Service) loadChangeEvent(ctx context.Context, change db.DeploymentChange) (*ctrlv1.DeploymentChangeEvent, error) {
 	switch change.ResourceType {
 	case db.DeploymentChangesResourceTypeDeploymentTopology:
+		if change.DeploymentResourceID != "" {
+			row, err := s.db.FindDeploymentResourceTopology(ctx, db.FindDeploymentResourceTopologyParams{
+				DeploymentID: change.ResourceID,
+				ResourceID:   change.DeploymentResourceID,
+				RegionID:     change.RegionID,
+			})
+			if err != nil {
+				return nil, err
+			}
+			state, err := deploymentRowToState(deploymentRow{
+				dt:              row.DeploymentTopology,
+				d:               row.Deployment,
+				resource:        &row.DeploymentResource,
+				k8sNamespace:    row.K8sNamespace,
+				environmentSlug: row.EnvironmentSlug,
+				regionName:      row.RegionName,
+				gitRepo:         row.GitRepo,
+			}, change.Pk)
+			if err != nil {
+				return nil, err
+			}
+			return &ctrlv1.DeploymentChangeEvent{
+				Version: change.Pk,
+				Event:   &ctrlv1.DeploymentChangeEvent_Deployment{Deployment: state},
+			}, nil
+		}
+
 		row, err := s.db.FindDeploymentTopologyByDeploymentAndRegion(ctx, db.FindDeploymentTopologyByDeploymentAndRegionParams{
 			DeploymentID: change.ResourceID,
 			RegionID:     change.RegionID,
@@ -175,6 +202,7 @@ func (s *Service) loadChangeEvent(ctx context.Context, change db.DeploymentChang
 type deploymentRow struct {
 	dt              db.DeploymentTopology
 	d               db.Deployment
+	resource        *db.DeploymentResource
 	k8sNamespace    sql.NullString
 	environmentSlug string
 	regionName      string
@@ -183,6 +211,16 @@ type deploymentRow struct {
 
 // deploymentRowToState converts a deployment row to a proto DeploymentState message.
 func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.DeploymentState, error) {
+	k8sName := row.d.K8sName
+	resourceID := ""
+	if row.resource != nil {
+		if !row.resource.K8sName.Valid || row.resource.K8sName.String == "" {
+			return nil, fmt.Errorf("deployment resource %q has no kubernetes name", row.resource.ID)
+		}
+		k8sName = row.resource.K8sName.String
+		resourceID = row.resource.ID
+	}
+
 	switch row.dt.DesiredStatus {
 	case db.DeploymentTopologyDesiredStatusStopped:
 		return &ctrlv1.DeploymentState{
@@ -190,7 +228,8 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 			State: &ctrlv1.DeploymentState_Delete{
 				Delete: &ctrlv1.DeleteDeployment{
 					K8SNamespace: row.k8sNamespace.String,
-					K8SName:      row.d.K8sName,
+					K8SName:      k8sName,
+					ResourceId:   resourceID,
 				},
 			},
 		}, nil
@@ -199,22 +238,63 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 		if row.d.BuildID.Valid {
 			buildID = &row.d.BuildID.String
 		}
+		image := row.d.Image.String
+		command := []string(row.d.Command)
+		port := row.d.Port
+		cpuMillicores := row.d.CpuMillicores
+		memoryMib := row.d.MemoryMib
+		storageMib := row.d.StorageMib
+		resourceName := ""
+		resourceKind := ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_UNSPECIFIED
+		public := true
+		schedule := ""
+		var runtime *string
+		var handler *string
+		if row.resource != nil {
+			if err := json.Unmarshal(row.resource.Command, &command); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal command for deployment resource %q: %w", row.resource.ID, err)
+			}
+			image = row.resource.Image.String
+			port = row.resource.Port
+			cpuMillicores = row.resource.CpuMillicores
+			memoryMib = row.resource.MemoryMib
+			storageMib = row.resource.StorageMib
+			resourceName = row.resource.Name
+			resourceKind = deploymentResourceKindToProto(row.resource.Kind)
+			public = row.resource.Public
+			if row.resource.Schedule.Valid {
+				schedule = row.resource.Schedule.String
+			}
+			if row.resource.Runtime.Valid {
+				runtime = &row.resource.Runtime.String
+			}
+			if row.resource.Handler.Valid {
+				handler = &row.resource.Handler.String
+			}
+		}
 
 		apply := &ctrlv1.ApplyDeployment{
 			DeploymentId:                  row.d.ID,
+			ResourceId:                    resourceID,
+			ResourceName:                  resourceName,
+			ResourceKind:                  resourceKind,
+			Public:                        public,
+			Schedule:                      schedule,
+			Runtime:                       runtime,
+			Handler:                       handler,
 			K8SNamespace:                  row.k8sNamespace.String,
-			K8SName:                       row.d.K8sName,
+			K8SName:                       k8sName,
 			WorkspaceId:                   row.d.WorkspaceID,
 			ProjectId:                     row.d.ProjectID,
 			EnvironmentId:                 row.d.EnvironmentID,
 			AppId:                         row.d.AppID,
-			Image:                         row.d.Image.String,
-			CpuMillicores:                 int64(row.d.CpuMillicores),
-			MemoryMib:                     int64(row.d.MemoryMib),
+			Image:                         image,
+			CpuMillicores:                 int64(cpuMillicores),
+			MemoryMib:                     int64(memoryMib),
 			EncryptedEnvironmentVariables: row.d.EncryptedEnvironmentVariables,
 			BuildId:                       buildID,
-			Command:                       row.d.Command,
-			Port:                          row.d.Port,
+			Command:                       command,
+			Port:                          port,
 			ShutdownSignal:                string(row.d.ShutdownSignal),
 			EnvironmentSlug:               &row.environmentSlug,
 			Region:                        &row.regionName,
@@ -233,7 +313,7 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 			apply.GitRepo = &row.gitRepo.String
 		}
 
-		if row.d.Healthcheck.Valid {
+		if row.d.Healthcheck.Valid && (row.resource == nil || row.resource.Kind == db.DeploymentResourcesKindService || row.resource.Kind == db.DeploymentResourcesKindFunction) {
 			hcBytes, err := json.Marshal(row.d.Healthcheck.Healthcheck)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal healthcheck: %w", err)
@@ -253,9 +333,9 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 		}
 		apply.Autoscaling = policy
 
-		if row.d.StorageMib > 0 {
+		if storageMib > 0 {
 			apply.EphemeralStorage = &ctrlv1.EphemeralStorage{
-				SizeMib: int64(row.d.StorageMib),
+				SizeMib: int64(storageMib),
 			}
 		}
 
@@ -267,5 +347,22 @@ func deploymentRowToState(row deploymentRow, version uint64) (*ctrlv1.Deployment
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown DeploymentTopologyDesiredStatus: %v", row.dt.DesiredStatus)
+	}
+}
+
+func deploymentResourceKindToProto(kind db.DeploymentResourcesKind) ctrlv1.DeploymentResourceKind {
+	switch kind {
+	case db.DeploymentResourcesKindService:
+		return ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_SERVICE
+	case db.DeploymentResourcesKindFunction:
+		return ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_FUNCTION
+	case db.DeploymentResourcesKindWorker:
+		return ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_WORKER
+	case db.DeploymentResourcesKindCron:
+		return ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_CRON
+	case db.DeploymentResourcesKindStatic:
+		return ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_UNSPECIFIED
+	default:
+		return ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_UNSPECIFIED
 	}
 }
