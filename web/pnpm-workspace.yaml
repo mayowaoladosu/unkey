@@ -38,3 +38,8 @@ overrides:
   "@tanstack/react-start-config>zod": "3.24.4"
   "@types/react": "19.2.4"
   "@types/react-dom": "19.2.3"
+
+packageExtensions:
+  "@hookform/resolvers@5.2.2":
+    peerDependencies:
+      zod: ">=3.25.0"
