@@ -97,6 +97,9 @@ describe("app-scoped paths", () => {
     expect(routes.projects.apps.deployments(scope)).toBe(
       "/acme/projects/proj_123/apps/app_456/deployments",
     );
+    expect(routes.projects.apps.environments(scope)).toBe(
+      "/acme/projects/proj_123/apps/app_456/environments",
+    );
   });
 
   it("builds a deployment path", () => {

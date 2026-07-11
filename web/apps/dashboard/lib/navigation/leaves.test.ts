@@ -27,6 +27,21 @@ describe("sidebar navigation leaves", () => {
     });
   });
 
+  it("exposes environment lifecycle in app navigation", () => {
+    const links = buildAppLinks(
+      "workspace",
+      "project",
+      "app",
+      ["projects", "project", "apps", "app", "environments"],
+      true,
+    );
+    expect(links.find((link) => link.key === "environments")).toMatchObject({
+      label: "Environments",
+      isActive: true,
+      href: "/workspace/projects/project/apps/app/environments",
+    });
+  });
+
   it("keeps deployment navigation entirely in the sidebar", () => {
     const base = "/workspace/projects/project/apps/app/deployments/deployment";
     const links = buildDeploymentLinks(
