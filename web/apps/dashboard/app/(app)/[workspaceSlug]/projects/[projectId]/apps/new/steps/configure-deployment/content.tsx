@@ -4,6 +4,10 @@ import { useProjectData } from "@/app/(app)/[workspaceSlug]/projects/[projectId]
 import { DeploymentEnvVars } from "@/app/(app)/[workspaceSlug]/projects/[projectId]/apps/[appId]/(overview)/env-vars/deployment-env-vars";
 import { DeploymentSettings } from "@/app/(app)/[workspaceSlug]/projects/[projectId]/apps/[appId]/(overview)/settings/deployment-settings";
 import { useEnvironmentSettings } from "@/app/(app)/[workspaceSlug]/projects/[projectId]/apps/[appId]/(overview)/settings/environment-provider";
+import {
+  estimateMonthlyCapacity,
+  formatCapacityEstimate,
+} from "@/lib/deploy/cost-estimate";
 import { trpc } from "@/lib/trpc/client";
 import {
   BracketsSquareDots,
@@ -34,6 +38,7 @@ export const ConfigureDeploymentContent = ({
   onDeploymentCreated: (deploymentId: string) => void;
 }) => {
   const [settingsRevision, setSettingsRevision] = useState(0);
+  const [confirmedCapacityKey, setConfirmedCapacityKey] = useState<string | null>(null);
   const { settings, isSaving } = useEnvironmentSettings();
   const { environments } = useProjectData();
   const github = trpc.github.getInstallations.useQuery(
@@ -45,6 +50,27 @@ export const ConfigureDeploymentContent = ({
   const branch = github.data?.defaultBranch ?? "default branch";
   const resourceCount = settings.outputs.length || 1;
   const resourceLabel = settings.outputs.length > 0 ? "explicit resources" : "detected service";
+  const capacityEstimate = estimateMonthlyCapacity({
+    cpuMillicores: settings.cpuMillicores,
+    memoryMib: settings.memoryMib,
+    storageMib: settings.storageMib,
+    regions: settings.regions,
+    outputs: settings.outputs,
+  });
+  const capacityKey = JSON.stringify({
+    cpuMillicores: settings.cpuMillicores,
+    memoryMib: settings.memoryMib,
+    storageMib: settings.storageMib,
+    regions: settings.regions.map(({ id, replicasMin, replicasMax }) => ({
+      id,
+      replicasMin,
+      replicasMax,
+    })),
+    outputs: settings.outputs.map(({ kind, name }) => ({ kind, name })),
+  });
+  const needsCapacityConfirmation = capacityEstimate.minInstances > 1;
+  const capacityConfirmed =
+    !needsCapacityConfirmation || confirmedCapacityKey === capacityKey;
 
   return (
     <div className="mx-auto w-full max-w-6xl pb-16">
@@ -154,6 +180,35 @@ export const ConfigureDeploymentContent = ({
               label="Environments"
               value={`${environments.length} configured`}
             />
+            <SummaryRow
+              icon={<Cube className="size-3.5" />}
+              label="Usage ceiling"
+              value={formatCapacityEstimate(capacityEstimate)}
+            />
+          </div>
+
+          <div className="mt-4 rounded-lg border border-grayA-5 bg-grayA-2 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-9">
+                  Monthly capacity ceiling
+                </p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-gray-12">
+                  {formatCapacityEstimate(capacityEstimate)}
+                </p>
+              </div>
+              <span className="rounded-full border border-grayA-5 bg-gray-1 px-2 py-1 text-[10px] text-gray-10">
+                {capacityEstimate.minInstances === capacityEstimate.maxInstances
+                  ? `${capacityEstimate.minInstances} runtime replica${capacityEstimate.minInstances === 1 ? "" : "s"}`
+                  : `${capacityEstimate.minInstances}–${capacityEstimate.maxInstances} runtime replicas`}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-gray-9">
+              Gross metered usage at full configured CPU and memory capacity for 730 hours. Actual
+              CPU and memory usage can be lower; plan credits offset usage. Public egress
+              {capacityEstimate.excludedCronResources > 0 ? " and cron execution are" : " is"}
+              {" "}additional.
+            </p>
           </div>
 
           <div className="my-5 space-y-2.5 text-xs text-gray-10">
@@ -169,11 +224,28 @@ export const ConfigureDeploymentContent = ({
             </div>
           ) : null}
 
+          {needsCapacityConfirmation ? (
+            <label className="mb-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-warningA-5 bg-warningA-2 px-3 py-2.5 text-xs leading-5 text-warning-11">
+              <input
+                type="checkbox"
+                className="mt-1 size-3.5 accent-current"
+                checked={confirmedCapacityKey === capacityKey}
+                onChange={(event) =>
+                  setConfirmedCapacityKey(event.target.checked ? capacityKey : null)
+                }
+              />
+              <span>
+                I understand this configuration keeps at least {capacityEstimate.minInstances}
+                {" "}runtime replicas active across {settings.regions.length} regions.
+              </span>
+            </label>
+          ) : null}
+
           <DeployAction
             projectId={projectId}
             appId={appId}
             source={source}
-            disabled={isSaving || settings.regions.length === 0}
+            disabled={isSaving || settings.regions.length === 0 || !capacityConfirmed}
             onDeploymentCreated={onDeploymentCreated}
           />
         </aside>

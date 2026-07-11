@@ -6,6 +6,7 @@ export const getAvailableRegions = workspaceProcedure.query(async () => {
   return db.query.regions
     .findMany({
       columns: { id: true, name: true, canSchedule: true },
+      orderBy: (table, { asc }) => [asc(table.pk)],
     })
     .catch((err) => {
       console.error(err);

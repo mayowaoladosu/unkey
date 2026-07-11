@@ -109,7 +109,7 @@ const EnvironmentSettingsPreloader = ({ envId }: { envId: string }) => {
 // handler (which would show toasts and whose silent metadata flag is broken).
 function useInitializeSettings(
   environments: { id: string; slug: string }[],
-  availableRegions: { id: string; name: string }[] | undefined,
+  availableRegions: { id: string; name: string; canSchedule: boolean }[] | undefined,
 ): {
   settingsInitialized: boolean;
   initializationError: string | null;
@@ -138,6 +138,7 @@ function useInitializeSettings(
     setInitializationError(null);
 
     const d = ENVIRONMENT_SETTINGS_DEFAULTS;
+    const defaultRegion = availableRegions.find((region) => region.canSchedule);
     const defaults = {
       autoDeploy: d.autoDeploy,
       dockerfile: d.dockerfile,
@@ -151,12 +152,16 @@ function useInitializeSettings(
       storageMib: d.storageMib,
       command: [] as string[],
       healthcheck: null,
-      regions: availableRegions.map((r) => ({
-        id: r.id,
-        name: r.name,
-        replicasMin: 1,
-        replicasMax: 1,
-      })),
+      regions: defaultRegion
+        ? [
+            {
+              id: defaultRegion.id,
+              name: defaultRegion.name,
+              replicasMin: 1,
+              replicasMax: 1,
+            },
+          ]
+        : [],
       shutdownSignal: d.shutdownSignal,
       upstreamProtocol: d.upstreamProtocol,
       openapiSpecPath: null,
