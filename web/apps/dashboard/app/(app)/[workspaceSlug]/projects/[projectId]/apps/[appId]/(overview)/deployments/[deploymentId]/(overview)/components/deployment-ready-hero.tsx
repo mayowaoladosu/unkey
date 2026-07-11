@@ -1,6 +1,7 @@
 "use client";
 
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
+import { collection } from "@/lib/collections";
 import { githubUrl } from "@/lib/github-url";
 import { routes } from "@/lib/navigation/routes";
 import {
@@ -13,6 +14,7 @@ import {
   Layers2,
 } from "@unkey/icons";
 import { Button, CopyButton } from "@unkey/ui";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useRouter } from "next/navigation";
 import { useProjectData } from "../../../../data-provider";
 import { getDomainPriority } from "../../../../../components/domain-priority";
@@ -41,6 +43,16 @@ export function DeploymentReadyHero({
     appId: deployment.appId,
     deploymentId: deployment.id,
   };
+  const apps = useLiveQuery(
+    (query) =>
+      query
+        .from({ app: collection.apps })
+        .where(({ app }) =>
+          and(eq(app.projectId, deployment.projectId), eq(app.id, deployment.appId)),
+        ),
+    [deployment.projectId, deployment.appId],
+  );
+  const repositoryFullName = apps.data.at(0)?.repositoryFullName ?? project?.repositoryFullName;
   const domains = getDomainPriority({
     domains: getDomainsForDeployment(deployment.id),
     customDomains,
@@ -57,7 +69,7 @@ export function DeploymentReadyHero({
       ? "Preview deployment is ready"
       : "Production is live";
   const sourceUrl = githubUrl.deployment({
-    repoFullName: project?.repositoryFullName,
+    repoFullName: repositoryFullName,
     forkRepoFullName: deployment.forkRepositoryFullName,
     prNumber: deployment.prNumber,
     sha: deployment.gitCommitSha,
