@@ -618,6 +618,93 @@ func (ns NullDeploymentStepsStep) Value() (driver.Value, error) {
 	return string(ns.DeploymentStepsStep), nil
 }
 
+type DeploymentTargetAssignmentsReason string
+
+const (
+	DeploymentTargetAssignmentsReasonDeploy   DeploymentTargetAssignmentsReason = "deploy"
+	DeploymentTargetAssignmentsReasonPromote  DeploymentTargetAssignmentsReason = "promote"
+	DeploymentTargetAssignmentsReasonRollback DeploymentTargetAssignmentsReason = "rollback"
+	DeploymentTargetAssignmentsReasonRestore  DeploymentTargetAssignmentsReason = "restore"
+)
+
+func (e *DeploymentTargetAssignmentsReason) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentTargetAssignmentsReason(s)
+	case string:
+		*e = DeploymentTargetAssignmentsReason(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentTargetAssignmentsReason: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentTargetAssignmentsReason struct {
+	DeploymentTargetAssignmentsReason DeploymentTargetAssignmentsReason
+	Valid                             bool // Valid is true if DeploymentTargetAssignmentsReason is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentTargetAssignmentsReason) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentTargetAssignmentsReason, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentTargetAssignmentsReason.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentTargetAssignmentsReason) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentTargetAssignmentsReason), nil
+}
+
+type DeploymentTargetsKind string
+
+const (
+	DeploymentTargetsKindBranch      DeploymentTargetsKind = "branch"
+	DeploymentTargetsKindEnvironment DeploymentTargetsKind = "environment"
+	DeploymentTargetsKindLive        DeploymentTargetsKind = "live"
+)
+
+func (e *DeploymentTargetsKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeploymentTargetsKind(s)
+	case string:
+		*e = DeploymentTargetsKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeploymentTargetsKind: %T", src)
+	}
+	return nil
+}
+
+type NullDeploymentTargetsKind struct {
+	DeploymentTargetsKind DeploymentTargetsKind
+	Valid                 bool // Valid is true if DeploymentTargetsKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeploymentTargetsKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeploymentTargetsKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeploymentTargetsKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeploymentTargetsKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeploymentTargetsKind), nil
+}
+
 type DeploymentTopologyDesiredStatus string
 
 const (
@@ -1330,6 +1417,36 @@ type DeploymentStep struct {
 	Error         sql.NullString      `db:"error"`
 }
 
+type DeploymentTarget struct {
+	Pk                   uint64                `db:"pk"`
+	ID                   string                `db:"id"`
+	WorkspaceID          string                `db:"workspace_id"`
+	ProjectID            string                `db:"project_id"`
+	AppID                string                `db:"app_id"`
+	EnvironmentID        string                `db:"environment_id"`
+	Kind                 DeploymentTargetsKind `db:"kind"`
+	TargetKey            string                `db:"target_key"`
+	DeploymentID         string                `db:"deployment_id"`
+	PreviousDeploymentID sql.NullString        `db:"previous_deployment_id"`
+	CreatedAt            int64                 `db:"created_at"`
+	UpdatedAt            sql.NullInt64         `db:"updated_at"`
+}
+
+type DeploymentTargetAssignment struct {
+	Pk                   uint64                            `db:"pk"`
+	ID                   string                            `db:"id"`
+	TargetID             string                            `db:"target_id"`
+	WorkspaceID          string                            `db:"workspace_id"`
+	ProjectID            string                            `db:"project_id"`
+	AppID                string                            `db:"app_id"`
+	EnvironmentID        string                            `db:"environment_id"`
+	DeploymentID         string                            `db:"deployment_id"`
+	PreviousDeploymentID sql.NullString                    `db:"previous_deployment_id"`
+	Reason               DeploymentTargetAssignmentsReason `db:"reason"`
+	OperationID          string                            `db:"operation_id"`
+	CreatedAt            int64                             `db:"created_at"`
+}
+
 type DeploymentTopology struct {
 	Pk                         uint64                          `db:"pk"`
 	WorkspaceID                string                          `db:"workspace_id"`
@@ -1373,6 +1490,7 @@ type FrontlineRoute struct {
 	ProjectID                string                `db:"project_id"`
 	AppID                    string                `db:"app_id"`
 	DeploymentID             string                `db:"deployment_id"`
+	TargetID                 sql.NullString        `db:"target_id"`
 	EnvironmentID            string                `db:"environment_id"`
 	FullyQualifiedDomainName string                `db:"fully_qualified_domain_name"`
 	Sticky                   FrontlineRoutesSticky `db:"sticky"`

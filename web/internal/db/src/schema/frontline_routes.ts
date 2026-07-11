@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import { bigint, index, mysqlEnum, mysqlTable, varchar } from "drizzle-orm/mysql-core";
+import { deploymentTargets } from "./deployment_targets";
 import { deployments } from "./deployments";
 import { projects } from "./projects";
 import { lifecycleDates } from "./util/lifecycle_dates";
@@ -12,6 +13,7 @@ export const frontlineRoutes = mysqlTable(
     projectId: varchar("project_id", { length: 255 }).notNull(),
     appId: varchar("app_id", { length: 64 }).notNull(),
     deploymentId: varchar("deployment_id", { length: 255 }).notNull(),
+    targetId: varchar("target_id", { length: 128 }),
     environmentId: varchar("environment_id", { length: 255 }).notNull(),
     fullyQualifiedDomainName: varchar("fully_qualified_domain_name", {
       length: 256,
@@ -40,6 +42,7 @@ export const frontlineRoutes = mysqlTable(
     index("project_id_idx").on(table.projectId),
     index("environment_id_idx").on(table.environmentId),
     index("deployment_id_idx").on(table.deploymentId),
+    index("frontline_routes_target_idx").on(table.targetId),
     index("fqdn_environment_deployment_idx").on(
       table.fullyQualifiedDomainName,
       table.environmentId,
@@ -52,6 +55,10 @@ export const frontlineRelations = relations(frontlineRoutes, ({ one }) => ({
   deployment: one(deployments, {
     fields: [frontlineRoutes.deploymentId],
     references: [deployments.id],
+  }),
+  target: one(deploymentTargets, {
+    fields: [frontlineRoutes.targetId],
+    references: [deploymentTargets.id],
   }),
   project: one(projects, {
     fields: [frontlineRoutes.projectId],

@@ -4,6 +4,7 @@ CREATE TABLE `frontline_routes` (
 	`project_id` varchar(255) NOT NULL,
 	`app_id` varchar(64) NOT NULL,
 	`deployment_id` varchar(255) NOT NULL,
+	`target_id` varchar(128),
 	`environment_id` varchar(255) NOT NULL,
 	`fully_qualified_domain_name` varchar(256) NOT NULL,
 	`sticky` enum('none','branch','environment','live','deployment') NOT NULL DEFAULT 'none',
@@ -19,6 +20,8 @@ CREATE INDEX `project_id_idx` ON `frontline_routes` (`project_id`);
 CREATE INDEX `environment_id_idx` ON `frontline_routes` (`environment_id`);
 
 CREATE INDEX `deployment_id_idx` ON `frontline_routes` (`deployment_id`);
+
+CREATE INDEX `frontline_routes_target_idx` ON `frontline_routes` (`target_id`);
 
 CREATE INDEX `fqdn_environment_deployment_idx` ON `frontline_routes` (`fully_qualified_domain_name`,`environment_id`,`deployment_id`);
 

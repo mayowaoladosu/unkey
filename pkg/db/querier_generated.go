@@ -10,6 +10,15 @@ import (
 )
 
 type Querier interface {
+	//AssignDeploymentTarget
+	//
+	//  UPDATE deployment_targets
+	//  SET
+	//    previous_deployment_id = deployment_id,
+	//    deployment_id = ?,
+	//    updated_at = ?
+	//  WHERE id = ?
+	AssignDeploymentTarget(ctx context.Context, db DBTX, arg AssignDeploymentTargetParams) error
 	//ClearAcmeChallengeTokens
 	//
 	//  UPDATE acme_challenges
@@ -111,6 +120,14 @@ type Querier interface {
 	//  JOIN deployments d ON ds.deployment_id = d.id
 	//  WHERE d.environment_id = ?
 	DeleteDeploymentStepsByEnvironmentId(ctx context.Context, db DBTX, environmentID string) error
+	//DeleteDeploymentTargetAssignmentsByEnvironment
+	//
+	//  DELETE FROM deployment_target_assignments WHERE environment_id = ?
+	DeleteDeploymentTargetAssignmentsByEnvironment(ctx context.Context, db DBTX, environmentID string) error
+	//DeleteDeploymentTargetsByEnvironment
+	//
+	//  DELETE FROM deployment_targets WHERE environment_id = ?
+	DeleteDeploymentTargetsByEnvironment(ctx context.Context, db DBTX, environmentID string) error
 	//DeleteDeploymentTopologiesByEnvironmentId
 	//
 	//  DELETE dt FROM deployment_topology dt
@@ -569,6 +586,19 @@ type Querier interface {
 	//  INNER JOIN `regions` r ON dt.region_id = r.id
 	//  WHERE dt.deployment_id = ?
 	FindDeploymentRegions(ctx context.Context, db DBTX, deploymentID string) ([]Region, error)
+	//FindDeploymentTargetByID
+	//
+	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at FROM deployment_targets WHERE id = ?
+	FindDeploymentTargetByID(ctx context.Context, db DBTX, id string) (DeploymentTarget, error)
+	//FindDeploymentTargetByIdentity
+	//
+	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at
+	//  FROM deployment_targets
+	//  WHERE app_id = ?
+	//    AND environment_id = ?
+	//    AND kind = ?
+	//    AND target_key = ?
+	FindDeploymentTargetByIdentity(ctx context.Context, db DBTX, arg FindDeploymentTargetByIdentityParams) (DeploymentTarget, error)
 	// FindDeploymentTopologyByDeploymentAndRegion returns a single deployment topology with all
 	// joined data needed for the Watch stream. Used by the unified WatchDeploymentChanges RPC.
 	//
@@ -629,11 +659,11 @@ type Querier interface {
 	FindEnvironmentByProjectIdAndSlug(ctx context.Context, db DBTX, arg FindEnvironmentByProjectIdAndSlugParams) (Environment, error)
 	//FindFrontlineRouteByDeploymentIDAndSticky
 	//
-	//  SELECT pk, id, project_id, app_id, deployment_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE deployment_id = ? AND sticky = ?
+	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE deployment_id = ? AND sticky = ?
 	FindFrontlineRouteByDeploymentIDAndSticky(ctx context.Context, db DBTX, arg FindFrontlineRouteByDeploymentIDAndStickyParams) (FrontlineRoute, error)
 	//FindFrontlineRouteByFQDN
 	//
-	//  SELECT pk, id, project_id, app_id, deployment_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
+	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
 	FindFrontlineRouteByFQDN(ctx context.Context, db DBTX, fullyQualifiedDomainName string) (FrontlineRoute, error)
 	//FindFrontlineRouteForPromotion
 	//
@@ -654,7 +684,7 @@ type Querier interface {
 	FindFrontlineRouteForPromotion(ctx context.Context, db DBTX, arg FindFrontlineRouteForPromotionParams) ([]FindFrontlineRouteForPromotionRow, error)
 	//FindFrontlineRoutesByDeploymentID
 	//
-	//  SELECT pk, id, project_id, app_id, deployment_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE deployment_id = ?
+	//  SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE deployment_id = ?
 	FindFrontlineRoutesByDeploymentID(ctx context.Context, db DBTX, deploymentID string) ([]FrontlineRoute, error)
 	//FindFrontlineRoutesForRollback
 	//
@@ -1746,6 +1776,35 @@ type Querier interface {
 	//      ended_at = NULL,
 	//      error = NULL
 	InsertDeploymentStep(ctx context.Context, db DBTX, arg InsertDeploymentStepParams) error
+	//InsertDeploymentTarget
+	//
+	//  INSERT INTO deployment_targets (
+	//    id,
+	//    workspace_id,
+	//    project_id,
+	//    app_id,
+	//    environment_id,
+	//    kind,
+	//    target_key,
+	//    deployment_id,
+	//    previous_deployment_id,
+	//    created_at,
+	//    updated_at
+	//  ) VALUES (
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?
+	//  )
+	//  ON DUPLICATE KEY UPDATE id = id
+	InsertDeploymentTarget(ctx context.Context, db DBTX, arg InsertDeploymentTargetParams) error
 	//InsertDeploymentTopology
 	//
 	//  INSERT INTO `deployment_topology` (
@@ -2384,6 +2443,27 @@ type Querier interface {
 	//  ORDER BY pk ASC
 	//  LIMIT ?
 	ListDeploymentChangesByRegionAll(ctx context.Context, db DBTX, arg ListDeploymentChangesByRegionAllParams) ([]DeploymentChange, error)
+	//ListDeploymentTargetAssignmentsByEnvironment
+	//
+	//  SELECT pk, id, target_id, workspace_id, project_id, app_id, environment_id, deployment_id, previous_deployment_id, reason, operation_id, created_at
+	//  FROM deployment_target_assignments
+	//  WHERE environment_id = ?
+	//  ORDER BY created_at DESC, pk DESC
+	ListDeploymentTargetAssignmentsByEnvironment(ctx context.Context, db DBTX, environmentID string) ([]DeploymentTargetAssignment, error)
+	//ListDeploymentTargetAssignmentsByTarget
+	//
+	//  SELECT pk, id, target_id, workspace_id, project_id, app_id, environment_id, deployment_id, previous_deployment_id, reason, operation_id, created_at
+	//  FROM deployment_target_assignments
+	//  WHERE target_id = ?
+	//  ORDER BY created_at DESC, pk DESC
+	ListDeploymentTargetAssignmentsByTarget(ctx context.Context, db DBTX, targetID string) ([]DeploymentTargetAssignment, error)
+	//ListDeploymentTargetsByEnvironment
+	//
+	//  SELECT pk, id, workspace_id, project_id, app_id, environment_id, kind, target_key, deployment_id, previous_deployment_id, created_at, updated_at
+	//  FROM deployment_targets
+	//  WHERE environment_id = ?
+	//  ORDER BY kind ASC, target_key ASC
+	ListDeploymentTargetsByEnvironment(ctx context.Context, db DBTX, environmentID string) ([]DeploymentTarget, error)
 	//ListDeploymentsByEnvironmentIdAndStatus
 	//
 	//  SELECT pk, id, k8s_name, workspace_id, project_id, environment_id, app_id, image, build_id, git_commit_sha, git_branch, git_commit_message, git_commit_author_handle, git_commit_author_avatar_url, git_commit_timestamp, sentinel_config, cpu_millicores, memory_mib, storage_mib, desired_state, encrypted_environment_variables, command, port, shutdown_signal, upstream_protocol, healthcheck, pr_number, fork_repository_full_name, github_deployment_id, invocation_id, status, `trigger`, triggered_by, trigger_reason, created_at, updated_at FROM `deployments`
@@ -3108,6 +3188,35 @@ type Querier interface {
 	//  )
 	//  ON DUPLICATE KEY UPDATE id = deployment_artifacts.id
 	RecordDeploymentArtifact(ctx context.Context, db DBTX, arg RecordDeploymentArtifactParams) error
+	//RecordDeploymentTargetAssignment
+	//
+	//  INSERT INTO deployment_target_assignments (
+	//    id,
+	//    target_id,
+	//    workspace_id,
+	//    project_id,
+	//    app_id,
+	//    environment_id,
+	//    deployment_id,
+	//    previous_deployment_id,
+	//    reason,
+	//    operation_id,
+	//    created_at
+	//  ) VALUES (
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?,
+	//    ?
+	//  )
+	//  ON DUPLICATE KEY UPDATE id = id
+	RecordDeploymentTargetAssignment(ctx context.Context, db DBTX, arg RecordDeploymentTargetAssignmentParams) error
 	// Records that kubelet has put a container into CrashLoopBackOff by setting
 	// container_status.waiting.reason. The lastTerminationState carries the
 	// most recent exit info and is left untouched — the dashboard renders both

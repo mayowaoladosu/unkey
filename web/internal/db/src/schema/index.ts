@@ -23,6 +23,7 @@ export * from "./app_environment_variables";
 export * from "./deployments";
 export * from "./deployment_artifacts";
 export * from "./deployment_manifests";
+export * from "./deployment_targets";
 export * from "./openapi_specs";
 export * from "./deployment_steps";
 export * from "./deployment_topology";

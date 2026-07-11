@@ -10,12 +10,12 @@ import (
 )
 
 const findFrontlineRouteByFQDN = `-- name: FindFrontlineRouteByFQDN :one
-SELECT pk, id, project_id, app_id, deployment_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
+SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
 `
 
 // FindFrontlineRouteByFQDN
 //
-//	SELECT pk, id, project_id, app_id, deployment_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
+//	SELECT pk, id, project_id, app_id, deployment_id, target_id, environment_id, fully_qualified_domain_name, sticky, created_at, updated_at FROM frontline_routes WHERE fully_qualified_domain_name = ?
 func (q *Queries) FindFrontlineRouteByFQDN(ctx context.Context, fullyQualifiedDomainName string) (FrontlineRoute, error) {
 	row := q.db.QueryRowContext(ctx, findFrontlineRouteByFQDN, fullyQualifiedDomainName)
 	var i FrontlineRoute
@@ -25,6 +25,7 @@ func (q *Queries) FindFrontlineRouteByFQDN(ctx context.Context, fullyQualifiedDo
 		&i.ProjectID,
 		&i.AppID,
 		&i.DeploymentID,
+		&i.TargetID,
 		&i.EnvironmentID,
 		&i.FullyQualifiedDomainName,
 		&i.Sticky,
