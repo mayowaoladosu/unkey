@@ -102,6 +102,12 @@ describe("app-scoped paths", () => {
     );
   });
 
+  it("scopes app settings to one environment", () => {
+    expect(routes.projects.apps.settings({ ...scope, environmentId: "env_staging" })).toBe(
+      "/acme/projects/proj_123/apps/app_456/settings?environmentId=env_staging",
+    );
+  });
+
   it("builds a deployment path", () => {
     expect(routes.projects.apps.deployment({ ...scope, deploymentId })).toBe(
       "/acme/projects/proj_123/apps/app_456/deployments/d_789",

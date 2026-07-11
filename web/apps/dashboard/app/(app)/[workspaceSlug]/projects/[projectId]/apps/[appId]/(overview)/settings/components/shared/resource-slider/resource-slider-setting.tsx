@@ -73,7 +73,7 @@ export const ResourceSliderSetting = ({ config }: { config: ResourceSliderConfig
     throw new Error("ResourceSliderSetting must be used within EnvironmentProvider");
   }
 
-  if (envContext.variant === "onboarding") {
+  if (envContext.variant !== "settings") {
     return <SingleMode config={config} />;
   }
 

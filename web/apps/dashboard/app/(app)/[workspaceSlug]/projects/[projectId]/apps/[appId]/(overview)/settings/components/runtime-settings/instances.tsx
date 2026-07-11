@@ -101,7 +101,7 @@ export const Instances = () => {
     throw new Error("Instances must be used within EnvironmentProvider");
   }
 
-  if (envContext.variant === "onboarding") {
+  if (envContext.variant !== "settings") {
     return <SingleMode />;
   }
 

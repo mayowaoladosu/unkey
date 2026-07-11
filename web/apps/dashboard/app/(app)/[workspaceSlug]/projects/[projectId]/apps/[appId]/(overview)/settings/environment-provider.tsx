@@ -9,7 +9,7 @@ import { useProjectData } from "../data-provider";
 
 type EnvironmentContextType = {
   settings: EnvironmentSettings;
-  variant: "settings" | "onboarding";
+  variant: "settings" | "onboarding" | "environment";
   isSaving: boolean;
 };
 
@@ -19,16 +19,16 @@ export const EnvironmentSettingsProvider = ({ children }: PropsWithChildren) => 
   const { environments } = useProjectData();
   const searchParams = useSearchParams();
   const envIdParam = searchParams.get("environmentId");
+  const selectedEnvironment = envIdParam
+    ? environments.find((environment) => environment.id === envIdParam)
+    : undefined;
 
   const getActiveEnvId = useCallback(() => {
-    if (envIdParam) {
-      const match = environments.find((e) => e.id === envIdParam);
-      if (match) {
-        return match.id;
-      }
+    if (selectedEnvironment) {
+      return selectedEnvironment.id;
     }
     return environments.find((e) => e.slug === "production")?.id ?? environments.at(0)?.id;
-  }, [envIdParam, environments]);
+  }, [selectedEnvironment, environments]);
 
   const { data } = useLiveQuery(
     (q) =>
@@ -45,7 +45,13 @@ export const EnvironmentSettingsProvider = ({ children }: PropsWithChildren) => 
   }
 
   return (
-    <EnvironmentContext.Provider value={{ settings, variant: "settings", isSaving: false }}>
+    <EnvironmentContext.Provider
+      value={{
+        settings,
+        variant: selectedEnvironment ? "environment" : "settings",
+        isSaving: false,
+      }}
+    >
       {children}
     </EnvironmentContext.Provider>
   );

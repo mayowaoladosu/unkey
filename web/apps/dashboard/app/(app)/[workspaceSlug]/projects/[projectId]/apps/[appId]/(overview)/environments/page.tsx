@@ -45,7 +45,7 @@ export default function EnvironmentsPage() {
         </header>
 
         <section className="overflow-hidden rounded-xl border border-grayA-4 bg-gray-1">
-          <div className="grid grid-cols-[minmax(0,1fr)_110px_120px_180px] gap-3 border-b border-grayA-4 bg-grayA-2 px-4 py-2.5 text-[10px] font-medium uppercase tracking-wide text-gray-9">
+          <div className="grid grid-cols-[minmax(0,1fr)_110px_120px_250px] gap-3 border-b border-grayA-4 bg-grayA-2 px-4 py-2.5 text-[10px] font-medium uppercase tracking-wide text-gray-9">
             <span>Environment</span>
             <span>Protection</span>
             <span>Deployments</span>
@@ -60,7 +60,7 @@ export default function EnvironmentsPage() {
               {environments.data?.map((environment) => (
                 <div
                   key={environment.id}
-                  className="grid grid-cols-[minmax(0,1fr)_110px_120px_180px] items-center gap-3 px-4 py-3"
+                  className="grid grid-cols-[minmax(0,1fr)_110px_120px_250px] items-center gap-3 px-4 py-3"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -88,6 +88,17 @@ export default function EnvironmentsPage() {
                     {environment.deploymentCount.toLocaleString()}
                   </span>
                   <div className="flex justify-end gap-2">
+                    <Link
+                      href={routes.projects.apps.settings({
+                        workspaceSlug: params.workspaceSlug,
+                        projectId,
+                        appId,
+                        environmentId: environment.id,
+                      })}
+                      className="inline-flex h-8 items-center rounded-md border border-grayA-5 px-2.5 text-xs text-gray-11 hover:bg-grayA-2"
+                    >
+                      Configure
+                    </Link>
                     <Link
                       href={routes.projects.apps.deployments({
                         workspaceSlug: params.workspaceSlug,

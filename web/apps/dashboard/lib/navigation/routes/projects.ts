@@ -76,10 +76,11 @@ export const projectRoutes = {
       );
     },
 
-    settings(scope: AppScope): Route {
+    settings({ environmentId, ...scope }: AppScope & { environmentId?: string }): Route {
       return buildRoute(
         "/[workspaceSlug]/projects/[projectId]/apps/[appId]/settings",
         appParams(scope),
+        { environmentId },
       );
     },
 

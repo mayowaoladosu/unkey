@@ -23,7 +23,7 @@ import { EnvironmentSliderSection } from "../shared/resource-slider";
 export const Regions = () => {
   const envContext = useContext(EnvironmentContext);
 
-  if (envContext?.variant === "onboarding") {
+  if (envContext?.variant !== "settings") {
     return <RegionsSingle />;
   }
 
