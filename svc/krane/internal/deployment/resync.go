@@ -12,6 +12,7 @@ import (
 	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
 	"github.com/unkeyed/unkey/svc/krane/pkg/metrics"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -65,7 +66,32 @@ func (c *Controller) runDesiredStateResyncLoop(ctx context.Context) {
 		c.forEachReplicaSet(ctx, func(ctx context.Context, rs *appsv1.ReplicaSet) {
 			c.reconcileDesiredState(ctx, rs)
 		})
+		c.forEachCronJob(ctx, func(ctx context.Context, cron *batchv1.CronJob) {
+			c.reconcileDesiredResource(ctx, cron.GetNamespace(), cron.GetName(), cron.GetLabels())
+		})
 	})
+}
+
+func (c *Controller) forEachCronJob(ctx context.Context, fn func(ctx context.Context, cron *batchv1.CronJob)) {
+	cursor := ""
+	for {
+		cronJobs, err := c.clientSet.BatchV1().CronJobs("").List(ctx, metav1.ListOptions{
+			LabelSelector: labels.New().
+				ManagedByKrane().
+				ComponentDeployment().
+				ToString(),
+			Continue: cursor,
+		})
+		if err != nil {
+			logger.Error("unable to list cron jobs", "error", err.Error())
+			return
+		}
+		conc.ForEach(ctx, cronJobs.Items, fn)
+		cursor = cronJobs.Continue
+		if cursor == "" {
+			return
+		}
+	}
 }
 
 // forEachReplicaSet paginates through all krane-managed deployment ReplicaSets
@@ -97,12 +123,16 @@ func (c *Controller) forEachReplicaSet(ctx context.Context, fn func(ctx context.
 // reconcileDesiredState fetches the desired state for a single ReplicaSet from
 // the control plane and applies or deletes as needed.
 func (c *Controller) reconcileDesiredState(ctx context.Context, replicaSet *appsv1.ReplicaSet) {
-	deploymentID, ok := labels.GetDeploymentID(replicaSet.Labels)
+	c.reconcileDesiredResource(ctx, replicaSet.GetNamespace(), replicaSet.GetName(), replicaSet.GetLabels())
+}
+
+func (c *Controller) reconcileDesiredResource(ctx context.Context, namespace, name string, objectLabels map[string]string) {
+	deploymentID, ok := labels.GetDeploymentID(objectLabels)
 	if !ok {
-		logger.Error("unable to get deployment ID", "replicaSet", replicaSet.Name)
+		logger.Error("unable to get deployment ID", "resource", name)
 		return
 	}
-	resourceID, _ := labels.GetResourceID(replicaSet.Labels)
+	resourceID, _ := labels.GetResourceID(objectLabels)
 
 	res, err := c.cluster.GetDesiredDeploymentState(ctx, &ctrlv1.GetDesiredDeploymentStateRequest{
 		Region:       c.regionKey(),
@@ -112,8 +142,8 @@ func (c *Controller) reconcileDesiredState(ctx context.Context, replicaSet *apps
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			if err := c.DeleteDeployment(ctx, &ctrlv1.DeleteDeployment{
-				K8SNamespace: replicaSet.GetNamespace(),
-				K8SName:      replicaSet.GetName(),
+				K8SNamespace: namespace,
+				K8SName:      name,
 				ResourceId:   resourceID,
 			}); err != nil {
 				logger.Error("unable to delete deployment", "error", err.Error(), "deployment_id", deploymentID)

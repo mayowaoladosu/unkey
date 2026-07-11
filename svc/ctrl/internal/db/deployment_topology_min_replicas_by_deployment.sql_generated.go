@@ -10,11 +10,9 @@ import (
 )
 
 const findDeploymentTopologyMinReplicas = `-- name: FindDeploymentTopologyMinReplicas :many
-SELECT dt.resource_id, dt.region_id, dt.autoscaling_replicas_min
-FROM deployment_topology dt
-LEFT JOIN deployment_resources dr ON dt.resource_id = dr.id
-WHERE dt.deployment_id = ?
-	AND (dt.resource_id = '' OR dr.kind != 'cron')
+SELECT resource_id, region_id, autoscaling_replicas_min
+FROM deployment_topology
+WHERE deployment_id = ?
 `
 
 type FindDeploymentTopologyMinReplicasRow struct {
@@ -27,11 +25,9 @@ type FindDeploymentTopologyMinReplicasRow struct {
 // Used by deploy and wake workflows to compute whether enough regions are
 // healthy before a deployment is considered ready.
 //
-//	SELECT dt.resource_id, dt.region_id, dt.autoscaling_replicas_min
-//	FROM deployment_topology dt
-//	LEFT JOIN deployment_resources dr ON dt.resource_id = dr.id
-//	WHERE dt.deployment_id = ?
-//		AND (dt.resource_id = '' OR dr.kind != 'cron')
+//	SELECT resource_id, region_id, autoscaling_replicas_min
+//	FROM deployment_topology
+//	WHERE deployment_id = ?
 func (q *Queries) FindDeploymentTopologyMinReplicas(ctx context.Context, deploymentID string) ([]FindDeploymentTopologyMinReplicasRow, error) {
 	rows, err := q.db.QueryContext(ctx, findDeploymentTopologyMinReplicas, deploymentID)
 	if err != nil {

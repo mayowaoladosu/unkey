@@ -57,6 +57,13 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 	if servesHTTP(req) {
 		portErr = assert.Greater(req.GetPort(), int32(0), "Port must be greater than 0 for HTTP resources")
 	}
+	var cronErr error
+	if req.GetResourceKind() == ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_CRON {
+		cronErr = assert.All(
+			assert.NotEmpty(req.GetSchedule(), "Cron schedule is required"),
+			assert.NotEmpty(req.GetCommand(), "Cron command is required"),
+		)
+	}
 	err := assert.All(
 		assert.NotEmpty(req.GetWorkspaceId(), "Workspace ID is required"),
 		assert.NotEmpty(req.GetProjectId(), "Project ID is required"),
@@ -68,6 +75,7 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 		assert.Greater(req.GetCpuMillicores(), int64(0), "CPU millicores must be greater than 0"),
 		assert.Greater(req.GetMemoryMib(), int64(0), "MemoryMib must be greater than 0"),
 		portErr,
+		cronErr,
 		assert.GreaterOrEqual(req.GetAutoscaling().GetMinReplicas(), uint32(1), "Autoscaling min_replicas must be at least 1"),
 		assert.GreaterOrEqual(req.GetAutoscaling().GetMaxReplicas(), req.GetAutoscaling().GetMinReplicas(), "Autoscaling max_replicas must be >= min_replicas"),
 	)
@@ -90,8 +98,6 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 
 	hasSecrets := len(plaintext) > 0
 
-	desired := c.buildReplicaSet(req, hasSecrets)
-
 	// Create the Secret and ServiceAccount before the ReplicaSet so they
 	// exist by the time pods are scheduled. This prevents the
 	// "serviceaccount not found" race condition. We patch ownerReferences
@@ -105,6 +111,11 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 			return fmt.Errorf("failed to ensure deployment service account: %w", err)
 		}
 	}
+	if req.GetResourceKind() == ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_CRON {
+		return c.applyCronJob(ctx, req, hasSecrets)
+	}
+
+	desired := c.buildReplicaSet(req, hasSecrets)
 
 	client := c.clientSet.AppsV1().ReplicaSets(req.GetK8SNamespace())
 
@@ -264,6 +275,19 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 			PeriodSeconds:       int32(hc.IntervalSeconds),
 			TimeoutSeconds:      int32(hc.TimeoutSeconds),
 			FailureThreshold:    int32(hc.FailureThreshold),
+		}
+		container.LivenessProbe = probe
+		container.ReadinessProbe = probe
+	}
+	if req.GetResourceKind() == ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_FUNCTION && container.ReadinessProbe == nil {
+		probe := &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(req.GetPort())},
+			},
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       5,
+			TimeoutSeconds:      2,
+			FailureThreshold:    3,
 		}
 		container.LivenessProbe = probe
 		container.ReadinessProbe = probe

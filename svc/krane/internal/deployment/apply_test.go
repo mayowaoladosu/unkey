@@ -159,6 +159,18 @@ func TestBuildReplicaSetWorkerIsPortlessAndResourceScoped(t *testing.T) {
 	require.Equal(t, "worker", rs.Labels[labels.LabelKeyResourceKind])
 }
 
+func TestBuildReplicaSetFunctionGetsDefaultTCPProbe(t *testing.T) {
+	req := fullApplyRequest(t)
+	req.ResourceKind = ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_FUNCTION
+	req.Healthcheck = nil
+
+	container := mainContainer(t, testController().buildReplicaSet(req, false))
+	require.NotNil(t, container.ReadinessProbe)
+	require.NotNil(t, container.ReadinessProbe.TCPSocket)
+	require.Equal(t, testPort, container.ReadinessProbe.TCPSocket.Port.IntVal)
+	require.NotNil(t, container.LivenessProbe)
+}
+
 // fieldAssertions maps each ApplyDeployment proto field (by proto name) to an
 // assertion that it is wired into the rendered ReplicaSet. Together with
 // fieldsRenderedElsewhere it must cover every proto field; the coverage test

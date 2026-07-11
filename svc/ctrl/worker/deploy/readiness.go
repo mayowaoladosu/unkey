@@ -36,18 +36,20 @@ import (
 // be registered as a durable compensation (survives Restate cancellation)
 // rather than relying on a Go defer.
 func (w *Workflow) waitForDeployments(ctx restate.ObjectContext, compensation *compensation.Compensation, deploymentID string, topologies []db.InsertDeploymentTopologyParams) error {
-	// Build per-region minimum replica requirements.
-	regionMinReplicas := make(map[string]uint32, len(topologies))
+	// Build per-resource, per-region minimum readiness requirements. CronJobs
+	// report a synthetic running instance after the schedule is materialized.
+	resourceRegionMinReplicas := make(map[string]map[string]uint32, len(topologies))
 	for _, topo := range topologies {
-		regionMinReplicas[topo.RegionID] = topo.AutoscalingReplicasMin
+		if resourceRegionMinReplicas[topo.ResourceID] == nil {
+			resourceRegionMinReplicas[topo.ResourceID] = make(map[string]uint32)
+		}
+		resourceRegionMinReplicas[topo.ResourceID][topo.RegionID] = topo.AutoscalingReplicasMin
 	}
-	requiredRegions := max(len(regionMinReplicas)-1, 1)
 
 	logger.Info(
 		"waiting for deployments to be ready",
 		"deployment_id", deploymentID,
-		"total_regions", len(regionMinReplicas),
-		"required_regions", requiredRegions,
+		"total_resources", len(resourceRegionMinReplicas),
 	)
 
 	// Create awakeable and stash it in VO state BEFORE doing the initial
@@ -68,7 +70,7 @@ func (w *Workflow) waitForDeployments(ctx restate.ObjectContext, compensation *c
 	// Best-effort: on retry exhaustion, log and continue so NotifyInstancesReady
 	// can still complete the wait via the awakeable.
 	alreadyHealthy, err := restate.Run(ctx, func(runCtx restate.RunContext) (bool, error) {
-		return w.checkInstancesHealthy(runCtx, deploymentID, regionMinReplicas, requiredRegions)
+		return w.checkInstancesHealthy(runCtx, deploymentID, resourceRegionMinReplicas)
 	}, restate.WithName("initial healthy-regions check"), restate.WithMaxRetryAttempts(runMaxAttempts))
 	if err != nil {
 		logger.Warn(
@@ -102,7 +104,7 @@ func (w *Workflow) waitForDeployments(ctx restate.ObjectContext, compensation *c
 	}
 
 	return fault.Wrap(
-		restate.TerminalErrorf("not enough regions became healthy in %v, required %d of %d", regionReadyTimeout, requiredRegions, len(regionMinReplicas)),
+		restate.TerminalErrorf("not all deployment resources became healthy in %v", regionReadyTimeout),
 		fault.Public("Not enough regions became healthy in time."),
 	)
 }
@@ -114,33 +116,51 @@ func (w *Workflow) waitForDeployments(ctx restate.ObjectContext, compensation *c
 func (w *Workflow) checkInstancesHealthy(
 	ctx context.Context,
 	deploymentID string,
-	regionMinReplicas map[string]uint32,
-	requiredRegions int,
+	resourceRegionMinReplicas map[string]map[string]uint32,
 ) (bool, error) {
 	instances, err := w.db.FindInstancesByDeploymentId(ctx, deploymentID)
 	if err != nil {
 		return false, err
 	}
 
-	runningPerRegion := make(map[string]uint32)
-	for _, instance := range instances {
-		if instance.Status == db.InstancesStatusRunning {
-			runningPerRegion[instance.RegionID]++
-		}
-	}
-
-	healthyRegions := 0
-	for regionID, minReplicas := range regionMinReplicas {
-		if runningPerRegion[regionID] >= minReplicas {
-			healthyRegions++
-		}
-	}
+	ready, healthyRegions, requiredRegions := evaluateResourceReadiness(instances, resourceRegionMinReplicas)
 
 	logger.Info(
 		"checked instances",
 		"deployment_id", deploymentID,
-		"healthy_regions", healthyRegions,
-		"required_regions", requiredRegions,
+		"healthy_regions_by_resource", healthyRegions,
+		"required_regions_by_resource", requiredRegions,
 	)
-	return healthyRegions >= requiredRegions, nil
+	return ready, nil
+}
+
+func evaluateResourceReadiness(
+	instances []db.Instance,
+	requirements map[string]map[string]uint32,
+) (bool, map[string]int, map[string]int) {
+	running := make(map[string]map[string]uint32)
+	for _, instance := range instances {
+		if instance.Status != db.InstancesStatusRunning {
+			continue
+		}
+		if running[instance.ResourceID] == nil {
+			running[instance.ResourceID] = make(map[string]uint32)
+		}
+		running[instance.ResourceID][instance.RegionID]++
+	}
+	healthyRegions := make(map[string]int, len(requirements))
+	requiredRegions := make(map[string]int, len(requirements))
+	ready := len(requirements) > 0
+	for resourceID, regionRequirements := range requirements {
+		for regionID, minReplicas := range regionRequirements {
+			if running[resourceID][regionID] >= minReplicas {
+				healthyRegions[resourceID]++
+			}
+		}
+		requiredRegions[resourceID] = max(len(regionRequirements)-1, 1)
+		if healthyRegions[resourceID] < requiredRegions[resourceID] {
+			ready = false
+		}
+	}
+	return ready, healthyRegions, requiredRegions
 }

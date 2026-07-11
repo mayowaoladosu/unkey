@@ -256,17 +256,13 @@ func (s *Service) maybeNotifyInstancesReady(ctx context.Context, deployment db.D
 		return
 	}
 
-	regionResourceMinReplicas := make(map[string]map[string]uint32)
+	resourceRegionMinReplicas := make(map[string]map[string]uint32)
 	for _, row := range minReplicaRows {
-		if regionResourceMinReplicas[row.RegionID] == nil {
-			regionResourceMinReplicas[row.RegionID] = make(map[string]uint32)
+		if resourceRegionMinReplicas[row.ResourceID] == nil {
+			resourceRegionMinReplicas[row.ResourceID] = make(map[string]uint32)
 		}
-		regionResourceMinReplicas[row.RegionID][row.ResourceID] = row.AutoscalingReplicasMin
+		resourceRegionMinReplicas[row.ResourceID][row.RegionID] = row.AutoscalingReplicasMin
 	}
-	// Mirrors waitForDeployments: requires (numRegions - 1) healthy regions,
-	// minimum 1. A region is healthy only when every continuously-running
-	// resource has reached its own minimum replica count there.
-	requiredRegions := max(len(regionResourceMinReplicas)-1, 1)
 
 	instances, err := s.db.FindInstancesByDeploymentId(ctx, deployment.ID)
 	if err != nil {
@@ -278,39 +274,40 @@ func (s *Service) maybeNotifyInstancesReady(ctx context.Context, deployment db.D
 		return
 	}
 
-	runningPerRegionResource := make(map[string]map[string]uint32)
+	runningPerResourceRegion := make(map[string]map[string]uint32)
 	for _, instance := range instances {
 		if instance.Status == db.InstancesStatusRunning {
-			if runningPerRegionResource[instance.RegionID] == nil {
-				runningPerRegionResource[instance.RegionID] = make(map[string]uint32)
+			if runningPerResourceRegion[instance.ResourceID] == nil {
+				runningPerResourceRegion[instance.ResourceID] = make(map[string]uint32)
 			}
-			runningPerRegionResource[instance.RegionID][instance.ResourceID]++
+			runningPerResourceRegion[instance.ResourceID][instance.RegionID]++
 		}
 	}
 
-	healthyRegions := 0
-	for regionID, resourceRequirements := range regionResourceMinReplicas {
-		regionHealthy := true
-		for resourceID, minReplicas := range resourceRequirements {
-			if runningPerRegionResource[regionID][resourceID] < minReplicas {
-				regionHealthy = false
-				break
+	ready := true
+	healthyRegions := make(map[string]int, len(resourceRegionMinReplicas))
+	requiredRegions := make(map[string]int, len(resourceRegionMinReplicas))
+	for resourceID, regionRequirements := range resourceRegionMinReplicas {
+		for regionID, minReplicas := range regionRequirements {
+			if runningPerResourceRegion[resourceID][regionID] >= minReplicas {
+				healthyRegions[resourceID]++
 			}
 		}
-		if regionHealthy {
-			healthyRegions++
+		requiredRegions[resourceID] = max(len(regionRequirements)-1, 1)
+		if healthyRegions[resourceID] < requiredRegions[resourceID] {
+			ready = false
 		}
 	}
 
-	if healthyRegions < requiredRegions {
+	if !ready {
 		metrics.NotifyInstancesReadyTotal.WithLabelValues("threshold_not_met").Inc()
 		logger.Info("notify instances ready: threshold not met",
 			"deployment_id", deployment.ID,
 			"outcome", "threshold_not_met",
 			"healthy_regions", healthyRegions,
 			"required_regions", requiredRegions,
-			"region_resource_min_replicas", regionResourceMinReplicas,
-			"running_per_region_resource", runningPerRegionResource,
+			"resource_region_min_replicas", resourceRegionMinReplicas,
+			"running_per_resource_region", runningPerResourceRegion,
 		)
 		return
 	}

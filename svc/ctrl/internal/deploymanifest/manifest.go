@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 )
 
 const SchemaVersion = 1
@@ -277,6 +278,9 @@ func validate(plan Plan) error {
 			if output.Runtime == "" || output.Handler == "" {
 				return fmt.Errorf("function output %q requires runtime and handler", output.Name)
 			}
+			if !supportedFunctionRuntime(output.Runtime) {
+				return fmt.Errorf("function output %q uses unsupported runtime %q", output.Name, output.Runtime)
+			}
 		case OutputKindWorker:
 			if len(output.Command) == 0 {
 				return fmt.Errorf("worker output %q requires a command", output.Name)
@@ -328,6 +332,12 @@ func validate(plan Plan) error {
 		}
 	}
 	return nil
+}
+
+func supportedFunctionRuntime(runtime string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(runtime))
+	return normalized == "node" || strings.HasPrefix(normalized, "nodejs") ||
+		normalized == "python" || strings.HasPrefix(normalized, "python3")
 }
 
 func routeRank(kind RouteKind) int {

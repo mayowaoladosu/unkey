@@ -667,6 +667,12 @@ func (w *Workflow) createTopologies(
 			fault.Public("No schedulable regions configured. Please configure at least one schedulable region before deploying."),
 		)
 	}
+	cronRegionID := regionalSettings[0].RegionID
+	for _, regionalSetting := range regionalSettings[1:] {
+		if regionalSetting.RegionID < cronRegionID {
+			cronRegionID = regionalSetting.RegionID
+		}
+	}
 
 	// --- Quota check ---
 	quota, err := restate.Run(ctx, func(runCtx restate.RunContext) (db.Quotas, error) {
@@ -689,6 +695,9 @@ func (w *Workflow) createTopologies(
 			maxReplicas = rs.AutoscalingReplicasMax.Int32
 		}
 		for _, resource := range runtimeResources {
+			if !resourceRunsInRegion(resource.Kind, rs.RegionID, cronRegionID) {
+				continue
+			}
 			resourceReplicas := maxReplicas
 			if resource.Kind == db.DeploymentResourcesKindCron {
 				resourceReplicas = 1
@@ -721,6 +730,9 @@ func (w *Workflow) createTopologies(
 
 	for _, resource := range runtimeResources {
 		for _, rs := range regionalSettings {
+			if !resourceRunsInRegion(resource.Kind, rs.RegionID, cronRegionID) {
+				continue
+			}
 
 			// Snapshot autoscaling policy values. When no policy is attached,
 			// default to min=1, max=1 (single replica). Once all regional settings
@@ -830,6 +842,10 @@ func (w *Workflow) createTopologies(
 	}
 
 	return topologies, nil
+}
+
+func resourceRunsInRegion(kind db.DeploymentResourcesKind, regionID, cronRegionID string) bool {
+	return kind != db.DeploymentResourcesKindCron || regionID == cronRegionID
 }
 
 // configureRouting sets up domain-based routing for a deployment. It generates

@@ -28,6 +28,10 @@ func (c *Controller) DeleteDeployment(ctx context.Context, req *ctrlv1.DeleteDep
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	err = c.clientSet.BatchV1().CronJobs(req.GetK8SNamespace()).Delete(ctx, req.GetK8SName(), metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
 
 	c.fingerprints.Remove(ctx, req.GetK8SName())
 

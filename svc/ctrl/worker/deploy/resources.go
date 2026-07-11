@@ -71,6 +71,12 @@ func (w *Workflow) materializeDeploymentResources(
 		if len(command) == 0 && output.Kind == deploymanifest.OutputKindContainer {
 			command = manifest.Runtime.Command
 		}
+		if len(command) == 0 && output.Kind == deploymanifest.OutputKindFunction {
+			command, err = functionRuntimeCommand(output.Runtime)
+			if err != nil {
+				return nil, err
+			}
+		}
 		image := deployment.Image
 		if output.Kind == deploymanifest.OutputKindStatic {
 			image = sql.NullString{}

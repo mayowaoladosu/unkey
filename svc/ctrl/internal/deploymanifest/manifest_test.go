@@ -164,3 +164,24 @@ func TestCompileSupportsOneImageServicesWorkersAndCron(t *testing.T) {
 	})
 	require.ErrorContains(t, err, "references unknown resource")
 }
+
+func TestCompileValidatesExecutableFunctionRuntimes(t *testing.T) {
+	base := Plan{
+		Source: Source{Kind: SourceKindDockerImage, DockerImage: "example.com/functions:latest"},
+		Build:  Build{Strategy: BuildStrategyPrebuilt},
+		Outputs: []Output{{
+			Kind:    OutputKindFunction,
+			Name:    "hello",
+			Runtime: "nodejs22",
+			Handler: "src/hello.handler",
+			Public:  true,
+		}},
+	}
+	compiled, err := Compile(base)
+	require.NoError(t, err)
+	require.Equal(t, OutputKindFunction, compiled.Manifest.Outputs[0].Kind)
+
+	base.Outputs[0].Runtime = "ruby3.3"
+	_, err = Compile(base)
+	require.ErrorContains(t, err, "unsupported runtime")
+}

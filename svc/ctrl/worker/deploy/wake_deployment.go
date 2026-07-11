@@ -77,11 +77,13 @@ func (w *Workflow) wakeStoppedDeployment(ctx restate.ObjectContext, deployment d
 		return restate.TerminalError(fmt.Errorf("deployment has no topology"), 400)
 	}
 
-	regionMinReplicas := make(map[string]uint32, len(rows))
+	resourceRegionMinReplicas := make(map[string]map[string]uint32, len(rows))
 	for _, row := range rows {
-		regionMinReplicas[row.RegionID] = row.AutoscalingReplicasMin
+		if resourceRegionMinReplicas[row.ResourceID] == nil {
+			resourceRegionMinReplicas[row.ResourceID] = make(map[string]uint32)
+		}
+		resourceRegionMinReplicas[row.ResourceID][row.RegionID] = row.AutoscalingReplicasMin
 	}
-	requiredRegions := max(len(regionMinReplicas)-1, 1)
 
 	now, err := restateutil.Now(ctx)
 	if err != nil {
@@ -96,7 +98,7 @@ func (w *Workflow) wakeStoppedDeployment(ctx restate.ObjectContext, deployment d
 
 	err = restate.RunVoid(ctx, func(runCtx restate.RunContext) error {
 		for {
-			healthy, checkErr := w.checkInstancesHealthy(runCtx, deploymentID, regionMinReplicas, requiredRegions)
+			healthy, checkErr := w.checkInstancesHealthy(runCtx, deploymentID, resourceRegionMinReplicas)
 			if checkErr != nil {
 				return fmt.Errorf("check wake instance readiness: %w", checkErr)
 			}
@@ -106,7 +108,7 @@ func (w *Workflow) wakeStoppedDeployment(ctx restate.ObjectContext, deployment d
 
 			if time.Now().After(deadline) {
 				return fault.Wrap(
-					restate.TerminalErrorf("not enough regions became healthy in %v, required %d of %d", regionReadyTimeout, requiredRegions, len(regionMinReplicas)),
+					restate.TerminalErrorf("not all deployment resources became healthy in %v", regionReadyTimeout),
 					fault.Public("Not enough regions became healthy in time."),
 				)
 			}

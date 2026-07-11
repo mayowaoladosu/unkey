@@ -63,3 +63,9 @@ func TestResolvePrivateBindingsBuildsEndpointAndInboundPolicy(t *testing.T) {
 	}}, bindings["emails"])
 	require.Equal(t, []string{"resource_emails"}, callers["resource_api"])
 }
+
+func TestCronResourcesRunInOneDeterministicRegion(t *testing.T) {
+	require.True(t, resourceRunsInRegion(db.DeploymentResourcesKindCron, "region_a", "region_a"))
+	require.False(t, resourceRunsInRegion(db.DeploymentResourcesKindCron, "region_b", "region_a"))
+	require.True(t, resourceRunsInRegion(db.DeploymentResourcesKindWorker, "region_b", "region_a"))
+}
