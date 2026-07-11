@@ -6,6 +6,7 @@ SELECT
 	ars.region_id,
 	r.name AS region_name,
 	ars.replicas,
+	ars.horizontal_autoscaling_policy_id,
 	r.can_schedule AS region_can_schedule,
 	hap.replicas_min AS autoscaling_replicas_min,
 	hap.replicas_max AS autoscaling_replicas_max,

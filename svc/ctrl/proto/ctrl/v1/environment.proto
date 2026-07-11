@@ -1,10 +1,15 @@
 syntax = "proto3";
 package ctrl.v1;
 
+import "ctrl/v1/actor.proto";
+
 option go_package = "github.com/unkeyed/unkey/gen/proto/ctrl/v1;ctrlv1";
 
 service EnvironmentService {
   rpc CreateEnvironment(CreateEnvironmentRequest) returns (CreateEnvironmentResponse) {}
+  rpc UpdateEnvironment(UpdateEnvironmentRequest) returns (UpdateEnvironmentResponse) {}
+  rpc SetEnvironmentDeleteProtection(SetEnvironmentDeleteProtectionRequest) returns (SetEnvironmentDeleteProtectionResponse) {}
+  rpc DeleteEnvironment(DeleteEnvironmentRequest) returns (DeleteEnvironmentResponse) {}
 }
 
 enum EnvironmentType {
@@ -19,8 +24,37 @@ message CreateEnvironmentRequest {
   string slug = 2;
   string description = 3;
   EnvironmentType type = 4;
+  string workspace_id = 5;
+  string app_id = 6;
+  string source_environment_id = 7;
+  bool delete_protection = 8;
+  ActorInfo actor = 9;
 }
 
 message CreateEnvironmentResponse {
   string id = 1;
 }
+
+message UpdateEnvironmentRequest {
+  string environment_id = 1;
+  string slug = 2;
+  string description = 3;
+  ActorInfo actor = 4;
+}
+
+message UpdateEnvironmentResponse {}
+
+message SetEnvironmentDeleteProtectionRequest {
+  string environment_id = 1;
+  bool enabled = 2;
+  ActorInfo actor = 3;
+}
+
+message SetEnvironmentDeleteProtectionResponse {}
+
+message DeleteEnvironmentRequest {
+  string environment_id = 1;
+  ActorInfo actor = 2;
+}
+
+message DeleteEnvironmentResponse {}

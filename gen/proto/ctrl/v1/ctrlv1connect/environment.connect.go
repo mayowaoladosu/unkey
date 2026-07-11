@@ -36,11 +36,23 @@ const (
 	// EnvironmentServiceCreateEnvironmentProcedure is the fully-qualified name of the
 	// EnvironmentService's CreateEnvironment RPC.
 	EnvironmentServiceCreateEnvironmentProcedure = "/ctrl.v1.EnvironmentService/CreateEnvironment"
+	// EnvironmentServiceUpdateEnvironmentProcedure is the fully-qualified name of the
+	// EnvironmentService's UpdateEnvironment RPC.
+	EnvironmentServiceUpdateEnvironmentProcedure = "/ctrl.v1.EnvironmentService/UpdateEnvironment"
+	// EnvironmentServiceSetEnvironmentDeleteProtectionProcedure is the fully-qualified name of the
+	// EnvironmentService's SetEnvironmentDeleteProtection RPC.
+	EnvironmentServiceSetEnvironmentDeleteProtectionProcedure = "/ctrl.v1.EnvironmentService/SetEnvironmentDeleteProtection"
+	// EnvironmentServiceDeleteEnvironmentProcedure is the fully-qualified name of the
+	// EnvironmentService's DeleteEnvironment RPC.
+	EnvironmentServiceDeleteEnvironmentProcedure = "/ctrl.v1.EnvironmentService/DeleteEnvironment"
 )
 
 // EnvironmentServiceClient is a client for the ctrl.v1.EnvironmentService service.
 type EnvironmentServiceClient interface {
 	CreateEnvironment(context.Context, *connect.Request[v1.CreateEnvironmentRequest]) (*connect.Response[v1.CreateEnvironmentResponse], error)
+	UpdateEnvironment(context.Context, *connect.Request[v1.UpdateEnvironmentRequest]) (*connect.Response[v1.UpdateEnvironmentResponse], error)
+	SetEnvironmentDeleteProtection(context.Context, *connect.Request[v1.SetEnvironmentDeleteProtectionRequest]) (*connect.Response[v1.SetEnvironmentDeleteProtectionResponse], error)
+	DeleteEnvironment(context.Context, *connect.Request[v1.DeleteEnvironmentRequest]) (*connect.Response[v1.DeleteEnvironmentResponse], error)
 }
 
 // NewEnvironmentServiceClient constructs a client for the ctrl.v1.EnvironmentService service. By
@@ -60,12 +72,33 @@ func NewEnvironmentServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(environmentServiceMethods.ByName("CreateEnvironment")),
 			connect.WithClientOptions(opts...),
 		),
+		updateEnvironment: connect.NewClient[v1.UpdateEnvironmentRequest, v1.UpdateEnvironmentResponse](
+			httpClient,
+			baseURL+EnvironmentServiceUpdateEnvironmentProcedure,
+			connect.WithSchema(environmentServiceMethods.ByName("UpdateEnvironment")),
+			connect.WithClientOptions(opts...),
+		),
+		setEnvironmentDeleteProtection: connect.NewClient[v1.SetEnvironmentDeleteProtectionRequest, v1.SetEnvironmentDeleteProtectionResponse](
+			httpClient,
+			baseURL+EnvironmentServiceSetEnvironmentDeleteProtectionProcedure,
+			connect.WithSchema(environmentServiceMethods.ByName("SetEnvironmentDeleteProtection")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteEnvironment: connect.NewClient[v1.DeleteEnvironmentRequest, v1.DeleteEnvironmentResponse](
+			httpClient,
+			baseURL+EnvironmentServiceDeleteEnvironmentProcedure,
+			connect.WithSchema(environmentServiceMethods.ByName("DeleteEnvironment")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // environmentServiceClient implements EnvironmentServiceClient.
 type environmentServiceClient struct {
-	createEnvironment *connect.Client[v1.CreateEnvironmentRequest, v1.CreateEnvironmentResponse]
+	createEnvironment              *connect.Client[v1.CreateEnvironmentRequest, v1.CreateEnvironmentResponse]
+	updateEnvironment              *connect.Client[v1.UpdateEnvironmentRequest, v1.UpdateEnvironmentResponse]
+	setEnvironmentDeleteProtection *connect.Client[v1.SetEnvironmentDeleteProtectionRequest, v1.SetEnvironmentDeleteProtectionResponse]
+	deleteEnvironment              *connect.Client[v1.DeleteEnvironmentRequest, v1.DeleteEnvironmentResponse]
 }
 
 // CreateEnvironment calls ctrl.v1.EnvironmentService.CreateEnvironment.
@@ -73,9 +106,27 @@ func (c *environmentServiceClient) CreateEnvironment(ctx context.Context, req *c
 	return c.createEnvironment.CallUnary(ctx, req)
 }
 
+// UpdateEnvironment calls ctrl.v1.EnvironmentService.UpdateEnvironment.
+func (c *environmentServiceClient) UpdateEnvironment(ctx context.Context, req *connect.Request[v1.UpdateEnvironmentRequest]) (*connect.Response[v1.UpdateEnvironmentResponse], error) {
+	return c.updateEnvironment.CallUnary(ctx, req)
+}
+
+// SetEnvironmentDeleteProtection calls ctrl.v1.EnvironmentService.SetEnvironmentDeleteProtection.
+func (c *environmentServiceClient) SetEnvironmentDeleteProtection(ctx context.Context, req *connect.Request[v1.SetEnvironmentDeleteProtectionRequest]) (*connect.Response[v1.SetEnvironmentDeleteProtectionResponse], error) {
+	return c.setEnvironmentDeleteProtection.CallUnary(ctx, req)
+}
+
+// DeleteEnvironment calls ctrl.v1.EnvironmentService.DeleteEnvironment.
+func (c *environmentServiceClient) DeleteEnvironment(ctx context.Context, req *connect.Request[v1.DeleteEnvironmentRequest]) (*connect.Response[v1.DeleteEnvironmentResponse], error) {
+	return c.deleteEnvironment.CallUnary(ctx, req)
+}
+
 // EnvironmentServiceHandler is an implementation of the ctrl.v1.EnvironmentService service.
 type EnvironmentServiceHandler interface {
 	CreateEnvironment(context.Context, *connect.Request[v1.CreateEnvironmentRequest]) (*connect.Response[v1.CreateEnvironmentResponse], error)
+	UpdateEnvironment(context.Context, *connect.Request[v1.UpdateEnvironmentRequest]) (*connect.Response[v1.UpdateEnvironmentResponse], error)
+	SetEnvironmentDeleteProtection(context.Context, *connect.Request[v1.SetEnvironmentDeleteProtectionRequest]) (*connect.Response[v1.SetEnvironmentDeleteProtectionResponse], error)
+	DeleteEnvironment(context.Context, *connect.Request[v1.DeleteEnvironmentRequest]) (*connect.Response[v1.DeleteEnvironmentResponse], error)
 }
 
 // NewEnvironmentServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -91,10 +142,34 @@ func NewEnvironmentServiceHandler(svc EnvironmentServiceHandler, opts ...connect
 		connect.WithSchema(environmentServiceMethods.ByName("CreateEnvironment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	environmentServiceUpdateEnvironmentHandler := connect.NewUnaryHandler(
+		EnvironmentServiceUpdateEnvironmentProcedure,
+		svc.UpdateEnvironment,
+		connect.WithSchema(environmentServiceMethods.ByName("UpdateEnvironment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	environmentServiceSetEnvironmentDeleteProtectionHandler := connect.NewUnaryHandler(
+		EnvironmentServiceSetEnvironmentDeleteProtectionProcedure,
+		svc.SetEnvironmentDeleteProtection,
+		connect.WithSchema(environmentServiceMethods.ByName("SetEnvironmentDeleteProtection")),
+		connect.WithHandlerOptions(opts...),
+	)
+	environmentServiceDeleteEnvironmentHandler := connect.NewUnaryHandler(
+		EnvironmentServiceDeleteEnvironmentProcedure,
+		svc.DeleteEnvironment,
+		connect.WithSchema(environmentServiceMethods.ByName("DeleteEnvironment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/ctrl.v1.EnvironmentService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case EnvironmentServiceCreateEnvironmentProcedure:
 			environmentServiceCreateEnvironmentHandler.ServeHTTP(w, r)
+		case EnvironmentServiceUpdateEnvironmentProcedure:
+			environmentServiceUpdateEnvironmentHandler.ServeHTTP(w, r)
+		case EnvironmentServiceSetEnvironmentDeleteProtectionProcedure:
+			environmentServiceSetEnvironmentDeleteProtectionHandler.ServeHTTP(w, r)
+		case EnvironmentServiceDeleteEnvironmentProcedure:
+			environmentServiceDeleteEnvironmentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -106,4 +181,16 @@ type UnimplementedEnvironmentServiceHandler struct{}
 
 func (UnimplementedEnvironmentServiceHandler) CreateEnvironment(context.Context, *connect.Request[v1.CreateEnvironmentRequest]) (*connect.Response[v1.CreateEnvironmentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ctrl.v1.EnvironmentService.CreateEnvironment is not implemented"))
+}
+
+func (UnimplementedEnvironmentServiceHandler) UpdateEnvironment(context.Context, *connect.Request[v1.UpdateEnvironmentRequest]) (*connect.Response[v1.UpdateEnvironmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ctrl.v1.EnvironmentService.UpdateEnvironment is not implemented"))
+}
+
+func (UnimplementedEnvironmentServiceHandler) SetEnvironmentDeleteProtection(context.Context, *connect.Request[v1.SetEnvironmentDeleteProtectionRequest]) (*connect.Response[v1.SetEnvironmentDeleteProtectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ctrl.v1.EnvironmentService.SetEnvironmentDeleteProtection is not implemented"))
+}
+
+func (UnimplementedEnvironmentServiceHandler) DeleteEnvironment(context.Context, *connect.Request[v1.DeleteEnvironmentRequest]) (*connect.Response[v1.DeleteEnvironmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ctrl.v1.EnvironmentService.DeleteEnvironment is not implemented"))
 }

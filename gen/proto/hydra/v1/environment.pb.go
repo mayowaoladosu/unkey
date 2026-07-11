@@ -33,8 +33,11 @@ type DeleteEnvironmentRequest struct {
 	// correlation_id groups this deletion with the parent teardown's other audit
 	// events. Threaded down from the app/project workflow.
 	CorrelationId string `protobuf:"bytes,2,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Parent project/app teardown deliberately bypasses per-environment
+	// protection after the parent resource has passed its own guard.
+	BypassDeleteProtection bool `protobuf:"varint,3,opt,name=bypass_delete_protection,json=bypassDeleteProtection,proto3" json:"bypass_delete_protection,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *DeleteEnvironmentRequest) Reset() {
@@ -81,6 +84,13 @@ func (x *DeleteEnvironmentRequest) GetCorrelationId() string {
 	return ""
 }
 
+func (x *DeleteEnvironmentRequest) GetBypassDeleteProtection() bool {
+	if x != nil {
+		return x.BypassDeleteProtection
+	}
+	return false
+}
+
 type DeleteEnvironmentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -121,10 +131,11 @@ var File_hydra_v1_environment_proto protoreflect.FileDescriptor
 
 const file_hydra_v1_environment_proto_rawDesc = "" +
 	"\n" +
-	"\x1ahydra/v1/environment.proto\x12\bhydra.v1\x1a\x13ctrl/v1/actor.proto\x1a\x18dev/restate/sdk/go.proto\"k\n" +
+	"\x1ahydra/v1/environment.proto\x12\bhydra.v1\x1a\x13ctrl/v1/actor.proto\x1a\x18dev/restate/sdk/go.proto\"\xa5\x01\n" +
 	"\x18DeleteEnvironmentRequest\x12(\n" +
 	"\x05actor\x18\x01 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\x12%\n" +
-	"\x0ecorrelation_id\x18\x02 \x01(\tR\rcorrelationId\"\x1b\n" +
+	"\x0ecorrelation_id\x18\x02 \x01(\tR\rcorrelationId\x128\n" +
+	"\x18bypass_delete_protection\x18\x03 \x01(\bR\x16bypassDeleteProtection\"\x1b\n" +
 	"\x19DeleteEnvironmentResponse2o\n" +
 	"\x12EnvironmentService\x12S\n" +
 	"\x06Delete\x12\".hydra.v1.DeleteEnvironmentRequest\x1a#.hydra.v1.DeleteEnvironmentResponse\"\x00\x1a\x04\x98\x80\x01\x01B\x96\x01\n" +

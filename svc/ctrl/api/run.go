@@ -41,6 +41,7 @@ import (
 	"github.com/unkeyed/unkey/svc/ctrl/services/ctrl"
 	"github.com/unkeyed/unkey/svc/ctrl/services/customdomain"
 	"github.com/unkeyed/unkey/svc/ctrl/services/deployment"
+	"github.com/unkeyed/unkey/svc/ctrl/services/environment"
 	"github.com/unkeyed/unkey/svc/ctrl/services/openapi"
 	"github.com/unkeyed/unkey/svc/ctrl/services/ops"
 	"github.com/unkeyed/unkey/svc/ctrl/services/project"
@@ -287,6 +288,9 @@ func Run(ctx context.Context, cfg Config) error {
 		Bearer:    cfg.AuthToken,
 	})
 	mux.Handle(ctrlv1connect.NewAppServiceHandler(appSvc))
+	mux.Handle(ctrlv1connect.NewEnvironmentServiceHandler(environment.New(environment.Config{
+		Database: database, Restate: restateClient, Auditlogs: auditlogSvc, Bearer: cfg.AuthToken,
+	})))
 	mux.Handle(ctrlv1connect.NewProjectServiceHandler(project.New(project.Config{
 		Database:          database,
 		Restate:           restateClient,

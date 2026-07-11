@@ -51,8 +51,9 @@ func (s *Service) Delete(
 
 		envClient := hydrav1.NewEnvironmentServiceClient(ctx, envID)
 		envClient.Delete().Send(&hydrav1.DeleteEnvironmentRequest{
-			Actor:         req.GetActor(),
-			CorrelationId: req.GetCorrelationId(),
+			Actor:                  req.GetActor(),
+			CorrelationId:          req.GetCorrelationId(),
+			BypassDeleteProtection: true,
 		})
 	}
 

@@ -4,13 +4,15 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { ActorInfo } from "./actor_pb";
+import { file_ctrl_v1_actor } from "./actor_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file ctrl/v1/environment.proto.
  */
 export const file_ctrl_v1_environment: GenFile = /*@__PURE__*/
-  fileDesc("ChljdHJsL3YxL2Vudmlyb25tZW50LnByb3RvEgdjdHJsLnYxInkKGENyZWF0ZUVudmlyb25tZW50UmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHNsdWcYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSJgoEdHlwZRgEIAEoDjIYLmN0cmwudjEuRW52aXJvbm1lbnRUeXBlIicKGUNyZWF0ZUVudmlyb25tZW50UmVzcG9uc2USCgoCaWQYASABKAkqlAEKD0Vudmlyb25tZW50VHlwZRIgChxFTlZJUk9OTUVOVF9UWVBFX1VOU1BFQ0lGSUVEEAASIAocRU5WSVJPTk1FTlRfVFlQRV9ERVZFTE9QTUVOVBABEhwKGEVOVklST05NRU5UX1RZUEVfUFJFVklFVxACEh8KG0VOVklST05NRU5UX1RZUEVfUFJPRFVDVElPThADMnIKEkVudmlyb25tZW50U2VydmljZRJcChFDcmVhdGVFbnZpcm9ubWVudBIhLmN0cmwudjEuQ3JlYXRlRW52aXJvbm1lbnRSZXF1ZXN0GiIuY3RybC52MS5DcmVhdGVFbnZpcm9ubWVudFJlc3BvbnNlIgBCjwEKC2NvbS5jdHJsLnYxQhBFbnZpcm9ubWVudFByb3RvUAFaMWdpdGh1Yi5jb20vdW5rZXllZC91bmtleS9nZW4vcHJvdG8vY3RybC92MTtjdHJsdjGiAgNDWFiqAgdDdHJsLlYxygIHQ3RybFxWMeICE0N0cmxcVjFcR1BCTWV0YWRhdGHqAghDdHJsOjpWMWIGcHJvdG8z");
+  fileDesc("ChljdHJsL3YxL2Vudmlyb25tZW50LnByb3RvEgdjdHJsLnYxIvwBChhDcmVhdGVFbnZpcm9ubWVudFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIMCgRzbHVnGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiYKBHR5cGUYBCABKA4yGC5jdHJsLnYxLkVudmlyb25tZW50VHlwZRIUCgx3b3Jrc3BhY2VfaWQYBSABKAkSDgoGYXBwX2lkGAYgASgJEh0KFXNvdXJjZV9lbnZpcm9ubWVudF9pZBgHIAEoCRIZChFkZWxldGVfcHJvdGVjdGlvbhgIIAEoCBIhCgVhY3RvchgJIAEoCzISLmN0cmwudjEuQWN0b3JJbmZvIicKGUNyZWF0ZUVudmlyb25tZW50UmVzcG9uc2USCgoCaWQYASABKAkieAoYVXBkYXRlRW52aXJvbm1lbnRSZXF1ZXN0EhYKDmVudmlyb25tZW50X2lkGAEgASgJEgwKBHNsdWcYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSIQoFYWN0b3IYBCABKAsyEi5jdHJsLnYxLkFjdG9ySW5mbyIbChlVcGRhdGVFbnZpcm9ubWVudFJlc3BvbnNlInMKJVNldEVudmlyb25tZW50RGVsZXRlUHJvdGVjdGlvblJlcXVlc3QSFgoOZW52aXJvbm1lbnRfaWQYASABKAkSDwoHZW5hYmxlZBgCIAEoCBIhCgVhY3RvchgDIAEoCzISLmN0cmwudjEuQWN0b3JJbmZvIigKJlNldEVudmlyb25tZW50RGVsZXRlUHJvdGVjdGlvblJlc3BvbnNlIlUKGERlbGV0ZUVudmlyb25tZW50UmVxdWVzdBIWCg5lbnZpcm9ubWVudF9pZBgBIAEoCRIhCgVhY3RvchgCIAEoCzISLmN0cmwudjEuQWN0b3JJbmZvIhsKGURlbGV0ZUVudmlyb25tZW50UmVzcG9uc2UqlAEKD0Vudmlyb25tZW50VHlwZRIgChxFTlZJUk9OTUVOVF9UWVBFX1VOU1BFQ0lGSUVEEAASIAocRU5WSVJPTk1FTlRfVFlQRV9ERVZFTE9QTUVOVBABEhwKGEVOVklST05NRU5UX1RZUEVfUFJFVklFVxACEh8KG0VOVklST05NRU5UX1RZUEVfUFJPRFVDVElPThADMrQDChJFbnZpcm9ubWVudFNlcnZpY2USXAoRQ3JlYXRlRW52aXJvbm1lbnQSIS5jdHJsLnYxLkNyZWF0ZUVudmlyb25tZW50UmVxdWVzdBoiLmN0cmwudjEuQ3JlYXRlRW52aXJvbm1lbnRSZXNwb25zZSIAElwKEVVwZGF0ZUVudmlyb25tZW50EiEuY3RybC52MS5VcGRhdGVFbnZpcm9ubWVudFJlcXVlc3QaIi5jdHJsLnYxLlVwZGF0ZUVudmlyb25tZW50UmVzcG9uc2UiABKDAQoeU2V0RW52aXJvbm1lbnREZWxldGVQcm90ZWN0aW9uEi4uY3RybC52MS5TZXRFbnZpcm9ubWVudERlbGV0ZVByb3RlY3Rpb25SZXF1ZXN0Gi8uY3RybC52MS5TZXRFbnZpcm9ubWVudERlbGV0ZVByb3RlY3Rpb25SZXNwb25zZSIAElwKEURlbGV0ZUVudmlyb25tZW50EiEuY3RybC52MS5EZWxldGVFbnZpcm9ubWVudFJlcXVlc3QaIi5jdHJsLnYxLkRlbGV0ZUVudmlyb25tZW50UmVzcG9uc2UiAEKPAQoLY29tLmN0cmwudjFCEEVudmlyb25tZW50UHJvdG9QAVoxZ2l0aHViLmNvbS91bmtleWVkL3Vua2V5L2dlbi9wcm90by9jdHJsL3YxO2N0cmx2MaICA0NYWKoCB0N0cmwuVjHKAgdDdHJsXFYx4gITQ3RybFxWMVxHUEJNZXRhZGF0YeoCCEN0cmw6OlYxYgZwcm90bzM", [file_ctrl_v1_actor]);
 
 /**
  * @generated from message ctrl.v1.CreateEnvironmentRequest
@@ -35,6 +37,31 @@ export type CreateEnvironmentRequest = Message<"ctrl.v1.CreateEnvironmentRequest
    * @generated from field: ctrl.v1.EnvironmentType type = 4;
    */
   type: EnvironmentType;
+
+  /**
+   * @generated from field: string workspace_id = 5;
+   */
+  workspaceId: string;
+
+  /**
+   * @generated from field: string app_id = 6;
+   */
+  appId: string;
+
+  /**
+   * @generated from field: string source_environment_id = 7;
+   */
+  sourceEnvironmentId: string;
+
+  /**
+   * @generated from field: bool delete_protection = 8;
+   */
+  deleteProtection: boolean;
+
+  /**
+   * @generated from field: ctrl.v1.ActorInfo actor = 9;
+   */
+  actor?: ActorInfo;
 };
 
 /**
@@ -60,6 +87,126 @@ export type CreateEnvironmentResponse = Message<"ctrl.v1.CreateEnvironmentRespon
  */
 export const CreateEnvironmentResponseSchema: GenMessage<CreateEnvironmentResponse> = /*@__PURE__*/
   messageDesc(file_ctrl_v1_environment, 1);
+
+/**
+ * @generated from message ctrl.v1.UpdateEnvironmentRequest
+ */
+export type UpdateEnvironmentRequest = Message<"ctrl.v1.UpdateEnvironmentRequest"> & {
+  /**
+   * @generated from field: string environment_id = 1;
+   */
+  environmentId: string;
+
+  /**
+   * @generated from field: string slug = 2;
+   */
+  slug: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: ctrl.v1.ActorInfo actor = 4;
+   */
+  actor?: ActorInfo;
+};
+
+/**
+ * Describes the message ctrl.v1.UpdateEnvironmentRequest.
+ * Use `create(UpdateEnvironmentRequestSchema)` to create a new message.
+ */
+export const UpdateEnvironmentRequestSchema: GenMessage<UpdateEnvironmentRequest> = /*@__PURE__*/
+  messageDesc(file_ctrl_v1_environment, 2);
+
+/**
+ * @generated from message ctrl.v1.UpdateEnvironmentResponse
+ */
+export type UpdateEnvironmentResponse = Message<"ctrl.v1.UpdateEnvironmentResponse"> & {
+};
+
+/**
+ * Describes the message ctrl.v1.UpdateEnvironmentResponse.
+ * Use `create(UpdateEnvironmentResponseSchema)` to create a new message.
+ */
+export const UpdateEnvironmentResponseSchema: GenMessage<UpdateEnvironmentResponse> = /*@__PURE__*/
+  messageDesc(file_ctrl_v1_environment, 3);
+
+/**
+ * @generated from message ctrl.v1.SetEnvironmentDeleteProtectionRequest
+ */
+export type SetEnvironmentDeleteProtectionRequest = Message<"ctrl.v1.SetEnvironmentDeleteProtectionRequest"> & {
+  /**
+   * @generated from field: string environment_id = 1;
+   */
+  environmentId: string;
+
+  /**
+   * @generated from field: bool enabled = 2;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: ctrl.v1.ActorInfo actor = 3;
+   */
+  actor?: ActorInfo;
+};
+
+/**
+ * Describes the message ctrl.v1.SetEnvironmentDeleteProtectionRequest.
+ * Use `create(SetEnvironmentDeleteProtectionRequestSchema)` to create a new message.
+ */
+export const SetEnvironmentDeleteProtectionRequestSchema: GenMessage<SetEnvironmentDeleteProtectionRequest> = /*@__PURE__*/
+  messageDesc(file_ctrl_v1_environment, 4);
+
+/**
+ * @generated from message ctrl.v1.SetEnvironmentDeleteProtectionResponse
+ */
+export type SetEnvironmentDeleteProtectionResponse = Message<"ctrl.v1.SetEnvironmentDeleteProtectionResponse"> & {
+};
+
+/**
+ * Describes the message ctrl.v1.SetEnvironmentDeleteProtectionResponse.
+ * Use `create(SetEnvironmentDeleteProtectionResponseSchema)` to create a new message.
+ */
+export const SetEnvironmentDeleteProtectionResponseSchema: GenMessage<SetEnvironmentDeleteProtectionResponse> = /*@__PURE__*/
+  messageDesc(file_ctrl_v1_environment, 5);
+
+/**
+ * @generated from message ctrl.v1.DeleteEnvironmentRequest
+ */
+export type DeleteEnvironmentRequest = Message<"ctrl.v1.DeleteEnvironmentRequest"> & {
+  /**
+   * @generated from field: string environment_id = 1;
+   */
+  environmentId: string;
+
+  /**
+   * @generated from field: ctrl.v1.ActorInfo actor = 2;
+   */
+  actor?: ActorInfo;
+};
+
+/**
+ * Describes the message ctrl.v1.DeleteEnvironmentRequest.
+ * Use `create(DeleteEnvironmentRequestSchema)` to create a new message.
+ */
+export const DeleteEnvironmentRequestSchema: GenMessage<DeleteEnvironmentRequest> = /*@__PURE__*/
+  messageDesc(file_ctrl_v1_environment, 6);
+
+/**
+ * @generated from message ctrl.v1.DeleteEnvironmentResponse
+ */
+export type DeleteEnvironmentResponse = Message<"ctrl.v1.DeleteEnvironmentResponse"> & {
+};
+
+/**
+ * Describes the message ctrl.v1.DeleteEnvironmentResponse.
+ * Use `create(DeleteEnvironmentResponseSchema)` to create a new message.
+ */
+export const DeleteEnvironmentResponseSchema: GenMessage<DeleteEnvironmentResponse> = /*@__PURE__*/
+  messageDesc(file_ctrl_v1_environment, 7);
 
 /**
  * @generated from enum ctrl.v1.EnvironmentType
@@ -103,6 +250,30 @@ export const EnvironmentService: GenService<{
     methodKind: "unary";
     input: typeof CreateEnvironmentRequestSchema;
     output: typeof CreateEnvironmentResponseSchema;
+  },
+  /**
+   * @generated from rpc ctrl.v1.EnvironmentService.UpdateEnvironment
+   */
+  updateEnvironment: {
+    methodKind: "unary";
+    input: typeof UpdateEnvironmentRequestSchema;
+    output: typeof UpdateEnvironmentResponseSchema;
+  },
+  /**
+   * @generated from rpc ctrl.v1.EnvironmentService.SetEnvironmentDeleteProtection
+   */
+  setEnvironmentDeleteProtection: {
+    methodKind: "unary";
+    input: typeof SetEnvironmentDeleteProtectionRequestSchema;
+    output: typeof SetEnvironmentDeleteProtectionResponseSchema;
+  },
+  /**
+   * @generated from rpc ctrl.v1.EnvironmentService.DeleteEnvironment
+   */
+  deleteEnvironment: {
+    methodKind: "unary";
+    input: typeof DeleteEnvironmentRequestSchema;
+    output: typeof DeleteEnvironmentResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_ctrl_v1_environment, 0);

@@ -9,10 +9,13 @@ type BulkQuerier interface {
 	InsertAcmeChallenges(ctx context.Context, args []InsertAcmeChallengeParams) error
 	InsertAcmeUsers(ctx context.Context, args []InsertAcmeUserParams) error
 	InsertApis(ctx context.Context, args []InsertApiParams) error
+	CloneAppBuildSettings(ctx context.Context, args []CloneAppBuildSettingsParams) error
 	UpsertAppBuildSettings(ctx context.Context, args []UpsertAppBuildSettingsParams) error
 	InsertAppEnvironmentVariables(ctx context.Context, args []InsertAppEnvironmentVariableParams) error
 	InsertApps(ctx context.Context, args []InsertAppParams) error
+	InsertAppRegionalSettingsWithPolicies(ctx context.Context, args []InsertAppRegionalSettingsWithPolicyParams) error
 	UpsertAppRegionalSettings(ctx context.Context, args []UpsertAppRegionalSettingsParams) error
+	CloneAppRuntimeSettings(ctx context.Context, args []CloneAppRuntimeSettingsParams) error
 	UpsertAppRuntimeSettings(ctx context.Context, args []UpsertAppRuntimeSettingsParams) error
 	InsertCertificates(ctx context.Context, args []InsertCertificateParams) error
 	InsertCiliumNetworkPolicies(ctx context.Context, args []InsertCiliumNetworkPolicyParams) error
@@ -33,6 +36,7 @@ type BulkQuerier interface {
 	InsertDeploymentTopologies(ctx context.Context, args []InsertDeploymentTopologyParams) error
 	InsertEnvironments(ctx context.Context, args []InsertEnvironmentParams) error
 	InsertGithubRepoConnections(ctx context.Context, args []InsertGithubRepoConnectionParams) error
+	InsertHorizontalAutoscalingPolicies(ctx context.Context, args []InsertHorizontalAutoscalingPolicyParams) error
 	InsertIdentities(ctx context.Context, args []InsertIdentityParams) error
 	InsertIdentityRatelimits(ctx context.Context, args []InsertIdentityRatelimitParams) error
 	InsertFrontlineRoutes(ctx context.Context, args []InsertFrontlineRouteParams) error

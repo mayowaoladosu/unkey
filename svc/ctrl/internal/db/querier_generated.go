@@ -25,6 +25,76 @@ type Querier interface {
 	//  VALUES (1, 1)
 	//  ON DUPLICATE KEY UPDATE revision = revision + 1
 	BumpFrontlineRouteRevision(ctx context.Context) error
+	//CloneAppBuildSettings
+	//
+	//  INSERT INTO app_build_settings (
+	//      workspace_id,
+	//      app_id,
+	//      environment_id,
+	//      dockerfile,
+	//      docker_context,
+	//      build_command,
+	//      watch_paths,
+	//      auto_deploy,
+	//      created_at,
+	//      updated_at
+	//  )
+	//  SELECT
+	//      source.workspace_id,
+	//      source.app_id,
+	//      ?,
+	//      source.dockerfile,
+	//      source.docker_context,
+	//      source.build_command,
+	//      source.watch_paths,
+	//      source.auto_deploy,
+	//      ?,
+	//      ?
+	//  FROM app_build_settings AS source
+	//  WHERE source.app_id = ?
+	//      AND source.environment_id = ?
+	CloneAppBuildSettings(ctx context.Context, arg CloneAppBuildSettingsParams) error
+	//CloneAppRuntimeSettings
+	//
+	//  INSERT INTO app_runtime_settings (
+	//      workspace_id,
+	//      app_id,
+	//      environment_id,
+	//      port,
+	//      cpu_millicores,
+	//      memory_mib,
+	//      storage_mib,
+	//      command,
+	//      outputs,
+	//      healthcheck,
+	//      shutdown_signal,
+	//      upstream_protocol,
+	//      sentinel_config,
+	//      openapi_spec_path,
+	//      created_at,
+	//      updated_at
+	//  )
+	//  SELECT
+	//      source.workspace_id,
+	//      source.app_id,
+	//      ?,
+	//      source.port,
+	//      source.cpu_millicores,
+	//      source.memory_mib,
+	//      source.storage_mib,
+	//      source.command,
+	//      source.outputs,
+	//      source.healthcheck,
+	//      source.shutdown_signal,
+	//      source.upstream_protocol,
+	//      source.sentinel_config,
+	//      source.openapi_spec_path,
+	//      ?,
+	//      ?
+	//  FROM app_runtime_settings AS source
+	//  WHERE source.app_id = ?
+	//      AND source.environment_id = ?
+	CloneAppRuntimeSettings(ctx context.Context, arg CloneAppRuntimeSettingsParams) error
 	//CompareAndSwapDeploymentStatus
 	//
 	//  UPDATE deployments
@@ -32,6 +102,12 @@ type Querier interface {
 	//  WHERE id = ?
 	//  AND status = ?
 	CompareAndSwapDeploymentStatus(ctx context.Context, arg CompareAndSwapDeploymentStatusParams) (sql.Result, error)
+	//CountDeploymentsByEnvironmentID
+	//
+	//  SELECT COUNT(*)
+	//  FROM deployments
+	//  WHERE environment_id = ?
+	CountDeploymentsByEnvironmentID(ctx context.Context, environmentID string) (int64, error)
 	//DeleteAcmeChallengeByDomainID
 	//
 	//  DELETE FROM acme_challenges WHERE domain_id = ?
@@ -226,6 +302,7 @@ type Querier interface {
 	//  	ars.region_id,
 	//  	r.name AS region_name,
 	//  	ars.replicas,
+	//  	ars.horizontal_autoscaling_policy_id,
 	//  	r.can_schedule AS region_can_schedule,
 	//  	hap.replicas_min AS autoscaling_replicas_min,
 	//  	hap.replicas_max AS autoscaling_replicas_max,
@@ -792,6 +869,28 @@ type Querier interface {
 	//  INSERT INTO app_environment_variables (id, workspace_id, app_id, environment_id, `key`, value, created_at)
 	//  VALUES (?, ?, ?, ?, ?, ?, ?)
 	InsertAppEnvironmentVariable(ctx context.Context, arg InsertAppEnvironmentVariableParams) error
+	//InsertAppRegionalSettingsWithPolicy
+	//
+	//  INSERT INTO app_regional_settings (
+	//      workspace_id,
+	//      app_id,
+	//      environment_id,
+	//      region_id,
+	//      replicas,
+	//      horizontal_autoscaling_policy_id,
+	//      created_at,
+	//      updated_at
+	//  ) VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	InsertAppRegionalSettingsWithPolicy(ctx context.Context, arg InsertAppRegionalSettingsWithPolicyParams) error
 	//InsertCertificate
 	//
 	//  INSERT INTO certificates (id, workspace_id, hostname, certificate, encrypted_private_key, created_at)
@@ -1199,6 +1298,30 @@ type Querier interface {
 	//      ?
 	//  )
 	InsertGithubRepoConnection(ctx context.Context, arg InsertGithubRepoConnectionParams) error
+	//InsertHorizontalAutoscalingPolicy
+	//
+	//  INSERT INTO horizontal_autoscaling_policies (
+	//      id,
+	//      workspace_id,
+	//      replicas_min,
+	//      replicas_max,
+	//      memory_threshold,
+	//      cpu_threshold,
+	//      rps_threshold,
+	//      created_at,
+	//      updated_at
+	//  ) VALUES (
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?,
+	//      ?
+	//  )
+	InsertHorizontalAutoscalingPolicy(ctx context.Context, arg InsertHorizontalAutoscalingPolicyParams) error
 	//InsertIdentity
 	//
 	//  INSERT INTO `identities` (
@@ -2149,6 +2272,21 @@ type Querier interface {
 	//  SET desired_status = ?, updated_at = ?
 	//  WHERE deployment_id = ? AND region_id = ?
 	UpdateDeploymentTopologyDesiredStatus(ctx context.Context, arg UpdateDeploymentTopologyDesiredStatusParams) error
+	//UpdateEnvironment
+	//
+	//  UPDATE environments
+	//  SET slug = ?,
+	//      description = ?,
+	//      updated_at = ?
+	//  WHERE id = ?
+	UpdateEnvironment(ctx context.Context, arg UpdateEnvironmentParams) error
+	//UpdateEnvironmentDeleteProtection
+	//
+	//  UPDATE environments
+	//  SET delete_protection = ?,
+	//      updated_at = ?
+	//  WHERE id = ?
+	UpdateEnvironmentDeleteProtection(ctx context.Context, arg UpdateEnvironmentDeleteProtectionParams) error
 	//UpdateKeysLastUsed
 	//
 	//  UPDATE `keys`

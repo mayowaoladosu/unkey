@@ -15,6 +15,9 @@ import (
 // Request and response types are plain protobuf messages without connect wrappers.
 type EnvironmentServiceClient interface {
 	CreateEnvironment(ctx context.Context, req *v1.CreateEnvironmentRequest) (*v1.CreateEnvironmentResponse, error)
+	UpdateEnvironment(ctx context.Context, req *v1.UpdateEnvironmentRequest) (*v1.UpdateEnvironmentResponse, error)
+	SetEnvironmentDeleteProtection(ctx context.Context, req *v1.SetEnvironmentDeleteProtectionRequest) (*v1.SetEnvironmentDeleteProtectionResponse, error)
+	DeleteEnvironment(ctx context.Context, req *v1.DeleteEnvironmentRequest) (*v1.DeleteEnvironmentResponse, error)
 }
 
 var _ EnvironmentServiceClient = (*ConnectEnvironmentServiceClient)(nil)
@@ -33,6 +36,45 @@ func (c *ConnectEnvironmentServiceClient) CreateEnvironment(ctx context.Context,
 	ctx, span := tracing.Start(ctx, "EnvironmentService.CreateEnvironment")
 	defer span.End()
 	resp, err := c.inner.CreateEnvironment(ctx, connect.NewRequest(req))
+	if err != nil {
+		if connect.CodeOf(err) != connect.CodeNotFound {
+			tracing.RecordError(span, err)
+		}
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+func (c *ConnectEnvironmentServiceClient) UpdateEnvironment(ctx context.Context, req *v1.UpdateEnvironmentRequest) (*v1.UpdateEnvironmentResponse, error) {
+	ctx, span := tracing.Start(ctx, "EnvironmentService.UpdateEnvironment")
+	defer span.End()
+	resp, err := c.inner.UpdateEnvironment(ctx, connect.NewRequest(req))
+	if err != nil {
+		if connect.CodeOf(err) != connect.CodeNotFound {
+			tracing.RecordError(span, err)
+		}
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+func (c *ConnectEnvironmentServiceClient) SetEnvironmentDeleteProtection(ctx context.Context, req *v1.SetEnvironmentDeleteProtectionRequest) (*v1.SetEnvironmentDeleteProtectionResponse, error) {
+	ctx, span := tracing.Start(ctx, "EnvironmentService.SetEnvironmentDeleteProtection")
+	defer span.End()
+	resp, err := c.inner.SetEnvironmentDeleteProtection(ctx, connect.NewRequest(req))
+	if err != nil {
+		if connect.CodeOf(err) != connect.CodeNotFound {
+			tracing.RecordError(span, err)
+		}
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+func (c *ConnectEnvironmentServiceClient) DeleteEnvironment(ctx context.Context, req *v1.DeleteEnvironmentRequest) (*v1.DeleteEnvironmentResponse, error) {
+	ctx, span := tracing.Start(ctx, "EnvironmentService.DeleteEnvironment")
+	defer span.End()
+	resp, err := c.inner.DeleteEnvironment(ctx, connect.NewRequest(req))
 	if err != nil {
 		if connect.CodeOf(err) != connect.CodeNotFound {
 			tracing.RecordError(span, err)

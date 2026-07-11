@@ -42,6 +42,9 @@ func (s *Service) Delete(
 	if err != nil {
 		return nil, fmt.Errorf("find environment: %w", err)
 	}
+	if !req.GetBypassDeleteProtection() && env.DeleteProtection.Valid && env.DeleteProtection.Bool {
+		return nil, restate.TerminalError(fmt.Errorf("delete protection is enabled"), 409)
+	}
 
 	if err := s.cancelProgressingDeployments(ctx, envID); err != nil {
 		return nil, fmt.Errorf("cancel progressing deployments: %w", err)

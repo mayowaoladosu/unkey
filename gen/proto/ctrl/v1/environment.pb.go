@@ -74,13 +74,18 @@ func (EnvironmentType) EnumDescriptor() ([]byte, []int) {
 }
 
 type CreateEnvironmentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	Slug          string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Type          EnvironmentType        `protobuf:"varint,4,opt,name=type,proto3,enum=ctrl.v1.EnvironmentType" json:"type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId           string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Slug                string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description         string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Type                EnvironmentType        `protobuf:"varint,4,opt,name=type,proto3,enum=ctrl.v1.EnvironmentType" json:"type,omitempty"`
+	WorkspaceId         string                 `protobuf:"bytes,5,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	AppId               string                 `protobuf:"bytes,6,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	SourceEnvironmentId string                 `protobuf:"bytes,7,opt,name=source_environment_id,json=sourceEnvironmentId,proto3" json:"source_environment_id,omitempty"`
+	DeleteProtection    bool                   `protobuf:"varint,8,opt,name=delete_protection,json=deleteProtection,proto3" json:"delete_protection,omitempty"`
+	Actor               *ActorInfo             `protobuf:"bytes,9,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CreateEnvironmentRequest) Reset() {
@@ -141,6 +146,41 @@ func (x *CreateEnvironmentRequest) GetType() EnvironmentType {
 	return EnvironmentType_ENVIRONMENT_TYPE_UNSPECIFIED
 }
 
+func (x *CreateEnvironmentRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *CreateEnvironmentRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *CreateEnvironmentRequest) GetSourceEnvironmentId() string {
+	if x != nil {
+		return x.SourceEnvironmentId
+	}
+	return ""
+}
+
+func (x *CreateEnvironmentRequest) GetDeleteProtection() bool {
+	if x != nil {
+		return x.DeleteProtection
+	}
+	return false
+}
+
+func (x *CreateEnvironmentRequest) GetActor() *ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
 type CreateEnvironmentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -185,26 +225,337 @@ func (x *CreateEnvironmentResponse) GetId() string {
 	return ""
 }
 
+type UpdateEnvironmentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EnvironmentId string                 `protobuf:"bytes,1,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
+	Slug          string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Actor         *ActorInfo             `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateEnvironmentRequest) Reset() {
+	*x = UpdateEnvironmentRequest{}
+	mi := &file_ctrl_v1_environment_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateEnvironmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateEnvironmentRequest) ProtoMessage() {}
+
+func (x *UpdateEnvironmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_environment_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateEnvironmentRequest.ProtoReflect.Descriptor instead.
+func (*UpdateEnvironmentRequest) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_environment_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *UpdateEnvironmentRequest) GetEnvironmentId() string {
+	if x != nil {
+		return x.EnvironmentId
+	}
+	return ""
+}
+
+func (x *UpdateEnvironmentRequest) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *UpdateEnvironmentRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpdateEnvironmentRequest) GetActor() *ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+type UpdateEnvironmentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateEnvironmentResponse) Reset() {
+	*x = UpdateEnvironmentResponse{}
+	mi := &file_ctrl_v1_environment_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateEnvironmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateEnvironmentResponse) ProtoMessage() {}
+
+func (x *UpdateEnvironmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_environment_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateEnvironmentResponse.ProtoReflect.Descriptor instead.
+func (*UpdateEnvironmentResponse) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_environment_proto_rawDescGZIP(), []int{3}
+}
+
+type SetEnvironmentDeleteProtectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EnvironmentId string                 `protobuf:"bytes,1,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
+	Enabled       bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Actor         *ActorInfo             `protobuf:"bytes,3,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetEnvironmentDeleteProtectionRequest) Reset() {
+	*x = SetEnvironmentDeleteProtectionRequest{}
+	mi := &file_ctrl_v1_environment_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetEnvironmentDeleteProtectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetEnvironmentDeleteProtectionRequest) ProtoMessage() {}
+
+func (x *SetEnvironmentDeleteProtectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_environment_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetEnvironmentDeleteProtectionRequest.ProtoReflect.Descriptor instead.
+func (*SetEnvironmentDeleteProtectionRequest) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_environment_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SetEnvironmentDeleteProtectionRequest) GetEnvironmentId() string {
+	if x != nil {
+		return x.EnvironmentId
+	}
+	return ""
+}
+
+func (x *SetEnvironmentDeleteProtectionRequest) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *SetEnvironmentDeleteProtectionRequest) GetActor() *ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+type SetEnvironmentDeleteProtectionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetEnvironmentDeleteProtectionResponse) Reset() {
+	*x = SetEnvironmentDeleteProtectionResponse{}
+	mi := &file_ctrl_v1_environment_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetEnvironmentDeleteProtectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetEnvironmentDeleteProtectionResponse) ProtoMessage() {}
+
+func (x *SetEnvironmentDeleteProtectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_environment_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetEnvironmentDeleteProtectionResponse.ProtoReflect.Descriptor instead.
+func (*SetEnvironmentDeleteProtectionResponse) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_environment_proto_rawDescGZIP(), []int{5}
+}
+
+type DeleteEnvironmentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EnvironmentId string                 `protobuf:"bytes,1,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
+	Actor         *ActorInfo             `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteEnvironmentRequest) Reset() {
+	*x = DeleteEnvironmentRequest{}
+	mi := &file_ctrl_v1_environment_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteEnvironmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteEnvironmentRequest) ProtoMessage() {}
+
+func (x *DeleteEnvironmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_environment_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteEnvironmentRequest.ProtoReflect.Descriptor instead.
+func (*DeleteEnvironmentRequest) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_environment_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DeleteEnvironmentRequest) GetEnvironmentId() string {
+	if x != nil {
+		return x.EnvironmentId
+	}
+	return ""
+}
+
+func (x *DeleteEnvironmentRequest) GetActor() *ActorInfo {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+type DeleteEnvironmentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteEnvironmentResponse) Reset() {
+	*x = DeleteEnvironmentResponse{}
+	mi := &file_ctrl_v1_environment_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteEnvironmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteEnvironmentResponse) ProtoMessage() {}
+
+func (x *DeleteEnvironmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ctrl_v1_environment_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteEnvironmentResponse.ProtoReflect.Descriptor instead.
+func (*DeleteEnvironmentResponse) Descriptor() ([]byte, []int) {
+	return file_ctrl_v1_environment_proto_rawDescGZIP(), []int{7}
+}
+
 var File_ctrl_v1_environment_proto protoreflect.FileDescriptor
 
 const file_ctrl_v1_environment_proto_rawDesc = "" +
 	"\n" +
-	"\x19ctrl/v1/environment.proto\x12\actrl.v1\"\x9d\x01\n" +
+	"\x19ctrl/v1/environment.proto\x12\actrl.v1\x1a\x13ctrl/v1/actor.proto\"\xe2\x02\n" +
 	"\x18CreateEnvironmentRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12,\n" +
-	"\x04type\x18\x04 \x01(\x0e2\x18.ctrl.v1.EnvironmentTypeR\x04type\"+\n" +
+	"\x04type\x18\x04 \x01(\x0e2\x18.ctrl.v1.EnvironmentTypeR\x04type\x12!\n" +
+	"\fworkspace_id\x18\x05 \x01(\tR\vworkspaceId\x12\x15\n" +
+	"\x06app_id\x18\x06 \x01(\tR\x05appId\x122\n" +
+	"\x15source_environment_id\x18\a \x01(\tR\x13sourceEnvironmentId\x12+\n" +
+	"\x11delete_protection\x18\b \x01(\bR\x10deleteProtection\x12(\n" +
+	"\x05actor\x18\t \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\"+\n" +
 	"\x19CreateEnvironmentResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id*\x94\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xa1\x01\n" +
+	"\x18UpdateEnvironmentRequest\x12%\n" +
+	"\x0eenvironment_id\x18\x01 \x01(\tR\renvironmentId\x12\x12\n" +
+	"\x04slug\x18\x02 \x01(\tR\x04slug\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12(\n" +
+	"\x05actor\x18\x04 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\"\x1b\n" +
+	"\x19UpdateEnvironmentResponse\"\x92\x01\n" +
+	"%SetEnvironmentDeleteProtectionRequest\x12%\n" +
+	"\x0eenvironment_id\x18\x01 \x01(\tR\renvironmentId\x12\x18\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\x12(\n" +
+	"\x05actor\x18\x03 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\"(\n" +
+	"&SetEnvironmentDeleteProtectionResponse\"k\n" +
+	"\x18DeleteEnvironmentRequest\x12%\n" +
+	"\x0eenvironment_id\x18\x01 \x01(\tR\renvironmentId\x12(\n" +
+	"\x05actor\x18\x02 \x01(\v2\x12.ctrl.v1.ActorInfoR\x05actor\"\x1b\n" +
+	"\x19DeleteEnvironmentResponse*\x94\x01\n" +
 	"\x0fEnvironmentType\x12 \n" +
 	"\x1cENVIRONMENT_TYPE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cENVIRONMENT_TYPE_DEVELOPMENT\x10\x01\x12\x1c\n" +
 	"\x18ENVIRONMENT_TYPE_PREVIEW\x10\x02\x12\x1f\n" +
-	"\x1bENVIRONMENT_TYPE_PRODUCTION\x10\x032r\n" +
+	"\x1bENVIRONMENT_TYPE_PRODUCTION\x10\x032\xb4\x03\n" +
 	"\x12EnvironmentService\x12\\\n" +
-	"\x11CreateEnvironment\x12!.ctrl.v1.CreateEnvironmentRequest\x1a\".ctrl.v1.CreateEnvironmentResponse\"\x00B\x8f\x01\n" +
+	"\x11CreateEnvironment\x12!.ctrl.v1.CreateEnvironmentRequest\x1a\".ctrl.v1.CreateEnvironmentResponse\"\x00\x12\\\n" +
+	"\x11UpdateEnvironment\x12!.ctrl.v1.UpdateEnvironmentRequest\x1a\".ctrl.v1.UpdateEnvironmentResponse\"\x00\x12\x83\x01\n" +
+	"\x1eSetEnvironmentDeleteProtection\x12..ctrl.v1.SetEnvironmentDeleteProtectionRequest\x1a/.ctrl.v1.SetEnvironmentDeleteProtectionResponse\"\x00\x12\\\n" +
+	"\x11DeleteEnvironment\x12!.ctrl.v1.DeleteEnvironmentRequest\x1a\".ctrl.v1.DeleteEnvironmentResponse\"\x00B\x8f\x01\n" +
 	"\vcom.ctrl.v1B\x10EnvironmentProtoP\x01Z1github.com/unkeyed/unkey/gen/proto/ctrl/v1;ctrlv1\xa2\x02\x03CXX\xaa\x02\aCtrl.V1\xca\x02\aCtrl\\V1\xe2\x02\x13Ctrl\\V1\\GPBMetadata\xea\x02\bCtrl::V1b\x06proto3"
 
 var (
@@ -220,21 +571,38 @@ func file_ctrl_v1_environment_proto_rawDescGZIP() []byte {
 }
 
 var file_ctrl_v1_environment_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ctrl_v1_environment_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_ctrl_v1_environment_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_ctrl_v1_environment_proto_goTypes = []any{
-	(EnvironmentType)(0),              // 0: ctrl.v1.EnvironmentType
-	(*CreateEnvironmentRequest)(nil),  // 1: ctrl.v1.CreateEnvironmentRequest
-	(*CreateEnvironmentResponse)(nil), // 2: ctrl.v1.CreateEnvironmentResponse
+	(EnvironmentType)(0),                           // 0: ctrl.v1.EnvironmentType
+	(*CreateEnvironmentRequest)(nil),               // 1: ctrl.v1.CreateEnvironmentRequest
+	(*CreateEnvironmentResponse)(nil),              // 2: ctrl.v1.CreateEnvironmentResponse
+	(*UpdateEnvironmentRequest)(nil),               // 3: ctrl.v1.UpdateEnvironmentRequest
+	(*UpdateEnvironmentResponse)(nil),              // 4: ctrl.v1.UpdateEnvironmentResponse
+	(*SetEnvironmentDeleteProtectionRequest)(nil),  // 5: ctrl.v1.SetEnvironmentDeleteProtectionRequest
+	(*SetEnvironmentDeleteProtectionResponse)(nil), // 6: ctrl.v1.SetEnvironmentDeleteProtectionResponse
+	(*DeleteEnvironmentRequest)(nil),               // 7: ctrl.v1.DeleteEnvironmentRequest
+	(*DeleteEnvironmentResponse)(nil),              // 8: ctrl.v1.DeleteEnvironmentResponse
+	(*ActorInfo)(nil),                              // 9: ctrl.v1.ActorInfo
 }
 var file_ctrl_v1_environment_proto_depIdxs = []int32{
 	0, // 0: ctrl.v1.CreateEnvironmentRequest.type:type_name -> ctrl.v1.EnvironmentType
-	1, // 1: ctrl.v1.EnvironmentService.CreateEnvironment:input_type -> ctrl.v1.CreateEnvironmentRequest
-	2, // 2: ctrl.v1.EnvironmentService.CreateEnvironment:output_type -> ctrl.v1.CreateEnvironmentResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	9, // 1: ctrl.v1.CreateEnvironmentRequest.actor:type_name -> ctrl.v1.ActorInfo
+	9, // 2: ctrl.v1.UpdateEnvironmentRequest.actor:type_name -> ctrl.v1.ActorInfo
+	9, // 3: ctrl.v1.SetEnvironmentDeleteProtectionRequest.actor:type_name -> ctrl.v1.ActorInfo
+	9, // 4: ctrl.v1.DeleteEnvironmentRequest.actor:type_name -> ctrl.v1.ActorInfo
+	1, // 5: ctrl.v1.EnvironmentService.CreateEnvironment:input_type -> ctrl.v1.CreateEnvironmentRequest
+	3, // 6: ctrl.v1.EnvironmentService.UpdateEnvironment:input_type -> ctrl.v1.UpdateEnvironmentRequest
+	5, // 7: ctrl.v1.EnvironmentService.SetEnvironmentDeleteProtection:input_type -> ctrl.v1.SetEnvironmentDeleteProtectionRequest
+	7, // 8: ctrl.v1.EnvironmentService.DeleteEnvironment:input_type -> ctrl.v1.DeleteEnvironmentRequest
+	2, // 9: ctrl.v1.EnvironmentService.CreateEnvironment:output_type -> ctrl.v1.CreateEnvironmentResponse
+	4, // 10: ctrl.v1.EnvironmentService.UpdateEnvironment:output_type -> ctrl.v1.UpdateEnvironmentResponse
+	6, // 11: ctrl.v1.EnvironmentService.SetEnvironmentDeleteProtection:output_type -> ctrl.v1.SetEnvironmentDeleteProtectionResponse
+	8, // 12: ctrl.v1.EnvironmentService.DeleteEnvironment:output_type -> ctrl.v1.DeleteEnvironmentResponse
+	9, // [9:13] is the sub-list for method output_type
+	5, // [5:9] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_ctrl_v1_environment_proto_init() }
@@ -242,13 +610,14 @@ func file_ctrl_v1_environment_proto_init() {
 	if File_ctrl_v1_environment_proto != nil {
 		return
 	}
+	file_ctrl_v1_actor_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ctrl_v1_environment_proto_rawDesc), len(file_ctrl_v1_environment_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   2,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

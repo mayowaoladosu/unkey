@@ -15,6 +15,7 @@ SELECT
 	ars.region_id,
 	r.name AS region_name,
 	ars.replicas,
+	ars.horizontal_autoscaling_policy_id,
 	r.can_schedule AS region_can_schedule,
 	hap.replicas_min AS autoscaling_replicas_min,
 	hap.replicas_max AS autoscaling_replicas_max,
@@ -33,14 +34,15 @@ type FindAppRegionalSettingsByAppAndEnvParams struct {
 }
 
 type FindAppRegionalSettingsByAppAndEnvRow struct {
-	RegionID                   string        `db:"region_id"`
-	RegionName                 string        `db:"region_name"`
-	Replicas                   int32         `db:"replicas"`
-	RegionCanSchedule          bool          `db:"region_can_schedule"`
-	AutoscalingReplicasMin     sql.NullInt32 `db:"autoscaling_replicas_min"`
-	AutoscalingReplicasMax     sql.NullInt32 `db:"autoscaling_replicas_max"`
-	AutoscalingThresholdCpu    sql.NullInt16 `db:"autoscaling_threshold_cpu"`
-	AutoscalingThresholdMemory sql.NullInt16 `db:"autoscaling_threshold_memory"`
+	RegionID                      string         `db:"region_id"`
+	RegionName                    string         `db:"region_name"`
+	Replicas                      int32          `db:"replicas"`
+	HorizontalAutoscalingPolicyID sql.NullString `db:"horizontal_autoscaling_policy_id"`
+	RegionCanSchedule             bool           `db:"region_can_schedule"`
+	AutoscalingReplicasMin        sql.NullInt32  `db:"autoscaling_replicas_min"`
+	AutoscalingReplicasMax        sql.NullInt32  `db:"autoscaling_replicas_max"`
+	AutoscalingThresholdCpu       sql.NullInt16  `db:"autoscaling_threshold_cpu"`
+	AutoscalingThresholdMemory    sql.NullInt16  `db:"autoscaling_threshold_memory"`
 }
 
 // FindAppRegionalSettingsByAppAndEnv returns per-region deployment settings
@@ -51,6 +53,7 @@ type FindAppRegionalSettingsByAppAndEnvRow struct {
 //		ars.region_id,
 //		r.name AS region_name,
 //		ars.replicas,
+//		ars.horizontal_autoscaling_policy_id,
 //		r.can_schedule AS region_can_schedule,
 //		hap.replicas_min AS autoscaling_replicas_min,
 //		hap.replicas_max AS autoscaling_replicas_max,
@@ -74,6 +77,7 @@ func (q *Queries) FindAppRegionalSettingsByAppAndEnv(ctx context.Context, arg Fi
 			&i.RegionID,
 			&i.RegionName,
 			&i.Replicas,
+			&i.HorizontalAutoscalingPolicyID,
 			&i.RegionCanSchedule,
 			&i.AutoscalingReplicasMin,
 			&i.AutoscalingReplicasMax,

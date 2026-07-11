@@ -26,6 +26,9 @@ message DeleteEnvironmentRequest {
   // correlation_id groups this deletion with the parent teardown's other audit
   // events. Threaded down from the app/project workflow.
   string correlation_id = 2;
+  // Parent project/app teardown deliberately bypasses per-environment
+  // protection after the parent resource has passed its own guard.
+  bool bypass_delete_protection = 3;
 }
 
 message DeleteEnvironmentResponse {}
