@@ -8,6 +8,7 @@ import (
 	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	dbtype "github.com/unkeyed/unkey/pkg/db/types"
 	"github.com/unkeyed/unkey/pkg/ptr"
+	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -36,6 +37,11 @@ const (
 	testGitCommitMessage = "sentinel commit message"
 	testHealthcheckPath  = "/sentinel-healthz"
 	testEphemeralMib     = int64(2048)
+	testResourceID       = "resource_sentinel"
+	testResourceName     = "web-sentinel"
+	testSchedule         = "*/5 * * * *"
+	testRuntime          = "nodejs22"
+	testHandler          = "src/index.handler"
 )
 
 var testCommand = []string{"/sentinel-app", "serve", "--flag"}
@@ -81,6 +87,13 @@ func fullApplyRequest(t *testing.T) *ctrlv1.ApplyDeployment {
 		GitCommitMessage:              ptr.P(testGitCommitMessage),
 		Autoscaling:                   &ctrlv1.AutoscalingPolicy{MinReplicas: 2, MaxReplicas: 5},
 		EphemeralStorage:              &ctrlv1.EphemeralStorage{SizeMib: testEphemeralMib},
+		ResourceId:                    testResourceID,
+		ResourceName:                  testResourceName,
+		ResourceKind:                  ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_SERVICE,
+		Public:                        true,
+		Schedule:                      testSchedule,
+		Runtime:                       ptr.P(testRuntime),
+		Handler:                       ptr.P(testHandler),
 	}
 }
 
@@ -114,6 +127,27 @@ func hasLabelValue(labels map[string]string, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestBuildReplicaSetWorkerIsPortlessAndResourceScoped(t *testing.T) {
+	req := fullApplyRequest(t)
+	req.ResourceKind = ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_WORKER
+	req.Public = false
+	req.Port = 0
+	req.Healthcheck = nil
+
+	rs := testController().buildReplicaSet(req, false)
+	container := mainContainer(t, rs)
+	require.Empty(t, container.Ports)
+	_, hasPort := envValue(container, "PORT")
+	require.False(t, hasPort)
+	require.Nil(t, container.LivenessProbe)
+	require.Nil(t, container.ReadinessProbe)
+	require.Equal(t, map[string]string{
+		labels.LabelKeyDeploymentID: testDeploymentID,
+		labels.LabelKeyResourceID:   testResourceID,
+	}, rs.Spec.Selector.MatchLabels)
+	require.Equal(t, "worker", rs.Labels[labels.LabelKeyResourceKind])
 }
 
 // fieldAssertions maps each ApplyDeployment proto field (by proto name) to an
@@ -240,12 +274,46 @@ var fieldAssertions = map[string]func(t *testing.T, rs *appsv1.ReplicaSet){
 		}
 		require.True(t, mounted, "ephemeral volume must be mounted at /data")
 	},
+	"resource_id": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		require.Equal(t, testResourceID, rs.Labels[labels.LabelKeyResourceID])
+		require.Equal(t, testResourceID, rs.Spec.Selector.MatchLabels[labels.LabelKeyResourceID])
+		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_RESOURCE_ID")
+		require.True(t, ok)
+		require.Equal(t, testResourceID, v)
+	},
+	"resource_name": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_RESOURCE_NAME")
+		require.True(t, ok)
+		require.Equal(t, testResourceName, v)
+	},
+	"resource_kind": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		require.Equal(t, "service", rs.Labels[labels.LabelKeyResourceKind])
+		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_RESOURCE_KIND")
+		require.True(t, ok)
+		require.Equal(t, "service", v)
+	},
+	"schedule": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_CRON_SCHEDULE")
+		require.True(t, ok)
+		require.Equal(t, testSchedule, v)
+	},
+	"runtime": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_RUNTIME")
+		require.True(t, ok)
+		require.Equal(t, testRuntime, v)
+	},
+	"handler": func(t *testing.T, rs *appsv1.ReplicaSet) {
+		v, ok := envValue(mainContainer(t, rs), "LAYER_RAIL_HANDLER")
+		require.True(t, ok)
+		require.Equal(t, testHandler, v)
+	},
 }
 
 // fieldsRenderedElsewhere lists proto fields that intentionally do not surface
 // in the ReplicaSet, with the reason.
 var fieldsRenderedElsewhere = map[string]string{
 	"autoscaling": "rendered into a HorizontalPodAutoscaler by ensureHPAExists, not the ReplicaSet",
+	"public":      "controls Service and Cilium ingress materialization outside the ReplicaSet renderer",
 }
 
 // labelDeploymentIDKey returns the label key used for the deployment id by

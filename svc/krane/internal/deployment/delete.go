@@ -34,7 +34,8 @@ func (c *Controller) DeleteDeployment(ctx context.Context, req *ctrlv1.DeleteDep
 	err = c.reportDeploymentStatus(ctx, &ctrlv1.ReportDeploymentStatusRequest{
 		Change: &ctrlv1.ReportDeploymentStatusRequest_Delete_{
 			Delete: &ctrlv1.ReportDeploymentStatusRequest_Delete{
-				K8SName: req.GetK8SName(),
+				K8SName:    req.GetK8SName(),
+				ResourceId: req.GetResourceId(),
 			},
 		},
 	})

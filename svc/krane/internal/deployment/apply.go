@@ -53,6 +53,10 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 		"deployment_id", req.GetDeploymentId(),
 	)
 
+	var portErr error
+	if servesHTTP(req) {
+		portErr = assert.Greater(req.GetPort(), int32(0), "Port must be greater than 0 for HTTP resources")
+	}
 	err := assert.All(
 		assert.NotEmpty(req.GetWorkspaceId(), "Workspace ID is required"),
 		assert.NotEmpty(req.GetProjectId(), "Project ID is required"),
@@ -63,7 +67,7 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 		assert.NotEmpty(req.GetImage(), "Image is required"),
 		assert.Greater(req.GetCpuMillicores(), int64(0), "CPU millicores must be greater than 0"),
 		assert.Greater(req.GetMemoryMib(), int64(0), "MemoryMib must be greater than 0"),
-		assert.Greater(req.GetPort(), int32(0), "Port must be greater than 0"),
+		portErr,
 		assert.GreaterOrEqual(req.GetAutoscaling().GetMinReplicas(), uint32(1), "Autoscaling min_replicas must be at least 1"),
 		assert.GreaterOrEqual(req.GetAutoscaling().GetMaxReplicas(), req.GetAutoscaling().GetMinReplicas(), "Autoscaling max_replicas must be >= min_replicas"),
 	)
@@ -93,11 +97,11 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 	// "serviceaccount not found" race condition. We patch ownerReferences
 	// onto them after the RS is created so K8s still garbage-collects them.
 	if hasSecrets {
-		if err := c.ensureDeploymentSecret(ctx, req.GetK8SNamespace(), req.GetDeploymentId(), plaintext); err != nil {
+		if err := c.ensureDeploymentSecret(ctx, req, plaintext); err != nil {
 			return fmt.Errorf("failed to ensure deployment secret: %w", err)
 		}
 
-		if err := c.ensureDeploymentServiceAccount(ctx, req.GetK8SNamespace(), req.GetDeploymentId()); err != nil {
+		if err := c.ensureDeploymentServiceAccount(ctx, req); err != nil {
 			return fmt.Errorf("failed to ensure deployment service account: %w", err)
 		}
 	}
@@ -119,7 +123,7 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 	// Patch ownerReferences onto the Secret and SA so K8s garbage-collects
 	// them when the ReplicaSet is deleted.
 	if hasSecrets {
-		resName := deploymentResourcePrefix(req.GetDeploymentId())
+		resName := workloadResourcePrefix(req)
 		if err := c.patchOwnerRef(ctx, req.GetK8SNamespace(), resName, replicaSetOwnerRef(applied)); err != nil {
 			return fmt.Errorf("failed to patch owner references: %w", err)
 		}
@@ -129,8 +133,10 @@ func (c *Controller) ApplyDeployment(ctx context.Context, req *ctrlv1.ApplyDeplo
 		return fmt.Errorf("failed to ensure HPA: %w", err)
 	}
 
-	if err := c.ensureCiliumNetworkPolicy(ctx, req, applied); err != nil {
-		return fmt.Errorf("failed to ensure cilium network policy: %w", err)
+	if req.GetPublic() && servesHTTP(req) {
+		if err := c.ensureCiliumNetworkPolicy(ctx, req, applied); err != nil {
+			return fmt.Errorf("failed to ensure cilium network policy: %w", err)
+		}
 	}
 
 	status, err := c.buildDeploymentStatus(ctx, applied)
@@ -168,8 +174,10 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{},
 		Env: []corev1.EnvVar{
-			{Name: "PORT", Value: strconv.Itoa(int(req.GetPort()))},
 			{Name: "UNKEY_DEPLOYMENT_ID", Value: req.GetDeploymentId()},
+			{Name: "LAYER_RAIL_RESOURCE_ID", Value: req.GetResourceId()},
+			{Name: "LAYER_RAIL_RESOURCE_NAME", Value: req.GetResourceName()},
+			{Name: "LAYER_RAIL_RESOURCE_KIND", Value: resourceKindName(req)},
 			{Name: "UNKEY_ENVIRONMENT_SLUG", Value: req.GetEnvironmentSlug()},
 			{Name: "UNKEY_REGION", Value: req.GetRegion()},
 			{Name: "UNKEY_GIT_COMMIT_SHA", Value: req.GetGitCommitSha()},
@@ -191,10 +199,6 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 			{Name: "KUBERNETES_PORT_443_TCP_PORT", Value: ""},
 			{Name: "KUBERNETES_PORT_443_TCP_ADDR", Value: ""},
 		},
-		Ports: []corev1.ContainerPort{{
-			ContainerPort: req.GetPort(),
-			Name:          "deployment",
-		}},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:              resource.MustParse(fmt.Sprintf("%dm", max(req.GetCpuMillicores()/resourceRequestFraction, 1))),
@@ -207,6 +211,13 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 				corev1.ResourceEphemeralStorage: resource.MustParse(fmt.Sprintf("%dMi", defaultContainerEphemeralStorageMib)),
 			},
 		},
+	}
+	if req.GetPort() > 0 {
+		container.Env = append(container.Env, corev1.EnvVar{Name: "PORT", Value: strconv.Itoa(int(req.GetPort()))})
+		container.Ports = []corev1.ContainerPort{{
+			ContainerPort: req.GetPort(),
+			Name:          "deployment",
+		}}
 	}
 
 	var volumes []corev1.Volume
@@ -242,7 +253,7 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 	}
 
 	// Configure healthcheck probes if provided
-	if hc := unmarshalHealthcheck(req.GetHealthcheck()); hc != nil {
+	if hc := unmarshalHealthcheck(req.GetHealthcheck()); hc != nil && req.GetPort() > 0 {
 		handler := buildProbeHandler(hc, req.GetPort())
 		probe := &corev1.Probe{
 			ProbeHandler:        handler,
@@ -266,12 +277,21 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 			},
 		}
 	}
+	if req.GetRuntime() != "" {
+		container.Env = append(container.Env, corev1.EnvVar{Name: "LAYER_RAIL_RUNTIME", Value: req.GetRuntime()})
+	}
+	if req.GetHandler() != "" {
+		container.Env = append(container.Env, corev1.EnvVar{Name: "LAYER_RAIL_HANDLER", Value: req.GetHandler()})
+	}
+	if req.GetSchedule() != "" {
+		container.Env = append(container.Env, corev1.EnvVar{Name: "LAYER_RAIL_CRON_SCHEDULE", Value: req.GetSchedule()})
+	}
 
 	// Mount the deployment secret as env vars if present
 	if hasSecrets {
 		container.EnvFrom = []corev1.EnvFromSource{{
 			SecretRef: &corev1.SecretEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: deploymentResourcePrefix(req.GetDeploymentId())},
+				LocalObjectReference: corev1.LocalObjectReference{Name: workloadResourcePrefix(req)},
 			},
 		}}
 	}
@@ -283,7 +303,7 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 		EnableServiceLinks:           ptr.P(false),
 		NodeSelector:                 map[string]string{nodeClassLabelKey: CustomerNodeClass},
 		Tolerations:                  []corev1.Toleration{untrustedToleration},
-		TopologySpreadConstraints:    deploymentTopologySpread(req.GetDeploymentId()),
+		TopologySpreadConstraints:    deploymentTopologySpread(workloadSelector(req)),
 		Containers:                   []corev1.Container{container},
 	}
 
@@ -292,7 +312,7 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 	}
 
 	if hasSecrets {
-		podSpec.ServiceAccountName = deploymentResourcePrefix(req.GetDeploymentId())
+		podSpec.ServiceAccountName = workloadResourcePrefix(req)
 	}
 
 	podSpec.ImagePullSecrets = c.imagePullSecrets
@@ -309,7 +329,7 @@ func (c *Controller) buildReplicaSet(req *ctrlv1.ApplyDeployment, hasSecrets boo
 		},
 		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels.New().DeploymentID(req.GetDeploymentId()),
+				MatchLabels: workloadSelector(req),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -501,7 +521,7 @@ func buildPodDisruptionBudget(req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MaxUnavailable: &maxUnavailable,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels.New().DeploymentID(req.GetDeploymentId()),
+				MatchLabels: workloadSelector(req),
 			},
 		},
 	}
@@ -515,8 +535,52 @@ func deploymentLabels(req *ctrlv1.ApplyDeployment) labels.Labels {
 		AppID(req.GetAppId()).
 		EnvironmentID(req.GetEnvironmentId()).
 		DeploymentID(req.GetDeploymentId()).
+		ResourceID(req.GetResourceId()).
+		ResourceKind(resourceKindName(req)).
 		ManagedByKrane().
 		ComponentDeployment()
+}
+
+func workloadSelector(req *ctrlv1.ApplyDeployment) labels.Labels {
+	return labels.New().
+		DeploymentID(req.GetDeploymentId()).
+		ResourceID(req.GetResourceId())
+}
+
+func workloadSelectorValue(req *ctrlv1.ApplyDeployment) string {
+	if req.GetResourceId() != "" {
+		return req.GetResourceId()
+	}
+	return req.GetDeploymentId()
+}
+
+func workloadResourcePrefix(req *ctrlv1.ApplyDeployment) string {
+	return deploymentResourcePrefix(workloadSelectorValue(req))
+}
+
+func resourceKindName(req *ctrlv1.ApplyDeployment) string {
+	switch req.GetResourceKind() {
+	case ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_SERVICE:
+		return "service"
+	case ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_FUNCTION:
+		return "function"
+	case ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_WORKER:
+		return "worker"
+	case ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_CRON:
+		return "cron"
+	default:
+		return "deployment"
+	}
+}
+
+func servesHTTP(req *ctrlv1.ApplyDeployment) bool {
+	switch req.GetResourceKind() {
+	case ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_WORKER,
+		ctrlv1.DeploymentResourceKind_DEPLOYMENT_RESOURCE_KIND_CRON:
+		return false
+	default:
+		return true
+	}
 }
 
 func replicaSetOwnerRef(rs *appsv1.ReplicaSet) metav1.OwnerReference {

@@ -94,6 +94,47 @@ func TestDeploymentResourcesPersistIndependentWorkloads(t *testing.T) {
 	require.True(t, web.Public)
 	require.JSONEq(t, `["node","server.js"]`, string(web.Command))
 
+	regionID := uid.New("region")
+	require.NoError(t, Query.InsertDeploymentTopology(ctx, database.RW(), InsertDeploymentTopologyParams{
+		WorkspaceID:            workspaceID,
+		DeploymentID:           deploymentID,
+		ResourceID:             webID,
+		RegionID:               regionID,
+		AutoscalingReplicasMin: 2,
+		AutoscalingReplicasMax: 4,
+		DesiredStatus:          DeploymentTopologyDesiredStatusRunning,
+		CreatedAt:              now,
+	}))
+	require.NoError(t, Query.UpsertInstance(ctx, database.RW(), UpsertInstanceParams{
+		ID:            uid.New(uid.InstancePrefix),
+		DeploymentID:  deploymentID,
+		ResourceID:    webID,
+		WorkspaceID:   workspaceID,
+		ProjectID:     projectID,
+		AppID:         appID,
+		RegionID:      regionID,
+		K8sName:       "web-pod-1",
+		Address:       "10-0-0-1.ns.pod.cluster.local:3000",
+		CpuMillicores: 250,
+		MemoryMib:     256,
+		Status:        InstancesStatusRunning,
+	}))
+
+	topologyRequirements, err := Query.FindDeploymentTopologyMinReplicas(ctx, database.RO(), deploymentID)
+	require.NoError(t, err)
+	require.Equal(t, []FindDeploymentTopologyMinReplicasRow{{
+		ResourceID:             webID,
+		RegionID:               regionID,
+		AutoscalingReplicasMin: 2,
+	}}, topologyRequirements)
+	resourceInstances, err := Query.FindInstancesByResourceAndRegion(ctx, database.RO(), FindInstancesByResourceAndRegionParams{
+		ResourceID: webID,
+		RegionID:   regionID,
+	})
+	require.NoError(t, err)
+	require.Len(t, resourceInstances, 1)
+	require.Equal(t, webID, resourceInstances[0].ResourceID)
+
 	require.NoError(t, Query.DeleteDeploymentResourcesByEnvironment(ctx, database.RW(), environmentID))
 	require.Equal(t, 0, countRows(t, ctx, database, "SELECT COUNT(*) FROM deployment_resources WHERE deployment_id = ?", deploymentID))
 }

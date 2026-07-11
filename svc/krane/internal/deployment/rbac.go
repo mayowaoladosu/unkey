@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	"github.com/unkeyed/unkey/pkg/ptr"
-	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,20 +17,20 @@ import (
 // The SA is referenced by podSpec.ServiceAccountName so the pod doesn't use the
 // namespace default. automountServiceAccountToken is false — no API access is needed.
 // The SA is owned by the ReplicaSet via ownerRef for automatic GC.
-func (c *Controller) ensureDeploymentServiceAccount(ctx context.Context, namespace, deploymentID string) error {
-	saName := deploymentResourcePrefix(deploymentID)
-	commonLabels := labels.New().DeploymentID(deploymentID).ManagedByKrane()
+func (c *Controller) ensureDeploymentServiceAccount(ctx context.Context, req *ctrlv1.ApplyDeployment) error {
+	saName := workloadResourcePrefix(req)
+	commonLabels := deploymentLabels(req)
 
 	sa := &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
-			Namespace: namespace,
+			Namespace: req.GetK8SNamespace(),
 			Labels:    commonLabels,
 		},
 		AutomountServiceAccountToken: ptr.P(false),
 	}
-	if err := serverSideApplyResource(ctx, c.clientSet.CoreV1().RESTClient(), "serviceaccounts", namespace, saName, sa); err != nil {
+	if err := serverSideApplyResource(ctx, c.clientSet.CoreV1().RESTClient(), "serviceaccounts", req.GetK8SNamespace(), saName, sa); err != nil {
 		return fmt.Errorf("failed to apply service account: %w", err)
 	}
 

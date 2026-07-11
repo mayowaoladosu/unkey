@@ -24,6 +24,12 @@ import (
 // is deleted.
 func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.ApplyDeployment, rs *appsv1.ReplicaSet) error {
 	policyName := fmt.Sprintf("%s-frontline-ingress", req.GetK8SName())
+	endpointLabels := map[string]interface{}{
+		labels.LabelKeyDeploymentID: req.GetDeploymentId(),
+	}
+	if req.GetResourceId() != "" {
+		endpointLabels[labels.LabelKeyResourceID] = req.GetResourceId()
+	}
 
 	policy := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -38,6 +44,8 @@ func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.
 					AppID(req.GetAppId()).
 					EnvironmentID(req.GetEnvironmentId()).
 					DeploymentID(req.GetDeploymentId()).
+					ResourceID(req.GetResourceId()).
+					ResourceKind(resourceKindName(req)).
 					ManagedByKrane().
 					ComponentCiliumNetworkPolicy(),
 				"ownerReferences": []interface{}{
@@ -53,9 +61,7 @@ func (c *Controller) ensureCiliumNetworkPolicy(ctx context.Context, req *ctrlv1.
 			},
 			"spec": map[string]interface{}{
 				"endpointSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
-						labels.LabelKeyDeploymentID: req.GetDeploymentId(),
-					},
+					"matchLabels": endpointLabels,
 				},
 				"ingress": []interface{}{
 					map[string]interface{}{

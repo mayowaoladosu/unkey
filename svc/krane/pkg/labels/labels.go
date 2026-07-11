@@ -13,6 +13,8 @@ const (
 	LabelKeyAppID           = "unkey.com/app.id"
 	LabelKeyEnvironmentID   = "unkey.com/environment.id"
 	LabelKeyDeploymentID    = "unkey.com/deployment.id"
+	LabelKeyResourceID      = "unkey.com/resource.id"
+	LabelKeyResourceKind    = "unkey.com/resource.kind"
 	LabelKeyBuildID         = "unkey.com/build.id"
 	LabelKeyNetworkPolicyID = "unkey.com/networkpolicy.id"
 	LabelKeyPlatform        = "unkey.com/platform"
@@ -74,6 +76,22 @@ func (l Labels) AppID(id string) Labels {
 // Labels instance for method chaining.
 func (l Labels) DeploymentID(id string) Labels {
 	l[LabelKeyDeploymentID] = id
+	return l
+}
+
+// ResourceID adds the independently materialized deployment-resource ID.
+func (l Labels) ResourceID(id string) Labels {
+	if id != "" {
+		l[LabelKeyResourceID] = id
+	}
+	return l
+}
+
+// ResourceKind adds the execution model for a deployment resource.
+func (l Labels) ResourceKind(kind string) Labels {
+	if kind != "" {
+		l[LabelKeyResourceKind] = kind
+	}
 	return l
 }
 
@@ -179,6 +197,12 @@ func (l Labels) ToString() string {
 // whether the label was found.
 func GetDeploymentID(l map[string]string) (string, bool) {
 	v, ok := l[LabelKeyDeploymentID]
+	return v, ok
+}
+
+// GetResourceID extracts a deployment-resource ID from Kubernetes labels.
+func GetResourceID(l map[string]string) (string, bool) {
+	v, ok := l[LabelKeyResourceID]
 	return v, ok
 }
 

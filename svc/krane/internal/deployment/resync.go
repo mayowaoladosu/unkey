@@ -102,16 +102,19 @@ func (c *Controller) reconcileDesiredState(ctx context.Context, replicaSet *apps
 		logger.Error("unable to get deployment ID", "replicaSet", replicaSet.Name)
 		return
 	}
+	resourceID, _ := labels.GetResourceID(replicaSet.Labels)
 
 	res, err := c.cluster.GetDesiredDeploymentState(ctx, &ctrlv1.GetDesiredDeploymentStateRequest{
 		Region:       c.regionKey(),
 		DeploymentId: deploymentID,
+		ResourceId:   resourceID,
 	})
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			if err := c.DeleteDeployment(ctx, &ctrlv1.DeleteDeployment{
 				K8SNamespace: replicaSet.GetNamespace(),
 				K8SName:      replicaSet.GetName(),
+				ResourceId:   resourceID,
 			}); err != nil {
 				logger.Error("unable to delete deployment", "error", err.Error(), "deployment_id", deploymentID)
 			}

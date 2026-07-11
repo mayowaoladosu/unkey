@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
+	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ func (c *Controller) buildDeploymentStatus(ctx context.Context, replicaset *apps
 	}
 
 	// Read the port from the ReplicaSet's container spec
-	containerPort := int32(8080)
+	containerPort := int32(0)
 	if containers := replicaset.Spec.Template.Spec.Containers; len(containers) > 0 {
 		if ports := containers[0].Ports; len(ports) > 0 {
 			containerPort = ports[0].ContainerPort
@@ -45,8 +46,9 @@ func (c *Controller) buildDeploymentStatus(ctx context.Context, replicaset *apps
 	}
 
 	update := &ctrlv1.ReportDeploymentStatusRequest_Update{
-		K8SName:   replicaset.Name,
-		Instances: make([]*ctrlv1.ReportDeploymentStatusRequest_Update_Instance, 0, len(pods.Items)),
+		K8SName:    replicaset.Name,
+		ResourceId: replicaset.Labels[labels.LabelKeyResourceID],
+		Instances:  make([]*ctrlv1.ReportDeploymentStatusRequest_Update_Instance, 0, len(pods.Items)),
 	}
 
 	for _, pod := range pods.Items {
@@ -54,9 +56,13 @@ func (c *Controller) buildDeploymentStatus(ctx context.Context, replicaset *apps
 			continue
 		}
 
+		address := fmt.Sprintf("%s.%s.pod.cluster.local", strings.ReplaceAll(pod.Status.PodIP, ".", "-"), pod.Namespace)
+		if containerPort > 0 {
+			address = fmt.Sprintf("%s:%d", address, containerPort)
+		}
 		instance := &ctrlv1.ReportDeploymentStatusRequest_Update_Instance{
 			K8SName:       pod.GetName(),
-			Address:       fmt.Sprintf("%s.%s.pod.cluster.local:%d", strings.ReplaceAll(pod.Status.PodIP, ".", "-"), pod.Namespace, containerPort),
+			Address:       address,
 			CpuMillicores: 0,
 			MemoryMib:     0,
 			Status:        ctrlv1.ReportDeploymentStatusRequest_Update_Instance_STATUS_UNSPECIFIED,

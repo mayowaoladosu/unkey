@@ -10,12 +10,15 @@ import (
 )
 
 const findDeploymentTopologyMinReplicas = `-- name: FindDeploymentTopologyMinReplicas :many
-SELECT region_id, autoscaling_replicas_min
-FROM deployment_topology
-WHERE deployment_id = ?
+SELECT dt.resource_id, dt.region_id, dt.autoscaling_replicas_min
+FROM deployment_topology dt
+LEFT JOIN deployment_resources dr ON dt.resource_id = dr.id
+WHERE dt.deployment_id = ?
+	AND (dt.resource_id = '' OR dr.kind != 'cron')
 `
 
 type FindDeploymentTopologyMinReplicasRow struct {
+	ResourceID             string `db:"resource_id"`
 	RegionID               string `db:"region_id"`
 	AutoscalingReplicasMin uint32 `db:"autoscaling_replicas_min"`
 }
@@ -24,9 +27,11 @@ type FindDeploymentTopologyMinReplicasRow struct {
 // Used by deploy and wake workflows to compute whether enough regions are
 // healthy before a deployment is considered ready.
 //
-//	SELECT region_id, autoscaling_replicas_min
-//	FROM deployment_topology
-//	WHERE deployment_id = ?
+//	SELECT dt.resource_id, dt.region_id, dt.autoscaling_replicas_min
+//	FROM deployment_topology dt
+//	LEFT JOIN deployment_resources dr ON dt.resource_id = dr.id
+//	WHERE dt.deployment_id = ?
+//		AND (dt.resource_id = '' OR dr.kind != 'cron')
 func (q *Queries) FindDeploymentTopologyMinReplicas(ctx context.Context, db DBTX, deploymentID string) ([]FindDeploymentTopologyMinReplicasRow, error) {
 	rows, err := db.QueryContext(ctx, findDeploymentTopologyMinReplicas, deploymentID)
 	if err != nil {
@@ -36,7 +41,7 @@ func (q *Queries) FindDeploymentTopologyMinReplicas(ctx context.Context, db DBTX
 	var items []FindDeploymentTopologyMinReplicasRow
 	for rows.Next() {
 		var i FindDeploymentTopologyMinReplicasRow
-		if err := rows.Scan(&i.RegionID, &i.AutoscalingReplicasMin); err != nil {
+		if err := rows.Scan(&i.ResourceID, &i.RegionID, &i.AutoscalingReplicasMin); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

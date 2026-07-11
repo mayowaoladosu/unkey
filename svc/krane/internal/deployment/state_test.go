@@ -8,6 +8,7 @@ import (
 	ctrlv1 "github.com/unkeyed/unkey/gen/proto/ctrl/v1"
 	"github.com/unkeyed/unkey/pkg/cache"
 	"github.com/unkeyed/unkey/svc/krane/internal/testutil"
+	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +23,7 @@ func TestBuildDeploymentStatus_PodStatuses(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rs-1",
 			Namespace: "ns-1",
+			Labels:    map[string]string{labels.LabelKeyResourceID: "resource_web"},
 		},
 		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: rsSelector},
@@ -85,6 +87,7 @@ func TestBuildDeploymentStatus_PodStatuses(t *testing.T) {
 
 	status, err := ctrl.buildDeploymentStatus(context.Background(), rs)
 	require.NoError(t, err)
+	require.Equal(t, "resource_web", status.GetUpdate().GetResourceId())
 
 	byName := map[string]ctrlv1.ReportDeploymentStatusRequest_Update_Instance_Status{}
 	for _, inst := range status.GetUpdate().GetInstances() {

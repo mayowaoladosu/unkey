@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"connectrpc.com/connect"
@@ -74,22 +75,47 @@ func (s *Service) ReportDeploymentStatus(ctx context.Context, req *connect.Reque
 	var updatedDeployment *db.Deployment
 
 	err = db.TxRetry(ctx, s.db.RW(), func(txCtx context.Context, tx db.DBTX) error {
+		queries := db.NewQueries(tx)
 		switch msg := req.Msg.GetChange().(type) {
 		case *ctrlv1.ReportDeploymentStatusRequest_Update_:
 			{
-				deployment, err := db.NewQueries(tx).FindDeploymentByK8sName(ctx, msg.Update.GetK8SName())
-				if err != nil {
-					return err
+				resourceID := msg.Update.GetResourceId()
+				var deployment db.Deployment
+				var staleInstances []db.Instance
+				if resourceID != "" {
+					resource, err := queries.FindDeploymentResourceByID(txCtx, resourceID)
+					if err != nil {
+						return err
+					}
+					if !resource.K8sName.Valid || resource.K8sName.String != msg.Update.GetK8SName() {
+						return fmt.Errorf("deployment resource %s does not own kubernetes workload %s", resourceID, msg.Update.GetK8SName())
+					}
+					deployment, err = queries.FindDeploymentById(txCtx, resource.DeploymentID)
+					if err != nil {
+						return err
+					}
+					staleInstances, err = queries.FindInstancesByResourceAndRegion(txCtx, db.FindInstancesByResourceAndRegionParams{
+						ResourceID: resourceID,
+						RegionID:   region.ID,
+					})
+					if err != nil {
+						return err
+					}
+				} else {
+					var err error
+					deployment, err = queries.FindDeploymentByK8sName(txCtx, msg.Update.GetK8SName())
+					if err != nil {
+						return err
+					}
+					staleInstances, err = queries.FindInstancesByDeploymentIdAndRegionID(txCtx, db.FindInstancesByDeploymentIdAndRegionIDParams{
+						DeploymentID: deployment.ID,
+						RegionID:     region.ID,
+					})
+					if err != nil {
+						return err
+					}
 				}
 				updatedDeployment = &deployment
-
-				staleInstances, err := db.NewQueries(tx).FindInstancesByDeploymentIdAndRegionID(ctx, db.FindInstancesByDeploymentIdAndRegionIDParams{
-					DeploymentID: deployment.ID,
-					RegionID:     region.ID,
-				})
-				if err != nil {
-					return err
-				}
 
 				wantInstanceNames := map[string]*ctrlv1.ReportDeploymentStatusRequest_Update_Instance{}
 				for _, instance := range msg.Update.GetInstances() {
@@ -98,7 +124,7 @@ func (s *Service) ReportDeploymentStatus(ctx context.Context, req *connect.Reque
 
 				for _, staleInstance := range staleInstances {
 					if _, ok := wantInstanceNames[staleInstance.K8sName]; !ok {
-						err = db.NewQueries(tx).DeleteInstance(ctx, db.DeleteInstanceParams{
+						err = queries.DeleteInstance(txCtx, db.DeleteInstanceParams{
 							K8sName:  staleInstance.K8sName,
 							RegionID: region.ID,
 						})
@@ -109,9 +135,10 @@ func (s *Service) ReportDeploymentStatus(ctx context.Context, req *connect.Reque
 				}
 
 				for _, instance := range msg.Update.GetInstances() {
-					err = db.NewQueries(tx).UpsertInstance(ctx, db.UpsertInstanceParams{
+					err = queries.UpsertInstance(txCtx, db.UpsertInstanceParams{
 						ID:            uid.New(uid.InstancePrefix),
 						DeploymentID:  deployment.ID,
+						ResourceID:    resourceID,
 						WorkspaceID:   deployment.WorkspaceID,
 						ProjectID:     deployment.ProjectID,
 						AppID:         deployment.AppID,
@@ -130,20 +157,42 @@ func (s *Service) ReportDeploymentStatus(ctx context.Context, req *connect.Reque
 
 		case *ctrlv1.ReportDeploymentStatusRequest_Delete_:
 			{
-				deployment, err := db.NewQueries(tx).FindDeploymentByK8sName(ctx, msg.Delete.GetK8SName())
-				if err != nil {
-					return err
-				}
-
-				if err := db.NewQueries(tx).DeleteDeploymentInstances(ctx, db.DeleteDeploymentInstancesParams{
-					DeploymentID: deployment.ID,
-					RegionID:     region.ID,
-				}); err != nil {
-					return err
+				resourceID := msg.Delete.GetResourceId()
+				var deployment db.Deployment
+				if resourceID != "" {
+					resource, err := queries.FindDeploymentResourceByID(txCtx, resourceID)
+					if err != nil {
+						return err
+					}
+					if !resource.K8sName.Valid || resource.K8sName.String != msg.Delete.GetK8SName() {
+						return fmt.Errorf("deployment resource %s does not own kubernetes workload %s", resourceID, msg.Delete.GetK8SName())
+					}
+					deployment, err = queries.FindDeploymentById(txCtx, resource.DeploymentID)
+					if err != nil {
+						return err
+					}
+					if err := queries.DeleteResourceInstances(txCtx, db.DeleteResourceInstancesParams{
+						ResourceID: resourceID,
+						RegionID:   region.ID,
+					}); err != nil {
+						return err
+					}
+				} else {
+					var err error
+					deployment, err = queries.FindDeploymentByK8sName(txCtx, msg.Delete.GetK8SName())
+					if err != nil {
+						return err
+					}
+					if err := queries.DeleteDeploymentInstances(txCtx, db.DeleteDeploymentInstancesParams{
+						DeploymentID: deployment.ID,
+						RegionID:     region.ID,
+					}); err != nil {
+						return err
+					}
 				}
 
 				if deployment.DesiredState == db.DeploymentsDesiredStateStopped {
-					if err := db.NewQueries(tx).StopDeploymentIfNoInstances(ctx, db.StopDeploymentIfNoInstancesParams{
+					if err := queries.StopDeploymentIfNoInstances(txCtx, db.StopDeploymentIfNoInstancesParams{
 						ID:        deployment.ID,
 						UpdatedAt: sql.NullInt64{Valid: true, Int64: time.Now().UnixMilli()},
 					}); err != nil {
@@ -207,13 +256,17 @@ func (s *Service) maybeNotifyInstancesReady(ctx context.Context, deployment db.D
 		return
 	}
 
-	regionMinReplicas := make(map[string]uint32, len(minReplicaRows))
+	regionResourceMinReplicas := make(map[string]map[string]uint32)
 	for _, row := range minReplicaRows {
-		regionMinReplicas[row.RegionID] = row.AutoscalingReplicasMin
+		if regionResourceMinReplicas[row.RegionID] == nil {
+			regionResourceMinReplicas[row.RegionID] = make(map[string]uint32)
+		}
+		regionResourceMinReplicas[row.RegionID][row.ResourceID] = row.AutoscalingReplicasMin
 	}
 	// Mirrors waitForDeployments: requires (numRegions - 1) healthy regions,
-	// minimum 1. Tolerates one full regional outage.
-	requiredRegions := max(len(regionMinReplicas)-1, 1)
+	// minimum 1. A region is healthy only when every continuously-running
+	// resource has reached its own minimum replica count there.
+	requiredRegions := max(len(regionResourceMinReplicas)-1, 1)
 
 	instances, err := s.db.FindInstancesByDeploymentId(ctx, deployment.ID)
 	if err != nil {
@@ -225,16 +278,26 @@ func (s *Service) maybeNotifyInstancesReady(ctx context.Context, deployment db.D
 		return
 	}
 
-	runningPerRegion := make(map[string]uint32)
+	runningPerRegionResource := make(map[string]map[string]uint32)
 	for _, instance := range instances {
 		if instance.Status == db.InstancesStatusRunning {
-			runningPerRegion[instance.RegionID]++
+			if runningPerRegionResource[instance.RegionID] == nil {
+				runningPerRegionResource[instance.RegionID] = make(map[string]uint32)
+			}
+			runningPerRegionResource[instance.RegionID][instance.ResourceID]++
 		}
 	}
 
 	healthyRegions := 0
-	for regionID, minReplicas := range regionMinReplicas {
-		if runningPerRegion[regionID] >= minReplicas {
+	for regionID, resourceRequirements := range regionResourceMinReplicas {
+		regionHealthy := true
+		for resourceID, minReplicas := range resourceRequirements {
+			if runningPerRegionResource[regionID][resourceID] < minReplicas {
+				regionHealthy = false
+				break
+			}
+		}
+		if regionHealthy {
 			healthyRegions++
 		}
 	}
@@ -246,8 +309,8 @@ func (s *Service) maybeNotifyInstancesReady(ctx context.Context, deployment db.D
 			"outcome", "threshold_not_met",
 			"healthy_regions", healthyRegions,
 			"required_regions", requiredRegions,
-			"region_min_replicas", regionMinReplicas,
-			"running_per_region", runningPerRegion,
+			"region_resource_min_replicas", regionResourceMinReplicas,
+			"running_per_region_resource", runningPerRegionResource,
 		)
 		return
 	}

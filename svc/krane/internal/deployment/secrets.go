@@ -10,7 +10,6 @@ import (
 	vaultv1 "github.com/unkeyed/unkey/gen/proto/vault/v1"
 	"github.com/unkeyed/unkey/pkg/logger"
 	"github.com/unkeyed/unkey/pkg/validation"
-	"github.com/unkeyed/unkey/svc/krane/pkg/labels"
 	"google.golang.org/protobuf/encoding/protojson"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,8 +58,8 @@ func deploymentResourcePrefix(deploymentID string) string {
 // ensureDeploymentSecret creates or updates a K8s Secret containing the plaintext
 // environment variables for the deployment. Uses server-side apply for idempotency.
 // The ownerRef ties the secret's lifecycle to the ReplicaSet for automatic GC.
-func (c *Controller) ensureDeploymentSecret(ctx context.Context, namespace, deploymentID string, envVars map[string]string) error {
-	secretName := deploymentResourcePrefix(deploymentID)
+func (c *Controller) ensureDeploymentSecret(ctx context.Context, req *ctrlv1.ApplyDeployment, envVars map[string]string) error {
+	secretName := workloadResourcePrefix(req)
 
 	// Use Data (not StringData) so SSA tracks ownership of data.* keys directly.
 	// StringData is converted to data.* server-side, but SSA tracks stringData.*
@@ -80,8 +79,8 @@ func (c *Controller) ensureDeploymentSecret(ctx context.Context, namespace, depl
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: namespace,
-			Labels:    labels.New().DeploymentID(deploymentID).ManagedByKrane(),
+			Namespace: req.GetK8SNamespace(),
+			Labels:    deploymentLabels(req),
 		},
 		Data: data,
 		Type: corev1.SecretTypeOpaque,
@@ -92,7 +91,7 @@ func (c *Controller) ensureDeploymentSecret(ctx context.Context, namespace, depl
 		return fmt.Errorf("failed to marshal secret: %w", err)
 	}
 
-	_, err = c.clientSet.CoreV1().Secrets(namespace).Patch(
+	_, err = c.clientSet.CoreV1().Secrets(req.GetK8SNamespace()).Patch(
 		ctx, secretName, types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: fieldManagerKrane},
 	)

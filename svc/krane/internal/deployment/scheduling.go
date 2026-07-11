@@ -32,9 +32,9 @@ const (
 // pods in the namespace, so single-replica deployments still contribute to
 // namespace-level AZ spread and Karpenter gets pressure to provision untrusted
 // nodes outside the currently crowded AZ.
-func deploymentTopologySpread(deploymentID string) []corev1.TopologySpreadConstraint {
+func deploymentTopologySpread(selector labels.Labels) []corev1.TopologySpreadConstraint {
 	deploymentSelector := &metav1.LabelSelector{
-		MatchLabels: labels.New().DeploymentID(deploymentID),
+		MatchLabels: selector,
 	}
 	fleetSelector := &metav1.LabelSelector{
 		MatchLabels: labels.New().
