@@ -486,6 +486,8 @@ local_resource(
   export AUTH_PROVIDER="${AUTH_PROVIDER:-local}"
   export SENTRY_DISABLED="${SENTRY_DISABLED:-true}"
   export NEXT_PUBLIC_SENTRY_DISABLED="${NEXT_PUBLIC_SENTRY_DISABLED:-true}"
+  export NEXT_TELEMETRY_DISABLED="${NEXT_TELEMETRY_DISABLED:-1}"
+  export NEXT_ALLOWED_DEV_ORIGINS="${NEXT_ALLOWED_DEV_ORIGINS:-$(hostname -I | awk '{print $1}')}"
       export GITHUB_APP_ID="$UNKEY_GITHUB_APP_ID"
       set +a
       cd ../web && pnpm --filter=@unkey/dashboard dev

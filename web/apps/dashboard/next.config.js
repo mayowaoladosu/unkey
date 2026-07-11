@@ -5,8 +5,13 @@ const securityHeaders = [
     value: "SAMEORIGIN",
   },
 ];
+const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const nextConfig = {
   output: "standalone",
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   reactStrictMode: true,
   typedRoutes: true,
   pageExtensions: ["tsx", "mdx", "ts", "js"],
