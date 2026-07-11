@@ -495,7 +495,7 @@ func TestRatelimitMany_LongWindowLowTrafficRefreshesStaleReplica(t *testing.T) {
 	ctx := context.Background()
 	start := time.Now().UTC().Truncate(time.Hour).Add(5 * time.Minute)
 	clk := clock.NewTestClock(start)
-	origin := counter.NewMemory()
+	origin := newTrackingCounter()
 
 	staleReplica, err := New(Config{
 		Clock: clk, Counter: origin, DB: newTestDB(t), Region: "us-east-1",
@@ -541,6 +541,14 @@ func TestRatelimitMany_LongWindowLowTrafficRefreshesStaleReplica(t *testing.T) {
 	require.Equal(t, int64(10), resp[0].Remaining)
 	require.True(t, resp[1].Success)
 	require.Equal(t, int64(20), resp[1].Remaining)
+
+	// RatelimitMany replays successful reads asynchronously, even with cost=0.
+	// Wait for both initial replays to finish while the clock is still at start;
+	// otherwise a delayed replay can run after the 10-minute jump below and mark
+	// stale local state fresh at the new time.
+	require.Eventually(t, func() bool {
+		return origin.incrCalls.Load() >= int64(len(readReqs))
+	}, 3*time.Second, 10*time.Millisecond, "initial zero-cost replays did not complete")
 
 	// Other replicas process traffic and successfully replay it to the shared
 	// origin. We write the origin directly so the test is deterministic and not

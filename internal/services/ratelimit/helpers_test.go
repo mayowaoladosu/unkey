@@ -51,8 +51,9 @@ func (c *trackingCounter) Get(ctx context.Context, key string) (int64, error) {
 }
 
 func (c *trackingCounter) Increment(ctx context.Context, key string, value int64, ttl ...time.Duration) (int64, error) {
+	count, err := c.Counter.Increment(ctx, key, value, ttl...)
 	c.incrCalls.Add(1)
-	return c.Counter.Increment(ctx, key, value, ttl...)
+	return count, err
 }
 
 // failingCounter wraps an underlying counter.Counter but returns a fixed error
