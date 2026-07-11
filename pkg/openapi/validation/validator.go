@@ -1,7 +1,9 @@
 package validation
 
 import (
+	"mime"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/pb33f/libopenapi"
@@ -29,7 +31,9 @@ type Result struct {
 
 // Validator validates HTTP requests against an OpenAPI specification.
 type Validator struct {
-	validator validator.Validator
+	validator        validator.Validator
+	warmMu           sync.Mutex
+	warmedOperations sync.Map
 }
 
 // NewFromBytes creates a Validator from a raw OpenAPI spec.
@@ -65,6 +69,30 @@ func NewFromBytes(spec []byte) (*Validator, error) {
 // Returns nil when the request is valid; returns a *Result describing
 // the failures otherwise.
 func (v *Validator) Validate(r *http.Request) *Result {
+	operationKey := requestOperationKey(r)
+	if _, warmed := v.warmedOperations.Load(operationKey); warmed {
+		return v.validate(r)
+	}
+
+	// libopenapi compiles request schemas lazily. Its schema cache is safe for
+	// concurrent reads, but concurrent misses can render the same schema at the
+	// same time and produce a false circular-reference error. Only first use of
+	// an operation/media type is serialized; steady-state validation remains
+	// fully concurrent after the compiled schema has entered the shared cache.
+	v.warmMu.Lock()
+	defer v.warmMu.Unlock()
+	if _, warmed := v.warmedOperations.Load(operationKey); warmed {
+		return v.validate(r)
+	}
+
+	result := v.validate(r)
+	if !isSchemaRenderFailure(result) {
+		v.warmedOperations.Store(operationKey, struct{}{})
+	}
+	return result
+}
+
+func (v *Validator) validate(r *http.Request) *Result {
 	valid, errors := v.validator.ValidateHttpRequestSync(r)
 
 	if !valid {
@@ -102,6 +130,33 @@ func (v *Validator) Validate(r *http.Request) *Result {
 	}
 
 	return result
+}
+
+func requestOperationKey(r *http.Request) string {
+	route := r.Pattern
+	if route == "" {
+		route = r.URL.Path
+	}
+	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil {
+		contentType = strings.TrimSpace(r.Header.Get("Content-Type"))
+	}
+	return r.Method + "\x00" + route + "\x00" + strings.ToLower(contentType)
+}
+
+func isSchemaRenderFailure(result *Result) bool {
+	if result == nil {
+		return false
+	}
+	if strings.Contains(result.Detail, "failed schema rendering") {
+		return true
+	}
+	for _, validationErr := range result.Errors {
+		if strings.Contains(validationErr.Message, "schema render failure") {
+			return true
+		}
+	}
+	return false
 }
 
 // filterIgnoredSecurityErrors drops OpenAPI security-scheme errors that our
