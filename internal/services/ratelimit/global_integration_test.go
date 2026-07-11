@@ -207,12 +207,12 @@ func TestGlobalPush_EmitsRowsInUniqueKeyOrder(t *testing.T) {
 	}
 }
 
-// TestGlobalPush_ConcurrentFlushesDoNotDeadlock reproduces the production lock
-// graph with real MySQL transactions. The DB wrapper splits each collected bulk
-// batch into per-row upserts inside one transaction, which turns inconsistent
-// row order into the same 1213 deadlock MySQL can produce under overlapping
-// ON DUPLICATE KEY UPDATE flushes.
-func TestGlobalPush_ConcurrentFlushesDoNotDeadlock(t *testing.T) {
+// TestGlobalPush_ConcurrentFlushesRecoverFromDeadlocks reproduces the production
+// lock graph with real MySQL transactions. Even consistently ordered upserts can
+// choose a deadlock victim because INSERT ... ON DUPLICATE KEY UPDATE also takes
+// auto-increment and secondary-index locks. A flush must retry that transient
+// failure and publish every row before returning.
+func TestGlobalPush_ConcurrentFlushesRecoverFromDeadlocks(t *testing.T) {
 	t.Parallel()
 
 	env := newIntegrationTestEnv(t)
@@ -256,11 +256,15 @@ func TestGlobalPush_ConcurrentFlushesDoNotDeadlock(t *testing.T) {
 		wg.Wait()
 		cancel()
 
-		require.Empty(t, db.deadlockErrors(),
-			"attempt %d reproduced a MySQL deadlock during concurrent global counter flushes; row orders: %v",
-			attempt,
-			db.rowOrders(),
-		)
+		for serviceIndex, svc := range []*service{svcA, svcB} {
+			for _, key := range keys {
+				entry, ok := svc.counters.Load(key)
+				require.True(t, ok)
+				require.Equal(t, int64(10), entry.(*counterEntry).lastPushed.Load(),
+					"attempt %d service %d did not finish publishing after transient errors; deadlocks: %v; row orders: %v",
+					attempt, serviceIndex, db.deadlockErrors(), db.rowOrders())
+			}
+		}
 	}
 }
 
