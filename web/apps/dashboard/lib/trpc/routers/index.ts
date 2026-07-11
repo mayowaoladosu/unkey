@@ -122,6 +122,7 @@ import { getRegionRps } from "./deploy/network/get-region-rps";
 import { createProject } from "./deploy/project/create";
 import { creationContext } from "./deploy/project/creation-context";
 import { deleteProject } from "./deploy/project/delete";
+import { initializeProject } from "./deploy/project/initialize";
 import { listProjects } from "./deploy/project/list";
 import { updateProject } from "./deploy/project/update";
 import { createSharedSecret } from "./share/create";
@@ -463,6 +464,7 @@ export const router = t.router({
     project: t.router({
       list: listProjects,
       create: createProject,
+      initialize: initializeProject,
       update: updateProject,
       delete: deleteProject,
       creationContext,
