@@ -2,6 +2,12 @@ load('ext://namespace', 'namespace_create')
 load('ext://secret', 'secret_create_generic')
 load('ext://helm_remote', 'helm_remote')
 
+# Docker-backed Minikube, ClickHouse, and several concurrent root-context file
+# watchers can exhaust WSL memory. Backend builds share cache, so serialize them.
+update_settings(max_parallel_updates=1)
+
+BACKEND_IMAGE_IGNORES = ['web']
+
 config.define_string('topolvm_backing_size')
 cfg = config.parse()
 # Sparse loopback file size. Sparse means this is a ceiling, not a reservation —
@@ -277,7 +283,7 @@ k8s_yaml('k8s/manifests/redis.yaml')
 k8s_resource('redis', port_forwards='6379:6379', resource_deps=[], labels=['database'])
 
 # MySQL service
-docker_build('unkey/mysql:local', '..', dockerfile='./Dockerfile.mysql')
+docker_build('unkey/mysql:local', '..', dockerfile='./Dockerfile.mysql', ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/mysql.yaml')
 k8s_resource('mysql', port_forwards='3306:3306', resource_deps=[], labels=['database'])
 
@@ -289,7 +295,7 @@ local_resource(
 )
 
 # ClickHouse service
-docker_build('unkey/clickhouse:local', '..', dockerfile='./Dockerfile.clickhouse')
+docker_build('unkey/clickhouse:local', '..', dockerfile='./Dockerfile.clickhouse', ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/clickhouse.yaml')
 k8s_resource('clickhouse', port_forwards=['8123:8123','9000:9000'], resource_deps=[], labels=['database'])
 
@@ -330,7 +336,7 @@ k8s_resource('restate-idle-preview-deployments', resource_deps=['restate', 'ctrl
 # Service images use Tilt's native Docker builder and the shared dev Dockerfile.
 
 # ─── Vault ─────────────────────────────────────────────────────────────────
-docker_build('unkey/vault:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/vault'})
+docker_build('unkey/vault:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/vault'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/vault.yaml')
 k8s_resource(
   'vault',
@@ -342,7 +348,7 @@ k8s_resource(
 )
 
 # ─── API ───────────────────────────────────────────────────────────────────
-docker_build('unkey/api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/api'})
+docker_build('unkey/api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/api'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/api.yaml')
 k8s_resource(
   'api',
@@ -354,7 +360,7 @@ k8s_resource(
 )
 
 # ─── Ctrl API ──────────────────────────────────────────────────────────────
-docker_build('unkey/control-api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-api'})
+docker_build('unkey/control-api:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-api'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/ctrl-api.yaml')
 ctrl_api_deps = ['mysql', 'clickhouse', 'restate', 'vault', 'github-credentials', 'domain-connect-credentials', 'stripe-credentials']
 if has_depot_credentials:
@@ -369,7 +375,7 @@ k8s_resource(
 )
 
 # ─── Ctrl Worker (Restate workflow handlers) ───────────────────────────────
-docker_build('unkey/control-worker:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-worker'})
+docker_build('unkey/control-worker:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/control-worker'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/ctrl-worker.yaml')
 ctrl_worker_deps = ['mysql', 'clickhouse', 'restate', 'webhooks-config', 'github-credentials', 'stripe-credentials']
 if has_depot_credentials:
@@ -396,7 +402,7 @@ if has_github_credentials:
     )
 
 # ─── Frontline (TLS termination proxy for *.unkey.local) ───────────────────
-docker_build('unkey/frontline:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/frontline'})
+docker_build('unkey/frontline:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/frontline'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/frontline.yaml')
 k8s_resource(
   'frontline',
@@ -409,7 +415,7 @@ k8s_resource(
 )
 
 # ─── Krane ─────────────────────────────────────────────────────────────────
-docker_build('unkey/krane:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/krane'})
+docker_build('unkey/krane:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/krane'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/krane.yaml')
 k8s_resource(
   'krane',
@@ -421,7 +427,7 @@ k8s_resource(
 )
 
 # ─── Heimdall (resource metering agent) ────────────────────────────────────
-docker_build('unkey/heimdall:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/heimdall'})
+docker_build('unkey/heimdall:dev', '..', dockerfile='Dockerfile', build_args={'PACKAGE': './build/heimdall'}, ignore=BACKEND_IMAGE_IGNORES)
 k8s_yaml('k8s/manifests/heimdall.yaml')
 k8s_resource(
   'heimdall',
