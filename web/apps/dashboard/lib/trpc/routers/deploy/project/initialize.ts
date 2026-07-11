@@ -142,7 +142,10 @@ export const initializeProject = workspaceProcedure
         workspaceId,
         projectId: createdProjectId,
         name: input.name,
-        slug: input.slug,
+        // The first app is an implementation detail of the source-first
+        // project flow. `default` keeps generated hostnames concise; explicit
+        // additional apps still use user-selected slugs.
+        slug: "default",
         actor,
       });
 
